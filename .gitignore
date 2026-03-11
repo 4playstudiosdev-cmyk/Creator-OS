@@ -1,0 +1,19 @@
+# Secrets — NEVER commit
+backend/.env
+frontend/.env
+.env
+backend/client_secret.json
+
+# Python cache
+backend/venv/
+**/__pycache__/
+**/*.pyc
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# OS
+.DS_Store
+Thumbs.db
