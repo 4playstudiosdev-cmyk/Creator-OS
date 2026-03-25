@@ -1,41 +1,61 @@
-import { Twitter, Linkedin } from 'lucide-react'
-
 const platforms = [
   {
     id: 'Twitter',
     name: 'Twitter',
-    icon: Twitter,
-    activeColor: 'text-blue-500 bg-blue-50 border-blue-500',
-    inactiveColor: 'text-gray-400 bg-white border-gray-200 hover:border-blue-200',
-    connectedKey: 'twitter'
+    icon: '𝕏',
+    activeStyle: { background: 'rgba(29,155,240,0.15)', border: '1px solid rgba(29,155,240,0.5)', color: '#60b8f5' },
+    connectedKey: 'twitter',
   },
   {
     id: 'LinkedIn',
     name: 'LinkedIn',
-    icon: Linkedin,
-    activeColor: 'text-blue-700 bg-blue-50 border-blue-700',
-    inactiveColor: 'text-gray-400 bg-white border-gray-200 hover:border-blue-200',
-    connectedKey: 'linkedin'
+    icon: 'in',
+    activeStyle: { background: 'rgba(0,119,181,0.15)', border: '1px solid rgba(0,119,181,0.5)', color: '#5ba8d4' },
+    connectedKey: 'linkedin',
+  },
+  {
+    id: 'YouTube',
+    name: 'YouTube',
+    icon: '▶',
+    activeStyle: { background: 'rgba(255,0,0,0.12)', border: '1px solid rgba(255,0,0,0.4)', color: '#f87171' },
+    connectedKey: 'youtube',
   },
 ]
 
 export default function PlatformSelector({ selectedPlatforms, togglePlatform, connectedPlatforms = [] }) {
   return (
-    <div className="flex gap-2 flex-wrap mb-4">
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
       {platforms.map((p) => {
-        const Icon = p.icon
         const isSelected = selectedPlatforms.includes(p.id)
         const isConnected = connectedPlatforms.includes(p.connectedKey)
         return (
           <button
             key={p.id}
             onClick={() => togglePlatform(p.id)}
-            className={"flex items-center gap-2 px-4 py-2 border rounded-full text-sm font-medium transition-all " +
-              (isSelected ? p.activeColor : p.inactiveColor)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '7px 14px',
+              borderRadius: 100,
+              fontSize: 12, fontWeight: 600,
+              fontFamily: "'Syne', sans-serif",
+              cursor: 'pointer',
+              transition: 'all 0.18s',
+              ...(isSelected
+                ? p.activeStyle
+                : {
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: '#6b7280',
+                  }),
+            }}
           >
-            <Icon size={16} />
+            <span style={{ fontSize: 13 }}>{p.icon}</span>
             {p.name}
-            <span className={"w-2 h-2 rounded-full " + (isConnected ? 'bg-green-400' : 'bg-gray-300')}></span>
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: isConnected ? '#10b981' : '#374151',
+              flexShrink: 0,
+            }} />
           </button>
         )
       })}

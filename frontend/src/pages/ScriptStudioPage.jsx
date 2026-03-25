@@ -3,362 +3,284 @@ import { supabase } from '../lib/supabaseClient'
 
 const PLATFORMS = ['YouTube', 'Instagram Reels', 'TikTok', 'YouTube Shorts']
 const DURATIONS = ['30 seconds', '60 seconds', '3 minutes', '5 minutes', '10 minutes', '15+ minutes']
-const TONES = ['Educational', 'Entertaining', 'Motivational', 'Storytelling', 'Promotional']
+const TONES     = ['Educational', 'Entertaining', 'Motivational', 'Storytelling', 'Promotional']
+
+const PLATFORM_COLORS = {
+  YouTube:          { bg: 'rgba(255,0,0,0.15)',     border: 'rgba(255,80,80,0.4)',   color: '#f87171' },
+  'Instagram Reels':{ bg: 'rgba(217,70,239,0.15)',  border: 'rgba(217,70,239,0.4)', color: '#e879f9' },
+  TikTok:           { bg: 'rgba(255,255,255,0.1)',   border: 'rgba(255,255,255,0.3)',color: '#f0f0f5' },
+  'YouTube Shorts': { bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.35)', color: '#fca5a5' },
+}
+const DURATION_COLOR = { bg: 'rgba(59,130,246,0.15)', border: 'rgba(59,130,246,0.4)', color: '#93c5fd' }
+const TONE_COLOR     = { bg: 'rgba(139,92,246,0.15)', border: 'rgba(139,92,246,0.4)', color: '#c4b5fd' }
+
+const chip = (active, colors) => ({
+  padding: '6px 14px', borderRadius: 100, fontSize: 12, fontWeight: 600,
+  cursor: 'pointer', border: 'none', fontFamily: "'Syne',sans-serif",
+  transition: 'all 0.18s',
+  ...(active
+    ? { background: colors.bg, border: `1px solid ${colors.border}`, color: colors.color }
+    : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#4b5563' }),
+})
+
+const sectionCard = (accent) => ({
+  background: 'rgba(255,255,255,0.02)', border: `1px solid ${accent || 'rgba(255,255,255,0.07)'}`,
+  borderRadius: 14, padding: '14px 16px', marginBottom: 10,
+})
 
 export default function ScriptStudioPage() {
-  const [topic, setTopic] = useState('')
-  const [platform, setPlatform] = useState('YouTube')
-  const [duration, setDuration] = useState('5 minutes')
-  const [tone, setTone] = useState('Educational')
+  const [topic, setTopic]               = useState('')
+  const [platform, setPlatform]         = useState('YouTube')
+  const [duration, setDuration]         = useState('5 minutes')
+  const [tone, setTone]                 = useState('Educational')
   const [targetAudience, setTargetAudience] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [script, setScript] = useState(null)
-  const [copied, setCopied] = useState(false)
-  const [error, setError] = useState('')
+  const [loading, setLoading]           = useState(false)
+  const [script, setScript]             = useState(null)
+  const [copied, setCopied]             = useState(false)
+  const [error, setError]               = useState('')
 
-  // YouTube Studio se topic auto-fill
   useEffect(() => {
-    const savedTopic = localStorage.getItem('script_topic')
-    if (savedTopic) {
-      setTopic(savedTopic)
-      localStorage.removeItem('script_topic')
-    }
+    const saved = localStorage.getItem('script_topic')
+    if (saved) { setTopic(saved); localStorage.removeItem('script_topic') }
   }, [])
 
   const handleGenerate = async () => {
     if (!topic.trim()) return
-    setLoading(true)
-    setScript(null)
-    setError('')
-
+    setLoading(true); setScript(null); setError('')
     try {
-      const { data: sessionData } = await supabase.auth.getSession()
-      if (!sessionData.session) throw new Error('Login zaroori hai')
-      const accessToken = sessionData.session.access_token
-
-      const response = await fetch('http://localhost:8000/api/ai/script', {
+      const { data: sd } = await supabase.auth.getSession()
+      if (!sd.session) throw new Error('Login zaroori hai')
+      const res = await fetch('http://localhost:8000/api/ai/script', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
-        },
-        body: JSON.stringify({
-          topic: topic.trim(),
-          platform,
-          duration,
-          tone,
-          target_audience: targetAudience || 'General audience'
-        })
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sd.session.access_token}` },
+        body: JSON.stringify({ topic: topic.trim(), platform, duration, tone, target_audience: targetAudience || 'General audience' }),
       })
-
-      const rawText = await response.text()
-      console.log('[Script] Raw:', rawText.slice(0, 200))
-
-      if (!rawText || rawText.trim() === '') {
-        throw new Error('Empty response from backend')
-      }
-
-      const parsed = JSON.parse(rawText)
-
-      if (parsed.detail) {
-        throw new Error(parsed.detail)
-      }
-
+      const raw = await res.text()
+      const parsed = JSON.parse(raw)
+      if (parsed.detail) throw new Error(parsed.detail)
       setScript(parsed)
-
-    } catch (e) {
-      console.error('[Script Error]', e)
-      setError('Error: ' + e.message)
-    } finally {
-      setLoading(false)
-    }
+    } catch (e) { setError('Error: ' + e.message) }
+    finally { setLoading(false) }
   }
 
   const getFullScript = () => {
     if (!script) return ''
-    return `TITLE: ${script.title}
-
-🪝 HOOK:
-${script.hook}
-
-📢 INTRO:
-${script.intro}
-
-${script.sections?.map((s, i) => `SECTION ${i + 1}: ${s.heading}
-${s.script}
-[Duration: ${s.duration}]`).join('\n\n')}
-
-🎯 CTA:
-${script.cta}
-
-👋 OUTRO:
-${script.outro}
-
-#️⃣ HASHTAGS:
-${script.hashtags?.map(h => '#' + h).join(' ')}
-
-🖼️ THUMBNAIL IDEA:
-${script.thumbnail_idea}
-
-🎬 B-ROLL SUGGESTIONS:
-${script.b_roll_suggestions?.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
+    return `TITLE: ${script.title}\n\n🪝 HOOK:\n${script.hook}\n\n📢 INTRO:\n${script.intro}\n\n${script.sections?.map((s,i)=>`SECTION ${i+1}: ${s.heading}\n${s.script}\n[Duration: ${s.duration}]`).join('\n\n')}\n\n🎯 CTA:\n${script.cta}\n\n👋 OUTRO:\n${script.outro}\n\n#️⃣ HASHTAGS:\n${script.hashtags?.map(h=>'#'+h).join(' ')}\n\n🖼️ THUMBNAIL IDEA:\n${script.thumbnail_idea}\n\n🎬 B-ROLL:\n${script.b_roll_suggestions?.map((s,i)=>`${i+1}. ${s}`).join('\n')}`
   }
 
-  const handleCopyAll = () => {
-    navigator.clipboard.writeText(getFullScript())
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
+  const handleCopyAll = () => { navigator.clipboard.writeText(getFullScript()); setCopied(true); setTimeout(()=>setCopied(false),2000) }
   const handleDownload = () => {
-    const blob = new Blob([getFullScript()], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url
-    a.download = `script-${topic.slice(0, 20).replace(/\s+/g, '-')}.txt`
+    a.href = URL.createObjectURL(new Blob([getFullScript()],{type:'text/plain'}))
+    a.download = `script-${topic.slice(0,20).replace(/\s+/g,'-')}.txt`
     a.click()
-    URL.revokeObjectURL(url)
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <header>
-        <h1 className="text-3xl font-bold text-gray-900">Script Studio 🎬</h1>
-        <p className="text-gray-500 mt-1">AI se apni video ka complete script banao</p>
-      </header>
+    <div style={{ fontFamily: "'DM Sans',sans-serif", color: '#f0f0f5' }}>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg) } }
+        @keyframes fadeUp { from { opacity:0;transform:translateY(14px) } to { opacity:1;transform:translateY(0) } }
+        .script-input {
+          width: 100%; background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+          padding: 11px 14px; color: #f0f0f5; font-family: 'DM Sans',sans-serif;
+          font-size: 13px; outline: none; transition: border-color 0.2s;
+          box-sizing: border-box; color-scheme: dark;
+        }
+        .script-input:focus { border-color: rgba(99,102,241,0.5); }
+        .script-input::placeholder { color: #374151; }
+        .fade-card { animation: fadeUp 0.35s ease both; }
+        .action-btn { cursor: pointer; border: none; transition: all 0.18s; font-family: 'Syne',sans-serif; font-weight: 700; }
+        .action-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+      `}</style>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left — Input */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-4">
-          <h3 className="font-semibold text-gray-800">📝 Script Details</h3>
+      {/* Header */}
+      <div style={{ marginBottom: 24 }}>
+        <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 6, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600 }}>AI Tools</p>
+        <h1 style={{ fontSize: 28, fontWeight: 800, fontFamily: 'Syne', letterSpacing: '-0.5px', marginBottom: 4 }}>Script Studio 🎬</h1>
+        <p style={{ fontSize: 13, color: '#6b7280' }}>AI se apni video ka complete script banao</p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 20, alignItems: 'start' }}>
+
+        {/* ── Left: Input Panel ── */}
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: 22 }}>
+          <p style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 14, marginBottom: 18, color: '#f0f0f5' }}>📝 Script Details</p>
 
           {/* Topic */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Video Topic *
-            </label>
-            <input
-              type="text"
-              value={topic}
-              onChange={e => setTopic(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleGenerate()}
-              placeholder="e.g. How to grow on YouTube in 2025"
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-400"
-            />
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Video Topic *</label>
+            <input className="script-input" type="text" value={topic} onChange={e=>setTopic(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleGenerate()} placeholder="e.g. How to grow on YouTube in 2025" />
           </div>
 
           {/* Target Audience */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Target Audience
-            </label>
-            <input
-              type="text"
-              value={targetAudience}
-              onChange={e => setTargetAudience(e.target.value)}
-              placeholder="e.g. Beginner content creators, age 18-30"
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-400"
-            />
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Target Audience</label>
+            <input className="script-input" type="text" value={targetAudience} onChange={e=>setTargetAudience(e.target.value)} placeholder="e.g. Beginner creators, age 18-30" />
           </div>
 
           {/* Platform */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
-            <div className="flex flex-wrap gap-2">
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Platform</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {PLATFORMS.map(p => (
-                <button
-                  key={p}
-                  onClick={() => setPlatform(p)}
-                  className={"px-3 py-1.5 rounded-full text-xs font-medium border transition-all " +
-                    (platform === p
-                      ? 'bg-red-500 text-white border-red-500'
-                      : 'bg-white text-gray-500 border-gray-200 hover:border-red-300')}
-                >
-                  {p}
-                </button>
+                <button key={p} onClick={()=>setPlatform(p)} style={chip(platform===p, PLATFORM_COLORS[p]||PLATFORM_COLORS.YouTube)}>{p}</button>
               ))}
             </div>
           </div>
 
           {/* Duration */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Video Duration</label>
-            <div className="flex flex-wrap gap-2">
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Video Duration</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {DURATIONS.map(d => (
-                <button
-                  key={d}
-                  onClick={() => setDuration(d)}
-                  className={"px-3 py-1.5 rounded-full text-xs font-medium border transition-all " +
-                    (duration === d
-                      ? 'bg-blue-500 text-white border-blue-500'
-                      : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300')}
-                >
-                  {d}
-                </button>
+                <button key={d} onClick={()=>setDuration(d)} style={chip(duration===d, DURATION_COLOR)}>{d}</button>
               ))}
             </div>
           </div>
 
           {/* Tone */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Tone</label>
-            <div className="flex flex-wrap gap-2">
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Tone</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {TONES.map(t => (
-                <button
-                  key={t}
-                  onClick={() => setTone(t)}
-                  className={"px-3 py-1.5 rounded-full text-xs font-medium border transition-all " +
-                    (tone === t
-                      ? 'bg-purple-500 text-white border-purple-500'
-                      : 'bg-white text-gray-500 border-gray-200 hover:border-purple-300')}
-                >
-                  {t}
-                </button>
+                <button key={t} onClick={()=>setTone(t)} style={chip(tone===t, TONE_COLOR)}>{t}</button>
               ))}
             </div>
           </div>
 
           {/* Error */}
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
-              <p className="text-sm text-red-600">{error}</p>
+            <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#fca5a5', marginBottom: 14 }}>
+              {error}
             </div>
           )}
 
-          {/* Generate Button */}
+          {/* Generate Btn */}
           <button
             onClick={handleGenerate}
             disabled={!topic.trim() || loading}
-            className="w-full py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-xl font-semibold transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+            style={{
+              width: '100%', padding: '13px', borderRadius: 12, border: 'none',
+              background: 'linear-gradient(135deg, #ef4444, #ec4899)',
+              color: '#fff', fontFamily: 'Syne', fontWeight: 700, fontSize: 14,
+              cursor: topic.trim() && !loading ? 'pointer' : 'not-allowed',
+              opacity: topic.trim() && !loading ? 1 : 0.45,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              transition: 'all 0.2s',
+            }}
           >
-            {loading ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Generating Script...
-              </>
-            ) : (
-              '🎬 Generate Script'
-            )}
+            {loading
+              ? <><div style={{ width:16,height:16,border:'2px solid rgba(255,255,255,0.3)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin 0.8s linear infinite' }}/> Generating Script...</>
+              : '🎬 Generate Script'}
           </button>
         </div>
 
-        {/* Right — Script Output */}
-        <div className="space-y-3">
+        {/* ── Right: Output ── */}
+        <div>
+          {/* Empty state */}
           {!script && !loading && (
-            <div className="bg-white rounded-xl border-2 border-dashed border-gray-200 p-10 flex flex-col items-center justify-center text-center min-h-64">
-              <div className="text-5xl mb-3">🎭</div>
-              <p className="text-gray-400 font-medium">Script yahan dikhega</p>
-              <p className="text-gray-300 text-sm mt-1">Topic enter karo aur Generate click karo</p>
+            <div style={{ background:'rgba(255,255,255,0.02)', border:'2px dashed rgba(255,255,255,0.06)', borderRadius:20, padding:'60px 24px', textAlign:'center' }}>
+              <div style={{ fontSize:48, marginBottom:12 }}>🎭</div>
+              <p style={{ fontFamily:'Syne', fontWeight:700, fontSize:16, marginBottom:6 }}>Script yahan dikhega</p>
+              <p style={{ fontSize:13, color:'#4b5563' }}>Topic enter karo aur Generate click karo</p>
             </div>
           )}
 
+          {/* Loading */}
           {loading && (
-            <div className="bg-white rounded-xl border border-gray-200 p-10 flex flex-col items-center justify-center text-center min-h-64">
-              <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-              <p className="text-gray-500 font-medium">AI script likh raha hai...</p>
-              <p className="text-gray-400 text-sm mt-1">Thoda wait karo ⏳</p>
+            <div style={{ background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:20, padding:'60px 24px', textAlign:'center' }}>
+              <div style={{ width:48,height:48,border:'4px solid rgba(239,68,68,0.2)',borderTopColor:'#ef4444',borderRadius:'50%',animation:'spin 0.8s linear infinite',margin:'0 auto 16px' }} />
+              <p style={{ fontFamily:'Syne', fontWeight:700, fontSize:15 }}>AI script likh raha hai...</p>
+              <p style={{ fontSize:13, color:'#4b5563', marginTop:4 }}>Thoda wait karo ⏳</p>
             </div>
           )}
 
+          {/* Script Output */}
           {script && (
-            <div className="space-y-3">
+            <div className="fade-card">
               {/* Action Buttons */}
-              <div className="flex gap-2">
-                <button
-                  onClick={handleCopyAll}
-                  className="flex-1 py-2.5 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition-colors"
-                >
+              <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+                <button className="action-btn" onClick={handleCopyAll} style={{ flex:1, padding:'10px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'#f0f0f5', fontSize:13 }}>
                   {copied ? '✅ Copied!' : '📋 Copy All'}
                 </button>
-                <button
-                  onClick={handleDownload}
-                  className="flex-1 py-2.5 bg-blue-500 text-white rounded-xl text-sm font-semibold hover:bg-blue-600 transition-colors"
-                >
+                <button className="action-btn" onClick={handleDownload} style={{ flex:1, padding:'10px', borderRadius:10, background:'rgba(59,130,246,0.15)', border:'1px solid rgba(59,130,246,0.35)', color:'#93c5fd', fontSize:13 }}>
                   ⬇️ Download .txt
                 </button>
-                <button
-                  onClick={() => { setScript(null); setTopic(''); setError('') }}
-                  className="px-4 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-colors"
-                >
+                <button className="action-btn" onClick={()=>{setScript(null);setTopic('');setError('')}} style={{ padding:'10px 16px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'#6b7280', fontSize:13 }}>
                   🔄 Reset
                 </button>
               </div>
 
               {/* Title */}
-              <div className="bg-gradient-to-r from-red-50 to-pink-50 rounded-xl border border-red-200 p-4">
-                <p className="text-xs font-semibold text-red-500 mb-1">VIDEO TITLE</p>
-                <p className="font-bold text-gray-800 text-lg">{script.title}</p>
+              <div style={{ ...sectionCard('rgba(239,68,68,0.25)'), background:'rgba(239,68,68,0.07)', marginBottom:10 }}>
+                <p style={{ fontSize:10, fontWeight:700, color:'#f87171', textTransform:'uppercase', letterSpacing:1, marginBottom:6 }}>VIDEO TITLE</p>
+                <p style={{ fontFamily:'Syne', fontWeight:800, fontSize:17, color:'#f0f0f5', lineHeight:1.4 }}>{script.title}</p>
               </div>
 
               {/* Hook */}
-              <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4">
-                <p className="text-xs font-semibold text-yellow-600 mb-1">🪝 HOOK (First 3-5 seconds)</p>
-                <p className="text-sm text-gray-700 leading-relaxed">{script.hook}</p>
+              <div style={{ ...sectionCard('rgba(245,158,11,0.3)'), background:'rgba(245,158,11,0.07)' }}>
+                <p style={{ fontSize:10, fontWeight:700, color:'#fbbf24', textTransform:'uppercase', letterSpacing:1, marginBottom:6 }}>🪝 Hook (First 3-5 seconds)</p>
+                <p style={{ fontSize:13, color:'#d1d5db', lineHeight:1.7 }}>{script.hook}</p>
               </div>
 
               {/* Intro */}
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <p className="text-xs font-semibold text-gray-500 mb-1">📢 INTRO</p>
-                <p className="text-sm text-gray-700 leading-relaxed">{script.intro}</p>
+              <div style={sectionCard()}>
+                <p style={{ fontSize:10, fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:1, marginBottom:6 }}>📢 Intro</p>
+                <p style={{ fontSize:13, color:'#d1d5db', lineHeight:1.7 }}>{script.intro}</p>
               </div>
 
               {/* Sections */}
-              {script.sections?.map((section, i) => (
-                <div key={i} className="bg-white rounded-xl border border-gray-200 p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold text-blue-600">
-                      SECTION {i + 1}: {section.heading}
-                    </p>
-                    <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">
-                      {section.duration}
-                    </span>
+              {script.sections?.map((s, i) => (
+                <div key={i} style={{ ...sectionCard('rgba(59,130,246,0.25)'), background:'rgba(59,130,246,0.05)' }}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                    <p style={{ fontSize:10, fontWeight:700, color:'#93c5fd', textTransform:'uppercase', letterSpacing:1 }}>Section {i+1}: {s.heading}</p>
+                    <span style={{ fontSize:10, background:'rgba(59,130,246,0.15)', border:'1px solid rgba(59,130,246,0.3)', color:'#93c5fd', padding:'2px 8px', borderRadius:100 }}>{s.duration}</span>
                   </div>
-                  <p className="text-sm text-gray-700 leading-relaxed">{section.script}</p>
+                  <p style={{ fontSize:13, color:'#d1d5db', lineHeight:1.7 }}>{s.script}</p>
                 </div>
               ))}
 
               {/* CTA */}
-              <div className="bg-green-50 rounded-xl border border-green-200 p-4">
-                <p className="text-xs font-semibold text-green-600 mb-1">🎯 CALL TO ACTION</p>
-                <p className="text-sm text-gray-700 leading-relaxed">{script.cta}</p>
+              <div style={{ ...sectionCard('rgba(16,185,129,0.3)'), background:'rgba(16,185,129,0.06)' }}>
+                <p style={{ fontSize:10, fontWeight:700, color:'#6ee7b7', textTransform:'uppercase', letterSpacing:1, marginBottom:6 }}>🎯 Call to Action</p>
+                <p style={{ fontSize:13, color:'#d1d5db', lineHeight:1.7 }}>{script.cta}</p>
               </div>
 
               {/* Outro */}
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <p className="text-xs font-semibold text-gray-500 mb-1">👋 OUTRO</p>
-                <p className="text-sm text-gray-700 leading-relaxed">{script.outro}</p>
+              <div style={sectionCard()}>
+                <p style={{ fontSize:10, fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:1, marginBottom:6 }}>👋 Outro</p>
+                <p style={{ fontSize:13, color:'#d1d5db', lineHeight:1.7 }}>{script.outro}</p>
               </div>
 
               {/* Hashtags */}
-              <div className="bg-purple-50 rounded-xl border border-purple-200 p-4">
-                <p className="text-xs font-semibold text-purple-600 mb-2">#️⃣ HASHTAGS</p>
-                <div className="flex flex-wrap gap-2">
-                  {script.hashtags?.map((tag, i) => (
-                    <span key={i} className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
-                      #{tag}
-                    </span>
+              <div style={{ ...sectionCard('rgba(139,92,246,0.3)'), background:'rgba(139,92,246,0.06)' }}>
+                <p style={{ fontSize:10, fontWeight:700, color:'#c4b5fd', textTransform:'uppercase', letterSpacing:1, marginBottom:10 }}>#️⃣ Hashtags</p>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                  {script.hashtags?.map((tag,i) => (
+                    <span key={i} style={{ padding:'4px 10px', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#c4b5fd', borderRadius:100, fontSize:11, fontWeight:600 }}>#{tag}</span>
                   ))}
                 </div>
               </div>
 
               {/* Thumbnail */}
-              <div className="bg-orange-50 rounded-xl border border-orange-200 p-4">
-                <p className="text-xs font-semibold text-orange-600 mb-1">🖼️ THUMBNAIL IDEA</p>
-                <p className="text-sm text-gray-700">{script.thumbnail_idea}</p>
+              <div style={{ ...sectionCard('rgba(249,115,22,0.3)'), background:'rgba(249,115,22,0.06)' }}>
+                <p style={{ fontSize:10, fontWeight:700, color:'#fdba74', textTransform:'uppercase', letterSpacing:1, marginBottom:6 }}>🖼️ Thumbnail Idea</p>
+                <p style={{ fontSize:13, color:'#d1d5db', lineHeight:1.7 }}>{script.thumbnail_idea}</p>
               </div>
 
               {/* B-Roll */}
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <p className="text-xs font-semibold text-gray-500 mb-2">🎬 B-ROLL SUGGESTIONS</p>
-                <ul className="space-y-1">
-                  {script.b_roll_suggestions?.map((s, i) => (
-                    <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
-                      <span className="text-gray-400 font-bold">{i + 1}.</span>
-                      {s}
-                    </li>
+              <div style={sectionCard()}>
+                <p style={{ fontSize:10, fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:1, marginBottom:10 }}>🎬 B-Roll Suggestions</p>
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {script.b_roll_suggestions?.map((s,i) => (
+                    <div key={i} style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
+                      <span style={{ fontSize:11, fontWeight:700, color:'#4b5563', minWidth:18 }}>{i+1}.</span>
+                      <span style={{ fontSize:13, color:'#9ca3af', lineHeight:1.6 }}>{s}</span>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             </div>
           )}

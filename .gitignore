@@ -1,19 +1,28 @@
-# Secrets — NEVER commit
-backend/.env
-frontend/.env
+# Environment files — KABHI PUSH MAT KARNA
 .env
-backend/client_secret.json
+.env.local
+.env.production
+backend/.env
 
-# Python cache
-backend/venv/
-**/__pycache__/
-**/*.pyc
+# Python
+__pycache__/
+*.pyc
+venv/
+backend/dist/
+*.egg-info/
 
 # Node
 node_modules/
-frontend/node_modules/
 frontend/dist/
+frontend/release/
 
-# OS
-.DS_Store
-Thumbs.db
+# Build artifacts
+*.exe
+*.spec
+build/
+dist/
+
+# Editor
+.vscode/
+.idea/
+*.DS_Store

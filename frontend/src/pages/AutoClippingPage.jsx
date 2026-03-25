@@ -1,758 +1,554 @@
 import { useState, useRef, useEffect } from 'react'
 
-// ─── ICONS ──────────────────────────────────────────────────────────────────
-const Ic = {
+const IC = {
   scissors: "M6 9l6 6M6 15l6-6M20 4l-8.5 8.5M20 20l-8.5-8.5",
   upload:   "M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12",
   dl:       "M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3",
   play:     "M5 3l14 9-14 9V3z",
-  fire:     "M12 2c0 0-5 4-5 9a5 5 0 0010 0c0-5-5-9-5-9zM9 17c0 1.66 1.34 3 3 3s3-1.34 3-3",
   clock:    "M12 2a10 10 0 100 20A10 10 0 0012 2zM12 6v6l4 2",
   zap:      "M13 2L3 14h9l-1 8 10-12h-9l1-8z",
   refresh:  "M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15",
   check:    "M20 6L9 17l-5-5",
   close:    "M18 6L6 18M6 6l12 12",
-  info:     "M12 22a10 10 0 100-20 10 10 0 000 20zM12 8h.01M11 12h1v4h1",
   yt:       "M22.54 6.42a2.78 2.78 0 00-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 00-1.95 1.96A29 29 0 001 12a29 29 0 00.46 5.58a2.78 2.78 0 001.95 1.95C5.12 20 12 20 12 20s6.88 0 8.59-.47a2.78 2.78 0 001.95-1.95A29 29 0 0023 12a29 29 0 00-.46-5.58zM9.75 15.02V8.98L15.5 12l-5.75 3.02z",
-  tag:      "M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82zM7 7h.01",
-  edit:     "M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z",
   lock:     "M19 11H5a2 2 0 00-2 2v7a2 2 0 002 2h14a2 2 0 002-2v-7a2 2 0 00-2-2zM7 11V7a5 5 0 0110 0v4",
-  auto:     "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z",
-  manual:   "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8",
+  file:     "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6",
+  tag:      "M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82zM7 7h.01",
 }
 
-const SVG = ({ d, size = 16, cls = '' }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cls}>
+const Ico = ({ d, s = 15, c = 'currentColor' }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c}
+    strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d={d} />
   </svg>
 )
 
 const CLIP_DURATIONS = [
-  { value: 30,  label: '30s',  tag: 'TikTok / Reels' },
-  { value: 60,  label: '60s',  tag: 'YouTube Shorts' },
-  { value: 90,  label: '90s',  tag: 'Long Reel' },
+  { value: 30,  label: '30s', tag: 'TikTok / Reels'  },
+  { value: 60,  label: '60s', tag: 'YouTube Shorts'  },
+  { value: 90,  label: '90s', tag: 'Long-form Reel'  },
 ]
 const MAX_CLIPS_OPTIONS = [3, 5, 7, 10]
-const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
-const scoreColor = (score) => {
-  if (score >= 90) return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30'
-  if (score >= 75) return 'text-amber-400 bg-amber-400/10 border-amber-400/30'
-  return 'text-blue-400 bg-blue-400/10 border-blue-400/30'
+
+const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+
+const scoreStyle = score => {
+  if (score >= 90) return { color: '#6ee7b7', bg: 'rgba(16,185,129,0.1)',  border: 'rgba(16,185,129,0.3)'  }
+  if (score >= 75) return { color: '#fbbf24', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.3)' }
+  return               { color: '#93c5fd', bg: 'rgba(59,130,246,0.1)',  border: 'rgba(59,130,246,0.3)'  }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+const CARD = { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16 }
+const INP  = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 8, padding: '8px 11px', color: '#f0f0f5', fontFamily: "'DM Sans',sans-serif", fontSize: 12, outline: 'none', width: '100%', boxSizing: 'border-box', colorScheme: 'dark' }
+
+const PROCESS_STEPS = [
+  { label: 'Upload & save video',          pct: 15 },
+  { label: 'Extract audio track',          pct: 35 },
+  { label: 'Whisper AI transcription',     pct: 60 },
+  { label: 'Groq AI detect best moments', pct: 80 },
+  { label: 'Cut clips with ffmpeg',        pct: 95 },
+]
+
 export default function AutoClippingPage() {
   const fileInputRef = useRef(null)
 
-  // video
-  const [videoFile,    setVideoFile]    = useState(null)
-  const [videoUrl,     setVideoUrl]     = useState(null)
+  const [videoFile,   setVideoFile]   = useState(null)
+  const [videoUrl,    setVideoUrl]    = useState(null)
+  const [clipDur,     setClipDur]     = useState(60)
+  const [maxClips,    setMaxClips]    = useState(5)
+  const [aspect,      setAspect]      = useState('9:16')
+  const [uploadMode,  setUploadMode]  = useState('manual')
+  const [ytConnected, setYtConnected] = useState(false)
+  const [loading,     setLoading]     = useState(false)
+  const [progress,    setProgress]    = useState(0)
+  const [progressMsg, setProgressMsg] = useState('')
+  const [error,       setError]       = useState('')
+  const [results,     setResults]     = useState(null)
+  const [downloading, setDownloading] = useState({})
+  const [previewing,  setPreviewing]  = useState(null)
+  const [clipMeta,    setClipMeta]    = useState({})
+  const [uploading,   setUploading]   = useState({})
+  const [uploadMsg,   setUploadMsg]   = useState({})
 
-  // settings
-  const [clipDuration, setClipDuration] = useState(60)
-  const [maxClips,     setMaxClips]     = useState(5)
-  const [aspectRatio,  setAspectRatio]  = useState('9:16')
-
-  // upload mode
-  const [uploadMode,   setUploadMode]   = useState('manual') // 'manual' | 'auto'
-  const [ytConnected,  setYtConnected]  = useState(false)
-
-  // processing
-  const [loading,      setLoading]      = useState(false)
-  const [progress,     setProgress]     = useState(0)
-  const [progressMsg,  setProgressMsg]  = useState('')
-  const [error,        setError]        = useState('')
-
-  // results
-  const [results,      setResults]      = useState(null)
-  const [downloading,  setDownloading]  = useState({})
-  const [previewing,   setPreviewing]   = useState(null)
-
-  // per-clip YouTube metadata (editable)
-  const [clipMeta,     setClipMeta]     = useState({}) // { [clip.id]: { title, description, hashtags, privacy } }
-
-  // per-clip upload state
-  const [uploading,    setUploading]    = useState({}) // { [clip.id]: 'idle'|'uploading'|'done'|'error' }
-  const [uploadMsg,    setUploadMsg]    = useState({}) // { [clip.id]: message }
-
-  // Check YouTube connection from backend
   useEffect(() => {
     fetch('http://localhost:8000/api/clipping/youtube-status')
-      .then(r => r.json())
-      .then(d => setYtConnected(d.connected))
-      .catch(() => setYtConnected(false))
+      .then(r => r.json()).then(d => setYtConnected(d.connected)).catch(() => {})
   }, [])
 
-  // ── LOAD VIDEO ──────────────────────────────────────────────────────────
-  const loadFile = (file) => {
+  const loadFile = file => {
     if (!file || !file.type.startsWith('video/')) return
-    setVideoFile(file)
-    setVideoUrl(URL.createObjectURL(file))
-    setResults(null)
-    setError('')
-    setClipMeta({})
-    setUploading({})
-    setUploadMsg({})
+    setVideoFile(file); setVideoUrl(URL.createObjectURL(file))
+    setResults(null); setError(''); setClipMeta({}); setUploading({}); setUploadMsg({})
   }
 
-  // ── GENERATE CLIPS ──────────────────────────────────────────────────────
   const handleGenerate = async () => {
     if (!videoFile) return
-    setLoading(true); setError(''); setResults(null)
-    setProgress(5); setProgressMsg('Uploading video...')
-
+    setLoading(true); setError(''); setResults(null); setProgress(5); setProgressMsg('Uploading video…')
     try {
       const fd = new FormData()
-      fd.append('file', videoFile)
-      fd.append('clip_duration', clipDuration)
-      fd.append('max_clips', maxClips)
-      fd.append('aspect_ratio', aspectRatio)
+      fd.append('file', videoFile); fd.append('clip_duration', clipDur)
+      fd.append('max_clips', maxClips); fd.append('aspect_ratio', aspect)
 
-      const stages = [
-        { pct: 15, msg: 'Extracting audio...' },
-        { pct: 35, msg: 'Transcribing with Whisper AI...' },
-        { pct: 60, msg: 'Groq AI analyzing best moments...' },
-        { pct: 80, msg: 'Cutting clips with ffmpeg...' },
-        { pct: 95, msg: 'Finalizing clips...' },
-      ]
-      let stageIdx = 0
+      let si = 0
       const iv = setInterval(() => {
-        if (stageIdx < stages.length) {
-          setProgress(stages[stageIdx].pct)
-          setProgressMsg(stages[stageIdx].msg)
-          stageIdx++
-        }
-      }, 3500)
+        if (si < PROCESS_STEPS.length) { setProgress(PROCESS_STEPS[si].pct); setProgressMsg(PROCESS_STEPS[si].label); si++ }
+      }, 3200)
 
       const res = await fetch('http://localhost:8000/api/clipping/detect-clips', { method: 'POST', body: fd })
       clearInterval(iv)
-
-      let data
-      try { data = JSON.parse(await res.text()) } catch { throw new Error('Server response parse nahi hua') }
+      let data; try { data = JSON.parse(await res.text()) } catch { throw new Error('Server response could not be parsed') }
       if (!res.ok) throw new Error(data.detail || `Server error ${res.status}`)
 
-      setProgress(100)
-      setProgressMsg(`${data.total_clips} clips ready!`)
-
-      // Pre-fill YouTube metadata from AI suggestions
+      setProgress(100); setProgressMsg(`${data.total_clips} clips ready!`)
       const meta = {}
       data.clips.forEach(clip => {
-        const tags = (clip.reason || '').split(' ')
-          .filter(w => w.length > 4)
-          .slice(0, 5)
-          .map(w => '#' + w.replace(/[^a-zA-Z0-9]/g, ''))
-          .join(' ')
-
+        const tags = (clip.reason || '').split(' ').filter(w => w.length > 4).slice(0, 5).map(w => '#' + w.replace(/[^a-zA-Z0-9]/g, '')).join(' ')
         meta[clip.id] = {
-          title:       clip.title || `Short Clip ${clip.index}`,
+          title: clip.title || `Short Clip ${clip.index}`,
           description: `${clip.hook || ''}\n\n${clip.reason || ''}\n\n#Shorts #YouTubeShorts #Viral`,
-          hashtags:    `#Shorts #YouTubeShorts #Viral #Trending ${tags}`,
-          privacy:     'public',
+          hashtags: `#Shorts #YouTubeShorts #Viral #Trending ${tags}`,
+          privacy: 'public',
         }
       })
       setClipMeta(meta)
-
       setTimeout(() => {
-        setLoading(false)
-        setResults(data)
-        // Auto upload if mode is auto and YT connected
-        if (uploadMode === 'auto' && ytConnected) {
-          setTimeout(() => autoUploadAll(data.clips, meta), 800)
-        }
-      }, 600)
-
-    } catch (e) {
-      console.error('[Clipping]', e)
-      setError(e.message)
-      setLoading(false)
-    }
+        setLoading(false); setResults(data)
+        if (uploadMode === 'auto' && ytConnected) setTimeout(() => autoUploadAll(data.clips, meta), 800)
+      }, 500)
+    } catch (e) { setError(e.message); setLoading(false) }
   }
 
-  // ── DOWNLOAD CLIP ──────────────────────────────────────────────────────
-  const downloadClip = async (clip) => {
-    setDownloading(prev => ({ ...prev, [clip.id]: true }))
+  const downloadClip = async clip => {
+    setDownloading(p => ({ ...p, [clip.id]: true }))
     try {
-      const res  = await fetch(`http://localhost:8000${clip.download_url}`)
+      const res = await fetch(`http://localhost:8000${clip.download_url}`)
       if (!res.ok) throw new Error('Download failed')
       const blob = await res.blob()
-      const url  = URL.createObjectURL(blob)
-      const a    = document.createElement('a')
-      a.href     = url
-      a.download = `${clip.title.replace(/\s+/g, '_')}_${clip.duration}s.mp4`
-      a.click()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url; a.download = `${clip.title.replace(/\s+/g, '_')}_${clip.duration}s.mp4`; a.click()
       URL.revokeObjectURL(url)
-    } catch (e) {
-      alert('Download failed: ' + e.message)
-    } finally {
-      setDownloading(prev => ({ ...prev, [clip.id]: false }))
-    }
+    } catch (e) { alert('Download failed: ' + e.message) }
+    finally { setDownloading(p => ({ ...p, [clip.id]: false })) }
   }
 
   const downloadAll = async () => {
-    for (const clip of results.clips) {
-      await downloadClip(clip)
-      await new Promise(r => setTimeout(r, 800))
-    }
+    for (const clip of results.clips) { await downloadClip(clip); await new Promise(r => setTimeout(r, 800)) }
   }
 
-  // ── YOUTUBE UPLOAD via BACKEND (ClipPulse style — no token needed) ──────
-  const uploadToYouTube = async (clip, meta) => {
-    if (!ytConnected) { alert('YouTube connect karo pehle — "Connect YouTube" button dabao!'); return }
-
-    const m = (typeof meta === 'object' && meta[clip.id]) ? meta[clip.id] : (clipMeta[clip.id] || {})
-
-    setUploading(prev => ({ ...prev, [clip.id]: 'uploading' }))
-    setUploadMsg(prev => ({ ...prev, [clip.id]: '📤 Uploading to YouTube...' }))
-
+  const uploadToYouTube = async (clip, metaOverride) => {
+    if (!ytConnected) { alert('Connect YouTube first in Settings!'); return }
+    const m = (metaOverride && metaOverride[clip.id]) ? metaOverride[clip.id] : (clipMeta[clip.id] || {})
+    setUploading(p => ({ ...p, [clip.id]: 'uploading' }))
+    setUploadMsg(p => ({ ...p, [clip.id]: '📤 Uploading to YouTube…' }))
     try {
       const fd = new FormData()
-      fd.append('filename',    clip.filename)
-      fd.append('title',       m.title       || clip.title || 'Short Clip')
-      fd.append('description', m.description || clip.reason || '')
-      fd.append('hashtags',    m.hashtags    || '#Shorts #YouTubeShorts')
-      fd.append('privacy',     m.privacy     || 'public')
-      // NO access_token — backend uses stored googleapiclient service (ClipPulse pattern)
-
-      const res = await fetch('http://localhost:8000/api/clipping/upload-youtube', {
-        method: 'POST',
-        body: fd,
-      })
-
-      let data
-      try { data = JSON.parse(await res.text()) } catch { throw new Error('Response parse error') }
+      fd.append('filename', clip.filename); fd.append('title', m.title || clip.title || 'Short Clip')
+      fd.append('description', m.description || ''); fd.append('hashtags', m.hashtags || '#Shorts')
+      fd.append('privacy', m.privacy || 'public')
+      const res = await fetch('http://localhost:8000/api/clipping/upload-youtube', { method: 'POST', body: fd })
+      let data; try { data = JSON.parse(await res.text()) } catch { throw new Error('Response parse error') }
       if (!res.ok) throw new Error(data.detail || `Upload failed ${res.status}`)
-
-      setUploading(prev => ({ ...prev, [clip.id]: 'done' }))
-      setUploadMsg(prev => ({
-        ...prev,
-        [clip.id]: data.video_url ? `✅ ${data.video_url}` : '✅ Uploaded to YouTube Shorts!'
-      }))
-
+      setUploading(p => ({ ...p, [clip.id]: 'done' }))
+      setUploadMsg(p => ({ ...p, [clip.id]: data.video_url ? `✅ ${data.video_url}` : '✅ Uploaded to YouTube Shorts!' }))
     } catch (e) {
-      console.error('[YT Upload]', e)
-      setUploading(prev => ({ ...prev, [clip.id]: 'error' }))
-      setUploadMsg(prev => ({ ...prev, [clip.id]: '❌ ' + e.message }))
+      setUploading(p => ({ ...p, [clip.id]: 'error' }))
+      setUploadMsg(p => ({ ...p, [clip.id]: '❌ ' + e.message }))
     }
   }
 
-  // YouTube connect is done from Settings page — single connect point
-
-  // ── AUTO UPLOAD ALL ─────────────────────────────────────────────────────
   const autoUploadAll = async (clips, meta) => {
-    for (const clip of clips) {
-      await uploadToYouTube(clip, meta)
-      await new Promise(r => setTimeout(r, 1000))
-    }
+    for (const clip of clips) { await uploadToYouTube(clip, meta); await new Promise(r => setTimeout(r, 1000)) }
   }
 
-  // ── META UPDATE HELPER ──────────────────────────────────────────────────
-  const updateMeta = (clipId, key, value) => {
-    setClipMeta(prev => ({ ...prev, [clipId]: { ...prev[clipId], [key]: value } }))
-  }
+  const updateMeta = (id, key, val) => setClipMeta(p => ({ ...p, [id]: { ...p[id], [key]: val } }))
 
-  // ═══════════════════════════════════════════════════════════════════════
-  return (
-    <div className="min-h-screen bg-gray-950 text-white">
+  // ─── UPLOAD SCREEN ────────────────────────────────────────────────────────
+  if (!videoUrl && !loading) return (
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'DM Sans',sans-serif", color: '#f0f0f5', padding: '36px' }}>
+      <style>{`.ac-drop:hover{border-color:rgba(99,102,241,0.55)!important;background:rgba(99,102,241,0.04)!important;}`}</style>
 
-      {/* HEADER */}
-      <div className="border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm sticky top-0 z-20">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20">
-            <SVG d={Ic.scissors} size={15} cls="text-white" />
-          </div>
-          <div>
-            <span className="text-white font-bold text-sm">Auto Clipping</span>
-            <span className="text-gray-500 text-xs ml-2">AI-powered short clips</span>
-          </div>
-          <div className="flex-1" />
-          {/* YT status — connect from Settings */}
-          {ytConnected ? (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border bg-red-500/10 border-red-500/30 text-red-400">
-              <SVG d={Ic.yt} size={12} />YouTube Connected
-            </div>
-          ) : (
-            <a href="/settings#social"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border bg-gray-800 border-red-500/40 text-red-400 hover:bg-red-500/10 transition-all animate-pulse">
-              <SVG d={Ic.yt} size={12} />Connect YouTube →Settings
-            </a>
-          )}
-          {results && (
-            <button onClick={() => { setResults(null); setVideoFile(null); setVideoUrl(null) }}
-              className="flex items-center gap-2 px-3 py-1.5 border border-gray-700 hover:border-gray-500 text-gray-400 hover:text-white rounded-lg text-xs font-medium transition-all">
-              <SVG d={Ic.refresh} size={13} />
-              New Video
-            </button>
-          )}
+      {/* Page header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 48 }}>
+        <div style={{ width: 38, height: 38, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(99,102,241,0.3)' }}>
+          <Ico d={IC.scissors} s={18} c="#fff" />
         </div>
+        <div>
+          <h1 style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 22, color: '#f0f0f5', lineHeight: 1 }}>Auto Clipping</h1>
+          <p style={{ color: '#4b5563', fontSize: 12, marginTop: 2 }}>AI finds the best moments · Generates short clips · Auto-upload to YouTube</p>
+        </div>
+        <div style={{ flex: 1 }} />
+        {ytConnected
+          ? <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 14px', borderRadius: 100, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#6ee7b7', fontSize: 12, fontWeight: 700 }}><Ico d={IC.yt} s={13} c="#6ee7b7" />YouTube Connected</div>
+          : <a href="/settings" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 14px', borderRadius: 100, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}><Ico d={IC.yt} s={13} c="#f87171" />Connect YouTube → Settings</a>}
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-8">
-
-        {/* ── UPLOAD ZONE ── */}
-        {!videoUrl && (
-          <div className="max-w-2xl mx-auto">
-            <div className="text-center mb-10">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500/10 border border-orange-500/20 rounded-full text-orange-400 text-xs font-bold mb-6">
-                <SVG d={Ic.zap} size={12} />AI-POWERED
-              </div>
-              <h1 className="text-4xl font-black mb-3 leading-tight">
-                Long Video →{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">Viral Clips</span>
-              </h1>
-              <p className="text-gray-400 text-lg">Upload karo, AI best moments dhundega, ready-to-post shorts milenge</p>
+      {/* Upload zone */}
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div style={{ width: '100%', maxWidth: 680 }}>
+          <div className="ac-drop"
+            onDrop={e => { e.preventDefault(); loadFile(e.dataTransfer.files[0]) }}
+            onDragOver={e => e.preventDefault()}
+            onClick={() => fileInputRef.current?.click()}
+            style={{ border: '2px dashed rgba(255,255,255,0.1)', borderRadius: 24, padding: '80px 48px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, cursor: 'pointer', transition: 'all .25s', background: 'rgba(255,255,255,0.01)' }}>
+            <div style={{ width: 80, height: 80, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Ico d={IC.upload} s={36} c="#6366f1" />
             </div>
-            <div onDrop={e => { e.preventDefault(); loadFile(e.dataTransfer.files[0]) }}
-              onDragOver={e => e.preventDefault()}
-              onClick={() => fileInputRef.current?.click()}
-              className="group cursor-pointer border-2 border-dashed border-gray-700 hover:border-orange-500 rounded-3xl p-14 flex flex-col items-center gap-5 transition-all duration-300 hover:bg-orange-500/5">
-              <div className="w-20 h-20 bg-gray-800 group-hover:bg-orange-500/20 rounded-2xl flex items-center justify-center transition-all">
-                <SVG d={Ic.upload} size={32} cls="text-gray-500 group-hover:text-orange-400 transition-colors" />
-              </div>
-              <div className="text-center">
-                <p className="text-white font-bold text-lg mb-1">Drop your long video here</p>
-                <p className="text-gray-500 text-sm">MP4, MOV, AVI — podcast, interview, vlog, tutorial</p>
-              </div>
-              <input ref={fileInputRef} type="file" accept="video/*" onChange={e => loadFile(e.target.files[0])} className="hidden" />
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 24, color: '#f0f0f5', marginBottom: 8 }}>Drop your long video here</p>
+              <p style={{ color: '#4b5563', fontSize: 14 }}>MP4, MOV, AVI — podcast, interview, vlog, tutorial</p>
             </div>
-          </div>
-        )}
-
-        {/* ── SETTINGS ── */}
-        {videoUrl && !results && !loading && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-            {/* Preview */}
-            <div className="space-y-4">
-              <h2 className="text-white font-bold text-lg flex items-center gap-2">
-                <SVG d={Ic.play} size={16} cls="text-orange-400" />Video Preview
-              </h2>
-              <div className="bg-black rounded-2xl overflow-hidden border border-gray-800 shadow-2xl">
-                <video src={videoUrl} controls className="w-full" style={{ maxHeight: 300 }} />
-              </div>
-              <div className="flex items-center gap-2 p-3 bg-gray-900 rounded-xl border border-gray-800">
-                <SVG d={Ic.info} size={14} cls="text-gray-500 flex-shrink-0" />
-                <span className="text-white text-xs font-medium truncate">{videoFile?.name}</span>
-                <span className="text-gray-500 text-xs ml-auto flex-shrink-0">{(videoFile?.size / 1024 / 1024).toFixed(1)} MB</span>
-                <button onClick={() => { setVideoFile(null); setVideoUrl(null) }} className="text-gray-600 hover:text-red-400 transition-colors ml-2">
-                  <SVG d={Ic.close} size={14} />
-                </button>
-              </div>
-            </div>
-
-            {/* Settings */}
-            <div className="space-y-4">
-              <h2 className="text-white font-bold text-lg flex items-center gap-2">
-                <SVG d={Ic.scissors} size={16} cls="text-orange-400" />Clip Settings
-              </h2>
-
-              {/* ── UPLOAD MODE SELECTOR ── */}
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-                <label className="text-gray-300 text-sm font-bold mb-3 block">Upload Mode</label>
-                <div className="grid grid-cols-2 gap-3">
-
-                  {/* MANUAL */}
-                  <button onClick={() => setUploadMode('manual')}
-                    className={`relative p-4 rounded-xl border-2 text-left transition-all ${
-                      uploadMode === 'manual'
-                        ? 'border-orange-500 bg-orange-500/10'
-                        : 'border-gray-700 bg-gray-800 hover:border-gray-600'
-                    }`}>
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${
-                      uploadMode === 'manual' ? 'bg-orange-500/20' : 'bg-gray-700'
-                    }`}>
-                      <SVG d={Ic.manual} size={16} cls={uploadMode === 'manual' ? 'text-orange-400' : 'text-gray-500'} />
-                    </div>
-                    <p className={`text-sm font-bold ${uploadMode === 'manual' ? 'text-orange-400' : 'text-gray-400'}`}>
-                      Manual Upload
-                    </p>
-                    <p className="text-gray-600 text-[10px] mt-0.5">Download karo, khud upload karo</p>
-                    {uploadMode === 'manual' && (
-                      <div className="absolute top-2 right-2 w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center">
-                        <SVG d={Ic.check} size={9} cls="text-white" />
-                      </div>
-                    )}
-                  </button>
-
-                  {/* AUTO YOUTUBE */}
-                  <button
-                    onClick={() => {
-                      if (!ytConnected) {
-                        window.location.href = '/settings'
-                        return
-                      }
-                      setUploadMode('auto')
-                    }}
-                    className={`relative p-4 rounded-xl border-2 text-left transition-all ${
-                      !ytConnected
-                        ? 'border-gray-800 bg-gray-900 opacity-60 cursor-not-allowed'
-                        : uploadMode === 'auto'
-                          ? 'border-red-500 bg-red-500/10'
-                          : 'border-gray-700 bg-gray-800 hover:border-gray-600'
-                    }`}>
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${
-                      uploadMode === 'auto' ? 'bg-red-500/20' : 'bg-gray-700'
-                    }`}>
-                      {!ytConnected
-                        ? <SVG d={Ic.lock} size={16} cls="text-gray-600" />
-                        : <SVG d={Ic.yt} size={16} cls={uploadMode === 'auto' ? 'text-red-400' : 'text-gray-500'} />
-                      }
-                    </div>
-                    <p className={`text-sm font-bold ${
-                      !ytConnected ? 'text-gray-600' : uploadMode === 'auto' ? 'text-red-400' : 'text-gray-400'
-                    }`}>
-                      Auto YouTube
-                    </p>
-                    <p className="text-gray-600 text-[10px] mt-0.5">
-                      {ytConnected ? 'Generate hone ke baad auto upload' : '🔒 YouTube connect karo'}
-                    </p>
-                    {uploadMode === 'auto' && ytConnected && (
-                      <div className="absolute top-2 right-2 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
-                        <SVG d={Ic.check} size={9} cls="text-white" />
-                      </div>
-                    )}
-                  </button>
-                </div>
-
-                {/* Auto mode info */}
-                {uploadMode === 'auto' && ytConnected && (
-                  <div className="mt-3 p-2.5 bg-red-500/5 border border-red-500/20 rounded-xl">
-                    <p className="text-red-300 text-[10px] leading-relaxed">
-                      ⚡ <span className="font-bold">Auto Mode ON:</span> Clips generate hone ke baad seedha YouTube Shorts par upload ho jayenge. AI title, description aur hashtags khud set karega.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Format */}
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-                <label className="text-gray-300 text-sm font-bold mb-3 block">Output Format</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { val: '9:16', icon: <div className="w-5 h-9 rounded border-2 border-current mx-auto" />, label: '9:16', sub: 'Shorts · Reels · TikTok' },
-                    { val: '16:9', icon: <div className="w-9 h-5 rounded border-2 border-current mx-auto" />, label: '16:9', sub: 'YouTube · Standard' },
-                  ].map(f => (
-                    <button key={f.val} onClick={() => setAspectRatio(f.val)}
-                      className={`py-4 px-3 rounded-xl border text-center transition-all ${
-                        aspectRatio === f.val
-                          ? 'border-orange-500 bg-orange-500/15 text-orange-400'
-                          : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
-                      }`}>
-                      <div className="mb-2">{f.icon}</div>
-                      <div className="font-black text-sm">{f.label}</div>
-                      <div className="text-[10px] mt-0.5 opacity-70">{f.sub}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Duration */}
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-                <label className="text-gray-300 text-sm font-bold mb-3 block">Clip Duration</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {CLIP_DURATIONS.map(d => (
-                    <button key={d.value} onClick={() => setClipDuration(d.value)}
-                      className={`py-3 px-2 rounded-xl border text-center transition-all ${
-                        clipDuration === d.value
-                          ? 'border-orange-500 bg-orange-500/15 text-orange-400'
-                          : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
-                      }`}>
-                      <div className="text-lg font-black">{d.label}</div>
-                      <div className="text-[10px] mt-0.5 opacity-70">{d.tag}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Max Clips */}
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-                <label className="text-gray-300 text-sm font-bold mb-3 block">Max Clips</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {MAX_CLIPS_OPTIONS.map(n => (
-                    <button key={n} onClick={() => setMaxClips(n)}
-                      className={`py-3 rounded-xl border font-bold text-lg transition-all ${
-                        maxClips === n
-                          ? 'border-orange-500 bg-orange-500/15 text-orange-400'
-                          : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
-                      }`}>
-                      {n}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Generate Button */}
-              <button onClick={handleGenerate}
-                className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white rounded-2xl font-black text-lg transition-all shadow-xl shadow-orange-500/20 flex items-center justify-center gap-3 active:scale-95">
-                <SVG d={uploadMode === 'auto' && ytConnected ? Ic.yt : Ic.scissors} size={20} />
-                {uploadMode === 'auto' && ytConnected ? 'Generate & Upload to YouTube' : 'Generate Clips'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── LOADING ── */}
-        {loading && (
-          <div className="max-w-lg mx-auto text-center py-16">
-            <div className="w-24 h-24 mx-auto mb-8 relative">
-              <svg className="w-24 h-24 animate-spin" viewBox="0 0 96 96">
-                <circle cx="48" cy="48" r="40" fill="none" stroke="#1f2937" strokeWidth="8"/>
-                <circle cx="48" cy="48" r="40" fill="none" stroke="url(#grad)" strokeWidth="8"
-                  strokeLinecap="round" strokeDasharray="80 170"/>
-                <defs>
-                  <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#f97316"/>
-                    <stop offset="100%" stopColor="#ef4444"/>
-                  </linearGradient>
-                </defs>
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <SVG d={Ic.scissors} size={28} cls="text-orange-400" />
-              </div>
-            </div>
-            <h2 className="text-white font-black text-2xl mb-2">Processing Video</h2>
-            <p className="text-orange-400 font-medium mb-8">{progressMsg}</p>
-            <div className="w-full bg-gray-800 rounded-full h-2 mb-3">
-              <div className="h-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
-            </div>
-            <p className="text-gray-500 text-sm">{progress}% complete</p>
-            <div className="mt-10 space-y-2 text-left">
-              {[
-                { label: 'Upload & save video',        done: progress >= 15 },
-                { label: 'Extract audio track',        done: progress >= 35 },
-                { label: 'Whisper AI transcription',   done: progress >= 60 },
-                { label: 'Groq AI best moment detect', done: progress >= 80 },
-                { label: 'Cut clips with ffmpeg',      done: progress >= 95 },
-              ].map((step, i) => (
-                <div key={i} className={`flex items-center gap-3 p-2.5 rounded-lg transition-all ${step.done ? 'bg-green-500/5' : ''}`}>
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${step.done ? 'bg-green-500' : 'bg-gray-700'}`}>
-                    {step.done ? <SVG d={Ic.check} size={11} cls="text-white" /> : <div className="w-2 h-2 bg-gray-500 rounded-full" />}
-                  </div>
-                  <span className={`text-sm ${step.done ? 'text-green-400' : 'text-gray-500'}`}>{step.label}</span>
-                </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 4 }}>
+              {['🎙️ Whisper Transcription', '🤖 Groq AI Analysis', '✂️ Auto Clip Cutting', '📱 9:16 Portrait', '☁️ YouTube Upload'].map(f => (
+                <span key={f} style={{ padding: '5px 14px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: 100, color: '#818cf8', fontSize: 12 }}>{f}</span>
               ))}
             </div>
           </div>
-        )}
+          <input ref={fileInputRef} type="file" accept="video/*" onChange={e => loadFile(e.target.files[0])} style={{ display: 'none' }} />
+        </div>
+      </div>
+    </div>
+  )
 
-        {/* ── ERROR ── */}
-        {error && !loading && (
-          <div className="max-w-lg mx-auto">
-            <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6 text-center">
-              <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <SVG d={Ic.close} size={20} cls="text-red-400" />
-              </div>
-              <h3 className="text-red-400 font-bold text-lg mb-2">Clipping Failed</h3>
-              <p className="text-gray-400 text-sm mb-4">{error}</p>
-              <button onClick={() => setError('')} className="px-6 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-sm font-medium transition-colors">Try Again</button>
-            </div>
+  // ─── SETTINGS SCREEN (video loaded, not yet processing) ───────────────────
+  if (videoUrl && !loading && !results && !error) return (
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'DM Sans',sans-serif", color: '#f0f0f5', padding: '32px 36px' }}>
+      <style>{`
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .acb{cursor:pointer;border:none;transition:all .15s;font-family:'DM Sans',sans-serif;}
+        .acb:hover{filter:brightness(1.15);}
+        .acb:disabled{opacity:.4;cursor:not-allowed;}
+        .aci::placeholder{color:#374151;}
+        .aci:focus{border-color:rgba(99,102,241,0.5)!important;}
+      `}</style>
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
+        <div style={{ width: 38, height: 38, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Ico d={IC.scissors} s={18} c="#fff" />
+        </div>
+        <div>
+          <h1 style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 20, color: '#f0f0f5', lineHeight: 1 }}>Configure Clips</h1>
+          <p style={{ color: '#4b5563', fontSize: 12, marginTop: 2 }}>Set your preferences before generating</p>
+        </div>
+        <div style={{ flex: 1 }} />
+        <button className="acb" onClick={() => { setVideoFile(null); setVideoUrl(null) }}
+          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 16px', border: '1px solid rgba(255,255,255,0.1)', color: '#6b7280', borderRadius: 10, background: 'rgba(255,255,255,0.03)', fontSize: 12 }}>
+          <Ico d={IC.close} s={13} c="#6b7280" /> Change Video
+        </button>
+      </div>
+
+      {/* Two-column layout */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
+
+        {/* LEFT — preview */}
+        <div>
+          <p style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 13, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 }}>Video Preview</p>
+          <div style={{ background: '#000', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 12 }}>
+            <video src={videoUrl} controls style={{ width: '100%', maxHeight: 320, display: 'block' }} />
           </div>
-        )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12 }}>
+            <Ico d={IC.file} s={13} c="#4b5563" />
+            <span style={{ fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#9ca3af' }}>{videoFile?.name}</span>
+            <span style={{ color: '#374151', fontSize: 11, flexShrink: 0 }}>{(videoFile?.size / 1024 / 1024).toFixed(1)} MB</span>
+          </div>
+        </div>
 
-        {/* ── RESULTS ── */}
-        {results && (
-          <div className="space-y-6">
+        {/* RIGHT — settings */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-            {/* Header bar */}
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div>
-                <h2 className="text-white font-black text-2xl flex items-center gap-2">
-                  <SVG d={Ic.fire} size={22} cls="text-orange-400" />
-                  {results.total_clips} Clips Generated
-                </h2>
-                <p className="text-gray-500 text-sm mt-0.5">
-                  Original: {fmt(results.video_duration)} · Each clip: {results.clip_duration}s · {aspectRatio} portrait
-                  {uploadMode === 'auto' && ytConnected && <span className="text-red-400 ml-2 font-medium">· Auto-uploading to YouTube...</span>}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                {!ytConnected && (
-                  <a href="/settings" className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-bold transition-all">
-                    <SVG d={Ic.yt} size={13} />Connect YouTube in Settings
-                  </a>
-                )}
-                <button onClick={downloadAll}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-orange-500/20">
-                  <SVG d={Ic.dl} size={15} />Download All
+          {/* Upload Mode */}
+          <div style={{ ...CARD, padding: 18 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 12 }}>Upload Mode</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {[
+                { id: 'manual', label: 'Manual Download', sub: 'Download & share yourself', icon: IC.dl },
+                { id: 'auto',   label: 'Auto YouTube',    sub: ytConnected ? 'Auto-upload to Shorts' : 'Connect YouTube first', icon: ytConnected ? IC.yt : IC.lock },
+              ].map(m => (
+                <button key={m.id} className="acb"
+                  onClick={() => { if (m.id === 'auto' && !ytConnected) { window.location.href = '/settings'; return } setUploadMode(m.id) }}
+                  style={{ padding: 14, borderRadius: 12, textAlign: 'left', position: 'relative', background: uploadMode === m.id ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)', border: `1.5px solid ${uploadMode === m.id ? 'rgba(99,102,241,0.45)' : 'rgba(255,255,255,0.07)'}`, opacity: m.id === 'auto' && !ytConnected ? 0.55 : 1 }}>
+                  <div style={{ width: 26, height: 26, borderRadius: 7, background: uploadMode === m.id ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                    <Ico d={m.icon} s={13} c={uploadMode === m.id ? '#a5b4fc' : '#4b5563'} />
+                  </div>
+                  <p style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 12, color: uploadMode === m.id ? '#a5b4fc' : '#6b7280', marginBottom: 2 }}>{m.label}</p>
+                  <p style={{ fontSize: 10, color: '#374151' }}>{m.sub}</p>
+                  {uploadMode === m.id && <div style={{ position: 'absolute', top: 8, right: 8, width: 16, height: 16, background: '#6366f1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Ico d={IC.check} s={9} c="#fff" /></div>}
                 </button>
-              </div>
-            </div>
-
-            {/* Clip cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {results.clips
-                .sort((a, b) => b.engagement_score - a.engagement_score)
-                .map((clip, i) => {
-                  const meta  = clipMeta[clip.id] || {}
-                  const upSt  = uploading[clip.id] || 'idle'
-                  const upMsg = uploadMsg[clip.id] || ''
-
-                  return (
-                    <div key={clip.id} className="bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-2xl overflow-hidden transition-all group flex flex-col">
-
-                      {/* Portrait preview */}
-                      <div className="bg-black relative cursor-pointer overflow-hidden"
-                        style={{ aspectRatio: aspectRatio === '9:16' ? '9/16' : '16/9', maxHeight: aspectRatio === '9:16' ? 320 : 180 }}
-                        onClick={() => setPreviewing(previewing === clip.id ? null : clip.id)}>
-                        <video
-                          src={`http://localhost:8000${clip.download_url}`}
-                          className="w-full h-full object-cover"
-                          style={{ display: previewing === clip.id ? 'block' : 'none' }}
-                          controls autoPlay={previewing === clip.id}
-                        />
-                        {previewing !== clip.id && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                            <div className="w-14 h-14 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/20 group-hover:bg-white/20 transition-all">
-                              <SVG d={Ic.play} size={20} cls="text-white" />
-                            </div>
-                            <div className="absolute bottom-3 right-3 bg-black/70 text-white text-xs px-2 py-1 rounded-lg font-mono">{clip.duration}s</div>
-                            <div className="absolute top-3 left-3 text-orange-400 text-xs font-black bg-black/70 px-2 py-1 rounded-lg">#{i + 1}</div>
-                            <div className={`absolute top-3 right-3 text-xs font-black px-2 py-1 rounded-lg border ${scoreColor(clip.engagement_score)}`}>{clip.engagement_score}%</div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Clip info + editable metadata */}
-                      <div className="p-4 space-y-3 flex-1 flex flex-col">
-
-                        {/* Hook */}
-                        {clip.hook && (
-                          <div className="bg-orange-500/5 border border-orange-500/15 rounded-xl p-2.5">
-                            <p className="text-orange-300 text-xs leading-relaxed">
-                              🎣 <span className="text-orange-400 font-bold">Hook:</span> {clip.hook}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Editable Title */}
-                        <div>
-                          <label className="text-gray-500 text-[10px] font-bold uppercase tracking-wide mb-1 flex items-center gap-1">
-                            <SVG d={Ic.edit} size={10} />Title
-                          </label>
-                          <input
-                            value={meta.title || ''}
-                            onChange={e => updateMeta(clip.id, 'title', e.target.value)}
-                            className="w-full bg-gray-800 border border-gray-700 focus:border-orange-500 text-white text-xs rounded-lg px-3 py-2 focus:outline-none transition-colors"
-                            placeholder="YouTube title..."
-                          />
-                        </div>
-
-                        {/* Editable Description */}
-                        <div>
-                          <label className="text-gray-500 text-[10px] font-bold uppercase tracking-wide mb-1 flex items-center gap-1">
-                            <SVG d={Ic.manual} size={10} />Description
-                          </label>
-                          <textarea
-                            value={meta.description || ''}
-                            onChange={e => updateMeta(clip.id, 'description', e.target.value)}
-                            rows={2}
-                            className="w-full bg-gray-800 border border-gray-700 focus:border-orange-500 text-white text-xs rounded-lg px-3 py-2 focus:outline-none transition-colors resize-none"
-                            placeholder="Description..."
-                          />
-                        </div>
-
-                        {/* Editable Hashtags */}
-                        <div>
-                          <label className="text-gray-500 text-[10px] font-bold uppercase tracking-wide mb-1 flex items-center gap-1">
-                            <SVG d={Ic.tag} size={10} />Hashtags
-                          </label>
-                          <input
-                            value={meta.hashtags || ''}
-                            onChange={e => updateMeta(clip.id, 'hashtags', e.target.value)}
-                            className="w-full bg-gray-800 border border-gray-700 focus:border-orange-500 text-white text-xs rounded-lg px-3 py-2 focus:outline-none transition-colors"
-                            placeholder="#Shorts #Viral..."
-                          />
-                          <div className="flex flex-wrap gap-1 mt-1.5">
-                            {(meta.hashtags || '').split(/\s+/).filter(t => t.startsWith('#')).map((tag, ti) => (
-                              <span key={ti} className="text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded-full">{tag}</span>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Privacy */}
-                        <div>
-                          <label className="text-gray-500 text-[10px] font-bold uppercase tracking-wide mb-1 block">Privacy</label>
-                          <select
-                            value={meta.privacy || 'public'}
-                            onChange={e => updateMeta(clip.id, 'privacy', e.target.value)}
-                            className="w-full bg-gray-800 border border-gray-700 focus:border-orange-500 text-white text-xs rounded-lg px-3 py-2 focus:outline-none transition-colors">
-                            <option value="public">🌍 Public</option>
-                            <option value="unlisted">🔗 Unlisted</option>
-                            <option value="private">🔒 Private</option>
-                          </select>
-                        </div>
-
-                        {/* Timestamps */}
-                        <div className="flex items-center gap-2 text-[10px] text-gray-600 font-mono pt-1">
-                          <SVG d={Ic.clock} size={10} />
-                          <span>{fmt(clip.start_time)} → {fmt(clip.end_time)}</span>
-                          <span className="ml-auto">{clip.file_size_mb} MB</span>
-                        </div>
-
-                        {/* Upload status */}
-                        {upMsg && (
-                          <div className={`p-2 rounded-lg text-xs font-medium ${
-                            upSt === 'done'     ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                            : upSt === 'error'  ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                            : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                          }`}>
-                            {upSt === 'uploading' && <span className="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mr-1" />}
-                            {upMsg}
-                          </div>
-                        )}
-
-                        {/* Action buttons */}
-                        <div className="flex gap-2 mt-auto pt-1">
-                          <button onClick={() => downloadClip(clip)} disabled={downloading[clip.id]}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 hover:text-white rounded-xl text-xs font-bold transition-all border border-gray-700">
-                            {downloading[clip.id]
-                              ? <><div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />...</>
-                              : <><SVG d={Ic.dl} size={13} />Download</>}
-                          </button>
-                          <button
-                            onClick={() => uploadToYouTube(clip, clipMeta)}
-                            disabled={!ytConnected || upSt === 'uploading' || upSt === 'done'}
-                            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                              !ytConnected
-                                ? 'bg-gray-800 text-gray-600 border border-gray-700 cursor-not-allowed'
-                                : upSt === 'done'
-                                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                  : upSt === 'uploading'
-                                    ? 'bg-red-500/20 text-red-300 border border-red-500/30'
-                                    : 'bg-red-500 hover:bg-red-600 text-white border-0'
-                            }`}>
-                            {upSt === 'uploading'
-                              ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />Uploading...</>
-                              : upSt === 'done'
-                                ? <><SVG d={Ic.check} size={13} />Uploaded!</>
-                                : !ytConnected
-                                  ? <><SVG d={Ic.lock} size={13} />Connect YT</>
-                                  : <><SVG d={Ic.yt} size={13} />Upload YT</>}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-            </div>
-
-            {/* Transcript */}
-            {results.full_transcript && (
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-                <h3 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">Transcript Preview</h3>
-                <p className="text-gray-500 text-sm leading-relaxed line-clamp-3">{results.full_transcript}...</p>
-              </div>
-            )}
-
-            {/* Re-generate */}
-            <div className="flex justify-center pt-4">
-              <button onClick={() => setResults(null)}
-                className="flex items-center gap-2 px-6 py-3 border border-gray-700 hover:border-orange-500 text-gray-400 hover:text-orange-400 rounded-2xl text-sm font-medium transition-all">
-                <SVG d={Ic.refresh} size={15} />Change Settings & Re-generate
-              </button>
+              ))}
             </div>
           </div>
-        )}
+
+          {/* Format */}
+          <div style={{ ...CARD, padding: 18 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 12 }}>Output Format</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {[{ val: '9:16', label: '9:16', sub: 'Shorts · Reels · TikTok' }, { val: '16:9', label: '16:9', sub: 'YouTube · Standard' }].map(f => (
+                <button key={f.val} className="acb" onClick={() => setAspect(f.val)}
+                  style={{ padding: '14px 10px', borderRadius: 12, textAlign: 'center', background: aspect === f.val ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)', border: `1.5px solid ${aspect === f.val ? 'rgba(99,102,241,0.45)' : 'rgba(255,255,255,0.07)'}`, color: aspect === f.val ? '#a5b4fc' : '#6b7280' }}>
+                  <div style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 20, marginBottom: 4 }}>{f.label}</div>
+                  <div style={{ fontSize: 10 }}>{f.sub}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Duration */}
+          <div style={{ ...CARD, padding: 18 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 12 }}>Clip Duration</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              {CLIP_DURATIONS.map(d => (
+                <button key={d.value} className="acb" onClick={() => setClipDur(d.value)}
+                  style={{ padding: '12px 8px', borderRadius: 12, textAlign: 'center', background: clipDur === d.value ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)', border: `1.5px solid ${clipDur === d.value ? 'rgba(99,102,241,0.45)' : 'rgba(255,255,255,0.07)'}`, color: clipDur === d.value ? '#a5b4fc' : '#6b7280' }}>
+                  <div style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 20 }}>{d.label}</div>
+                  <div style={{ fontSize: 9, marginTop: 3 }}>{d.tag}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Max clips */}
+          <div style={{ ...CARD, padding: 18 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 12 }}>Number of Clips</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+              {MAX_CLIPS_OPTIONS.map(n => (
+                <button key={n} className="acb" onClick={() => setMaxClips(n)}
+                  style={{ padding: '12px 0', borderRadius: 12, textAlign: 'center', fontFamily: 'Syne', fontWeight: 900, fontSize: 22, background: maxClips === n ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)', border: `1.5px solid ${maxClips === n ? 'rgba(99,102,241,0.45)' : 'rgba(255,255,255,0.07)'}`, color: maxClips === n ? '#a5b4fc' : '#6b7280' }}>
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Generate button */}
+          <button className="acb" onClick={handleGenerate}
+            style={{ width: '100%', padding: '15px 0', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', borderRadius: 16, fontSize: 15, fontWeight: 700, fontFamily: 'Syne', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, boxShadow: '0 6px 20px rgba(99,102,241,0.35)' }}>
+            <Ico d={IC.scissors} s={18} c="#fff" />
+            {uploadMode === 'auto' && ytConnected ? 'Generate & Upload to YouTube' : 'Generate Clips'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
+  // ─── LOADING SCREEN ───────────────────────────────────────────────────────
+  if (loading) return (
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'DM Sans',sans-serif", color: '#f0f0f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={{ width: '100%', maxWidth: 480, textAlign: 'center' }}>
+        {/* Spinner */}
+        <div style={{ width: 88, height: 88, margin: '0 auto 28px', position: 'relative' }}>
+          <svg style={{ width: 88, height: 88, animation: 'spin 1.4s linear infinite' }} viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="36" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
+            <circle cx="44" cy="44" r="36" fill="none" stroke="url(#acGrad)" strokeWidth="6" strokeLinecap="round" strokeDasharray="70 155" />
+            <defs>
+              <linearGradient id="acGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#6366f1" /><stop offset="100%" stopColor="#8b5cf6" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Ico d={IC.scissors} s={26} c="#6366f1" />
+          </div>
+        </div>
+        <h2 style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 24, marginBottom: 8 }}>Processing Video</h2>
+        <p style={{ color: '#a5b4fc', fontWeight: 600, marginBottom: 28, fontSize: 14 }}>{progressMsg}</p>
+        {/* Progress bar */}
+        <div style={{ width: '100%', background: 'rgba(255,255,255,0.06)', borderRadius: 99, height: 6, marginBottom: 8 }}>
+          <div style={{ height: 6, background: 'linear-gradient(90deg,#6366f1,#8b5cf6)', borderRadius: 99, transition: 'width .7s ease', width: `${progress}%` }} />
+        </div>
+        <p style={{ color: '#374151', fontSize: 12, marginBottom: 32 }}>{progress}% complete</p>
+        {/* Steps */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'left' }}>
+          {PROCESS_STEPS.map((step, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', borderRadius: 10, background: progress >= step.pct ? 'rgba(99,102,241,0.07)' : 'transparent', transition: 'background .4s' }}>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', background: progress >= step.pct ? '#6366f1' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background .4s' }}>
+                {progress >= step.pct ? <Ico d={IC.check} s={10} c="#fff" /> : <div style={{ width: 6, height: 6, background: '#1f2937', borderRadius: '50%' }} />}
+              </div>
+              <span style={{ fontSize: 13, color: progress >= step.pct ? '#a5b4fc' : '#374151', transition: 'color .4s' }}>{step.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+
+  // ─── ERROR SCREEN ─────────────────────────────────────────────────────────
+  if (error && !loading) return (
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'DM Sans',sans-serif", color: '#f0f0f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
+      <div style={{ ...CARD, padding: 48, textAlign: 'center', maxWidth: 440, width: '100%' }}>
+        <div style={{ width: 52, height: 52, background: 'rgba(239,68,68,0.12)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+          <Ico d={IC.close} s={22} c="#f87171" />
+        </div>
+        <h3 style={{ color: '#f87171', fontFamily: 'Syne', fontWeight: 800, fontSize: 20, marginBottom: 8 }}>Clipping Failed</h3>
+        <p style={{ color: '#6b7280', fontSize: 13, lineHeight: 1.6, marginBottom: 24 }}>{error}</p>
+        <button onClick={() => setError('')} style={{ padding: '10px 28px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#f0f0f5', borderRadius: 12, fontSize: 13, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>
+          Try Again
+        </button>
+      </div>
+    </div>
+  )
+
+  // ─── RESULTS SCREEN ───────────────────────────────────────────────────────
+  return (
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'DM Sans',sans-serif", color: '#f0f0f5', padding: '32px 36px' }}>
+      <style>{`
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .acb{cursor:pointer;border:none;transition:all .15s;font-family:'DM Sans',sans-serif;}
+        .acb:hover{filter:brightness(1.15);}
+        .acb:disabled{opacity:.4;cursor:not-allowed;}
+        .aci::placeholder{color:#374151;}
+        .aci:focus{border-color:rgba(99,102,241,0.5)!important;}
+        .ac-scroll::-webkit-scrollbar{width:3px;}
+        .ac-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:99px;}
+      `}</style>
+
+      {/* Results header */}
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 38, height: 38, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Ico d={IC.scissors} s={18} c="#fff" />
+          </div>
+          <div>
+            <h1 style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 20, lineHeight: 1 }}>
+              🔥 {results.total_clips} Clips Generated
+            </h1>
+            <p style={{ color: '#4b5563', fontSize: 12, marginTop: 3 }}>
+              Original: {fmt(results.video_duration)} · Each clip: {results.clip_duration}s · {aspect}
+              {uploadMode === 'auto' && ytConnected && <span style={{ color: '#a5b4fc', marginLeft: 8 }}>· Auto-uploading…</span>}
+            </p>
+          </div>
+        </div>
+        <div style={{ flex: 1 }} />
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="acb" onClick={() => { setResults(null); setVideoFile(null); setVideoUrl(null) }}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', border: '1px solid rgba(255,255,255,0.1)', color: '#6b7280', borderRadius: 10, background: 'rgba(255,255,255,0.03)', fontSize: 12 }}>
+            <Ico d={IC.refresh} s={13} c="#6b7280" /> New Video
+          </button>
+          {!ytConnected && (
+            <a href="/settings" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: 10, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+              <Ico d={IC.yt} s={13} c="#f87171" />Connect YouTube
+            </a>
+          )}
+          <button className="acb" onClick={downloadAll}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 20px', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', borderRadius: 10, fontSize: 13, fontWeight: 700, boxShadow: '0 3px 12px rgba(99,102,241,0.35)' }}>
+            <Ico d={IC.dl} s={14} c="#fff" /> Download All
+          </button>
+        </div>
+      </div>
+
+      {/* Clip grid — wider, fills full content width */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 18 }}>
+        {results.clips.sort((a, b) => b.engagement_score - a.engagement_score).map((clip, i) => {
+          const meta  = clipMeta[clip.id] || {}
+          const upSt  = uploading[clip.id] || 'idle'
+          const upMsg = uploadMsg[clip.id] || ''
+          const sc    = scoreStyle(clip.engagement_score)
+          return (
+            <div key={clip.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+
+              {/* Thumbnail */}
+              <div style={{ background: '#000', position: 'relative', cursor: 'pointer', aspectRatio: aspect === '9:16' ? '9/16' : '16/9', maxHeight: aspect === '9:16' ? 260 : 190 }}
+                onClick={() => setPreviewing(previewing === clip.id ? null : clip.id)}>
+                <video
+                  src={`http://localhost:8000${clip.download_url}`}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: previewing === clip.id ? 'block' : 'none' }}
+                  controls autoPlay={previewing === clip.id} />
+                {previewing !== clip.id && (
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)' }}>
+                    <div style={{ width: 52, height: 52, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.18)' }}>
+                      <Ico d={IC.play} s={18} c="#fff" />
+                    </div>
+                    {/* Badges */}
+                    <span style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: 10, padding: '3px 8px', borderRadius: 7, fontFamily: 'monospace' }}>{clip.duration}s</span>
+                    <span style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.65)', color: '#a5b4fc', fontSize: 10, padding: '3px 8px', borderRadius: 7, fontFamily: 'Syne', fontWeight: 800 }}>#{i + 1}</span>
+                    <span style={{ position: 'absolute', top: 10, right: 10, fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 8, background: sc.bg, border: `1px solid ${sc.border}`, color: sc.color }}>{clip.engagement_score}%</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Clip info */}
+              <div style={{ padding: 14, flex: 1, display: 'flex', flexDirection: 'column', gap: 9 }}>
+                {clip.hook && (
+                  <div style={{ background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 9, padding: '7px 11px' }}>
+                    <p style={{ fontSize: 11, color: '#a5b4fc', lineHeight: 1.6 }}>🎣 <span style={{ fontWeight: 700 }}>Hook:</span> {clip.hook}</p>
+                  </div>
+                )}
+
+                {/* Editable meta */}
+                {[
+                  { label: 'Title',       key: 'title',       type: 'input',    ph: 'YouTube title…' },
+                  { label: 'Description', key: 'description', type: 'textarea', ph: 'Description…', rows: 2 },
+                  { label: 'Hashtags',    key: 'hashtags',    type: 'input',    ph: '#Shorts #Viral…' },
+                ].map(f => (
+                  <div key={f.key}>
+                    <label style={{ fontSize: 9, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 4 }}>{f.label}</label>
+                    {f.type === 'textarea'
+                      ? <textarea value={meta[f.key] || ''} onChange={e => updateMeta(clip.id, f.key, e.target.value)} rows={f.rows} placeholder={f.ph} className="aci" style={{ ...INP, resize: 'none' }} />
+                      : <input value={meta[f.key] || ''} onChange={e => updateMeta(clip.id, f.key, e.target.value)} placeholder={f.ph} className="aci" style={INP} />
+                    }
+                  </div>
+                ))}
+
+                {/* Privacy */}
+                <div>
+                  <label style={{ fontSize: 9, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 4 }}>Privacy</label>
+                  <select value={meta.privacy || 'public'} onChange={e => updateMeta(clip.id, 'privacy', e.target.value)} className="aci" style={{ ...INP, cursor: 'pointer' }}>
+                    <option value="public"   style={{ background: '#0d0d14' }}>🌍 Public</option>
+                    <option value="unlisted" style={{ background: '#0d0d14' }}>🔗 Unlisted</option>
+                    <option value="private"  style={{ background: '#0d0d14' }}>🔒 Private</option>
+                  </select>
+                </div>
+
+                {/* Timecode */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#374151', fontFamily: 'monospace' }}>
+                  <Ico d={IC.clock} s={10} c="#374151" />
+                  {fmt(clip.start_time)} → {fmt(clip.end_time)}
+                  <span style={{ marginLeft: 'auto' }}>{clip.file_size_mb} MB</span>
+                </div>
+
+                {/* Upload status */}
+                {upMsg && (
+                  <div style={{ padding: '7px 11px', borderRadius: 9, fontSize: 11, fontWeight: 600, background: upSt === 'done' ? 'rgba(16,185,129,0.1)' : upSt === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(99,102,241,0.1)', border: `1px solid ${upSt === 'done' ? 'rgba(16,185,129,0.3)' : upSt === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(99,102,241,0.3)'}`, color: upSt === 'done' ? '#6ee7b7' : upSt === 'error' ? '#f87171' : '#a5b4fc' }}>
+                    {upSt === 'uploading' && <span style={{ display: 'inline-block', width: 10, height: 10, border: '2px solid rgba(165,180,252,0.3)', borderTopColor: '#a5b4fc', borderRadius: '50%', animation: 'spin .8s linear infinite', marginRight: 6 }} />}
+                    {upMsg}
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
+                  <button className="acb" onClick={() => downloadClip(clip)} disabled={downloading[clip.id]}
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 0', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#9ca3af', borderRadius: 10, fontSize: 12 }}>
+                    {downloading[clip.id]
+                      ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(156,163,175,0.3)', borderTopColor: '#9ca3af', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />…</>
+                      : <><Ico d={IC.dl} s={12} c="#9ca3af" />Download</>}
+                  </button>
+                  <button className="acb" onClick={() => uploadToYouTube(clip, clipMeta)} disabled={!ytConnected || upSt === 'uploading' || upSt === 'done'}
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 0', borderRadius: 10, fontSize: 12, fontWeight: 700, background: !ytConnected ? 'rgba(255,255,255,0.03)' : upSt === 'done' ? 'rgba(16,185,129,0.12)' : upSt === 'uploading' ? 'rgba(99,102,241,0.15)' : '#6366f1', border: !ytConnected ? '1px solid rgba(255,255,255,0.07)' : upSt === 'done' ? '1px solid rgba(16,185,129,0.3)' : 'none', color: !ytConnected ? '#374151' : upSt === 'done' ? '#6ee7b7' : '#fff' }}>
+                    {upSt === 'uploading' ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />Uploading…</>
+                      : upSt === 'done' ? <><Ico d={IC.check} s={12} c="#6ee7b7" />Uploaded!</>
+                      : !ytConnected ? <><Ico d={IC.lock} s={12} c="#374151" />Connect YT</>
+                      : <><Ico d={IC.yt} s={12} c="#fff" />Upload YT</>}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Transcript preview */}
+      {results.full_transcript && (
+        <div style={{ ...CARD, padding: 20, marginTop: 24 }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 8 }}>Transcript Preview</p>
+          <p style={{ color: '#4b5563', fontSize: 13, lineHeight: 1.7 }}>{results.full_transcript.slice(0, 300)}…</p>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 28 }}>
+        <button className="acb" onClick={() => setResults(null)}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 28px', border: '1px solid rgba(255,255,255,0.1)', color: '#6b7280', borderRadius: 14, fontSize: 13, background: 'transparent' }}>
+          <Ico d={IC.refresh} s={14} c="#6b7280" /> Change Settings & Re-generate
+        </button>
       </div>
     </div>
   )

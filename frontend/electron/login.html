@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Creator OS — Sign In</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@300;400;500;600&display=swap');
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0a0f; color: #f0f0f5; font-family: 'DM Sans', sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background-image: radial-gradient(rgba(255,255,255,0.025) 1px, transparent 1px); background-size: 26px 26px; }
+    .card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; padding: 40px 36px; width: 100%; max-width: 420px; box-shadow: 0 32px 80px rgba(0,0,0,0.5); }
+    .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+    .logo-icon { width: 38px; height: 38px; border-radius: 11px; background: linear-gradient(135deg, #6366f1, #8b5cf6); display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 4px 16px rgba(99,102,241,0.35); }
+    .logo-text { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 21px; letter-spacing: -0.5px; }
+    .logo-text span { color: #818cf8; }
+    h2 { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 900; margin-bottom: 5px; letter-spacing: -0.5px; }
+    .subtitle { font-size: 13px; color: #4b5563; margin-bottom: 28px; line-height: 1.6; }
+    .tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 4px; margin-bottom: 24px; }
+    .tab-btn { flex: 1; padding: 8px 0; border: none; border-radius: 9px; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px; cursor: pointer; transition: all .2s; background: transparent; color: #4b5563; }
+    .tab-btn.active { background: rgba(99,102,241,0.2); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.35); }
+    label { display: block; font-size: 11px; font-weight: 700; color: #4b5563; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+    input { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 11px 14px; color: #f0f0f5; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color 0.2s; margin-bottom: 14px; color-scheme: dark; }
+    input:focus { border-color: rgba(99,102,241,0.55); }
+    input::placeholder { color: #374151; }
+    .btn { width: 100%; padding: 13px; border-radius: 13px; border: none; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; font-family: 'Syne', sans-serif; font-weight: 800; font-size: 14px; cursor: pointer; margin-top: 6px; transition: all .2s; box-shadow: 0 4px 18px rgba(99,102,241,0.35); display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; filter: none; }
+    .divider { display: flex; align-items: center; gap: 12px; margin: 18px 0; color: #1f2937; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.05); }
+    .btn-google { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #9ca3af; font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .btn-google:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.15); color: #f0f0f5; }
+    .msg { border-radius: 10px; padding: 10px 14px; font-size: 12px; font-weight: 600; margin-top: 12px; display: none; line-height: 1.5; }
+    .msg.show { display: block; }
+    .msg.error   { background: rgba(239,68,68,0.1);  border: 1px solid rgba(239,68,68,0.25);  color: #fca5a5; }
+    .msg.success { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); color: #6ee7b7; }
+    .msg.info    { background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.25); color: #a5b4fc; }
+    .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.25); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg) } }
+    .forgot { text-align: right; margin-top: -8px; margin-bottom: 16px; }
+    .forgot a { font-size: 11px; color: #6366f1; cursor: pointer; text-decoration: none; }
+    .terms { font-size: 10px; color: #374151; text-align: center; margin-top: 16px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">&#9889;</div>
+    <div class="logo-text">Creator <span>OS</span></div>
+  </div>
+  <h2 id="heading">Welcome back</h2>
+  <p class="subtitle" id="sub-heading">Sign in to continue to your dashboard</p>
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-login"  onclick="switchTab('login')">Sign In</button>
+    <button class="tab-btn"        id="tab-signup" onclick="switchTab('signup')">Create Account</button>
+  </div>
+  <div id="form-login">
+    <label>Email</label>
+    <input id="login-email" type="email" placeholder="you@example.com" autocomplete="email" />
+    <label>Password</label>
+    <input id="login-password" type="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password" />
+    <div class="forgot"><a onclick="showForgot()">Forgot password?</a></div>
+    <button class="btn" id="btn-login" onclick="handleLogin()">Sign In &rarr;</button>
+  </div>
+  <div id="form-signup" style="display:none">
+    <label>Full Name</label>
+    <input id="signup-name" type="text" placeholder="Your name" autocomplete="name" />
+    <label>Email</label>
+    <input id="signup-email" type="email" placeholder="you@example.com" autocomplete="email" />
+    <label>Password</label>
+    <input id="signup-password" type="password" placeholder="Min. 8 characters" autocomplete="new-password" />
+    <button class="btn" id="btn-signup" onclick="handleSignup()">Create Account &rarr;</button>
+  </div>
+  <div class="divider">or</div>
+  <button class="btn-google" onclick="handleGoogle()">
+    <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+    Continue with Google
+  </button>
+  <div class="msg error"   id="msg-error"></div>
+  <div class="msg success" id="msg-success"></div>
+  <div class="msg info"    id="msg-info"></div>
+  <p class="terms">By continuing, you agree to Creator OS Terms of Service.</p>
+</div>
+<script>
+  const SUPABASE_URL      = 'https://ttmmrdwfzdabjdqvopjg.supabase.co'
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR0bW1yZHdmemRhYmpkcXZvcGpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NjU3NDEsImV4cCI6MjA4ODA0MTc0MX0.7Qca9cygzLNJ-SS4gRSEMJaRmjwUB0_zpezhRtBZo80'
+  const { createClient } = supabase
+  const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+  function switchTab(tab) {
+    const isLogin = tab === 'login'
+    document.getElementById('form-login').style.display  = isLogin ? 'block' : 'none'
+    document.getElementById('form-signup').style.display = isLogin ? 'none'  : 'block'
+    document.getElementById('tab-login').classList.toggle('active',  isLogin)
+    document.getElementById('tab-signup').classList.toggle('active', !isLogin)
+    document.getElementById('heading').textContent     = isLogin ? 'Welcome back' : 'Create your account'
+    document.getElementById('sub-heading').textContent = isLogin ? 'Sign in to continue to your dashboard' : 'Start building your creator empire'
+    clearMsgs()
+  }
+  function clearMsgs() {
+    ['msg-error','msg-success','msg-info'].forEach(id => { const el=document.getElementById(id); el.classList.remove('show'); el.textContent='' })
+  }
+  function showMsg(type, text) { clearMsgs(); const el=document.getElementById('msg-'+type); el.textContent=text; el.classList.add('show') }
+  function setLoading(btnId, loading, defaultText) { const btn=document.getElementById(btnId); btn.disabled=loading; btn.innerHTML=loading?'<div class="spinner"></div> Please wait\u2026':defaultText }
+
+  async function onAuthSuccess(session) {
+    showMsg('success', '\u2713 Signed in! Opening Creator OS\u2026')
+    const sessionPayload = {
+      access_token:  session.access_token,
+      refresh_token: session.refresh_token,
+      token_type:    'bearer',
+      expires_in:    session.expires_in  || 3600,
+      expires_at:    session.expires_at  || (Math.floor(Date.now()/1000)+3600),
+      user:          session.user,
+    }
+    setTimeout(() => { window.electronAPI.loginSuccess(sessionPayload) }, 700)
+  }
+
+  async function handleLogin() {
+    const email=document.getElementById('login-email').value.trim()
+    const password=document.getElementById('login-password').value
+    if (!email||!password) { showMsg('error','\u2715 Please fill in all fields'); return }
+    setLoading('btn-login',true,'Sign In \u2192')
+    clearMsgs()
+    const {data,error} = await sb.auth.signInWithPassword({email,password})
+    if (error) { showMsg('error','\u2715 '+(error.message||'Sign in failed')); setLoading('btn-login',false,'Sign In \u2192'); return }
+    await onAuthSuccess(data.session)
+  }
+
+  async function handleSignup() {
+    const name=document.getElementById('signup-name').value.trim()
+    const email=document.getElementById('signup-email').value.trim()
+    const password=document.getElementById('signup-password').value
+    if (!name||!email||!password) { showMsg('error','\u2715 Please fill in all fields'); return }
+    if (password.length<8) { showMsg('error','\u2715 Password must be at least 8 characters'); return }
+    setLoading('btn-signup',true,'Create Account \u2192')
+    clearMsgs()
+    const {data,error} = await sb.auth.signUp({email,password,options:{data:{full_name:name}}})
+    if (error) { showMsg('error','\u2715 '+(error.message||'Signup failed')); setLoading('btn-signup',false,'Create Account \u2192'); return }
+    if (data.session) { await onAuthSuccess(data.session) }
+    else { showMsg('info','\ud83d\udce7 Check your email to confirm your account, then sign in.'); setLoading('btn-signup',false,'Create Account \u2192'); switchTab('login') }
+  }
+
+  async function handleGoogle() {
+    showMsg('info','\ud83c\udf10 Opening Google sign in\u2026')
+    const {error} = await sb.auth.signInWithOAuth({provider:'google'})
+    if (error) showMsg('error','\u2715 '+error.message)
+  }
+
+  async function showForgot() {
+    const email=document.getElementById('login-email').value.trim()
+    if (!email) { showMsg('error','\u2715 Enter your email above first'); return }
+    const {error} = await sb.auth.resetPasswordForEmail(email)
+    if (error) showMsg('error','\u2715 '+error.message)
+    else showMsg('success','\u2713 Password reset email sent!')
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key!=='Enter') return
+    const loginVisible = document.getElementById('form-login').style.display!=='none'
+    if (loginVisible) handleLogin(); else handleSignup()
+  })
+</script>
+</body>
+</html>

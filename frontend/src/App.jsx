@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { HashRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabaseClient'
 import Login from './pages/Login'
@@ -30,9 +30,9 @@ import AutoClippingPage from './pages/AutoClippingPage'
 import './index.css'
 
 function ProtectedRoute() {
-  const [session, setSession] = useState(undefined)
+  const [session,     setSession]     = useState(undefined)
   const [accountType, setAccountType] = useState(undefined)
-  const [checking, setChecking] = useState(true)
+  const [checking,    setChecking]    = useState(true)
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -63,23 +63,24 @@ function ProtectedRoute() {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">Loading...</p>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0f' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 36, height: 36, border: '3px solid rgba(99,102,241,0.2)', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+          <p style={{ color: '#374151', fontSize: 13, fontFamily: 'DM Sans, sans-serif' }}>Loading...</p>
         </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       </div>
     )
   }
 
-  if (!session) return <Navigate to="/login" replace />
+  if (!session)     return <Navigate to="/login"      replace />
   if (!accountType) return <Navigate to="/onboarding" replace />
   return <Outlet context={{ accountType }} />
 }
 
 function IndividualRoute({ children }) {
   const [accountType, setAccountType] = useState(null)
-  const [checking, setChecking] = useState(true)
+  const [checking,    setChecking]    = useState(true)
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
@@ -102,7 +103,7 @@ function IndividualRoute({ children }) {
 
 function AgencyRoute({ children }) {
   const [accountType, setAccountType] = useState(null)
-  const [checking, setChecking] = useState(true)
+  const [checking,    setChecking]    = useState(true)
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {

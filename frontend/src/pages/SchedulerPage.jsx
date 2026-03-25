@@ -6,19 +6,23 @@ export default function SchedulerPage() {
   const [refreshKey, setRefreshKey] = useState(0)
 
   return (
-    <div className="space-y-6">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Content Hub</h1>
-        <p className="text-gray-500 mt-1">Write, schedule, and manage your content across platforms.</p>
-      </header>
+    <div style={{ fontFamily: "'Syne', 'DM Sans', sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');`}</style>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1">
-          <PostComposer onPostSaved={() => setRefreshKey(k => k + 1)} />
-        </div>
-        <div className="lg:col-span-2">
-          <CalendarGrid key={refreshKey} />
-        </div>
+      {/* Header */}
+      <div style={{ marginBottom: 28 }}>
+        <p style={{ fontSize: 13, color: '#6b7280', fontFamily: 'DM Sans', marginBottom: 4 }}>Manage your content</p>
+        <h1 style={{ fontSize: 30, fontWeight: 800, color: '#f0f0f5', letterSpacing: '-1px', lineHeight: 1.1 }}>
+          Content Hub 📅
+        </h1>
+        <p style={{ fontSize: 13, color: '#6b7280', marginTop: 6, fontFamily: 'DM Sans' }}>
+          Write, schedule, and manage your content across platforms.
+        </p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 20, alignItems: 'start' }}>
+        <PostComposer onPostSaved={() => setRefreshKey(k => k + 1)} />
+        <CalendarGrid key={refreshKey} />
       </div>
     </div>
   )

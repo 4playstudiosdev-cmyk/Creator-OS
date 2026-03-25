@@ -381,7 +381,7 @@ export default function LandingPage() {
           <a href="/login" style={{ textDecoration: "none" }}>
             <button className="btn-outline" style={{ padding: "10px 20px", fontSize: 14 }}>Log In</button>
           </a>
-          <a href="/signup" style={{ textDecoration: "none" }}>
+          <a href="/login?tab=signup" style={{ textDecoration: "none" }}>
             <button className="btn-primary" style={{ padding: "10px 20px", fontSize: 14 }}>Get Started Free</button>
           </a>
         </div>
@@ -416,7 +416,7 @@ export default function LandingPage() {
         </p>
 
         <div className="hero-animate-4" style={{ display: "flex", gap: 14, flexWrap: "wrap", justifyContent: "center", marginBottom: 60 }}>
-          <a href="/signup" style={{ textDecoration: "none" }}>
+          <a href="/login?tab=signup" style={{ textDecoration: "none" }}>
             <button className="btn-primary" style={{ fontSize: 16, padding: "16px 32px" }}>
               Start for Free <span>→</span>
             </button>
@@ -578,7 +578,7 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <a href="/signup" style={{ textDecoration: "none" }}>
+              <a href="/login?tab=signup" style={{ textDecoration: "none" }}>
                 <button className={plan.highlight ? "btn-primary" : "btn-outline"} style={{ width: "100%", justifyContent: "center" }}>
                   {plan.cta}
                 </button>

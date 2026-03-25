@@ -6,9 +6,10 @@ const TIERS = [
     id: 'solo',
     name: 'Solo Creator',
     price: 19,
-    color: 'border-gray-200',
+    accent: '#9ca3af',
+    accentRgb: '156,163,175',
     badge: null,
-    description: 'Naye creators ke liye — shuruaat karein!',
+    description: 'For new creators just getting started',
     features: [
       { text: 'Repurpose Router — 10x per month', included: true },
       { text: 'Content Scheduler — 30 posts/mo', included: true },
@@ -24,15 +25,15 @@ const TIERS = [
       { text: 'Priority Support', included: false },
     ],
     cta: 'Start Solo',
-    ctaColor: 'bg-gray-800 hover:bg-gray-900',
   },
   {
     id: 'growth',
     name: 'Growth',
     price: 49,
-    color: 'border-blue-500',
+    accent: '#6366f1',
+    accentRgb: '99,102,241',
     badge: '🔥 Most Popular',
-    description: 'Serious creators ke liye — scale karein!',
+    description: 'For serious creators ready to scale',
     features: [
       { text: 'Repurpose Router — Unlimited', included: true },
       { text: 'Content Scheduler — Unlimited', included: true },
@@ -48,15 +49,15 @@ const TIERS = [
       { text: 'Priority Support', included: false },
     ],
     cta: 'Start Growth',
-    ctaColor: 'bg-blue-600 hover:bg-blue-700',
   },
   {
     id: 'pro',
     name: 'Pro',
     price: 99,
-    color: 'border-purple-500',
+    accent: '#8b5cf6',
+    accentRgb: '139,92,246',
     badge: '👑 Best Value',
-    description: 'Pro creators aur agencies ke liye!',
+    description: 'For pro creators and agencies',
     features: [
       { text: 'Repurpose Router — Unlimited', included: true },
       { text: 'Content Scheduler — Unlimited', included: true },
@@ -72,193 +73,225 @@ const TIERS = [
       { text: 'Priority Support — 24h response', included: true },
     ],
     cta: 'Start Pro',
-    ctaColor: 'bg-purple-600 hover:bg-purple-700',
   },
 ]
 
 const FAQS = [
   {
-    q: 'Kya main plan change kar sakta hoon?',
-    a: 'Haan! Kisi bhi waqt upgrade ya downgrade kar sakte hain. Change immediately effective hoga.'
+    q: 'Can I change my plan anytime?',
+    a: 'Yes! You can upgrade or downgrade at any time. Changes take effect immediately.',
   },
   {
-    q: 'Free trial hai?',
-    a: '7 din ka free trial hai — koi credit card nahi chahiye. Baad mein decide karein.'
+    q: 'Is there a free trial?',
+    a: '7-day free trial — no credit card required. Decide later.',
   },
   {
-    q: 'Kaunse payment methods accept hote hain?',
-    a: 'Visa, Mastercard, aur local payment methods support karte hain.'
+    q: 'Which payment methods are accepted?',
+    a: 'Visa, Mastercard, and local payment methods are supported.',
   },
   {
-    q: 'Cancel karna mushkil hai?',
-    a: 'Bilkul nahi — ek click mein cancel kar sakte hain. Koi hidden fees nahi.'
+    q: 'Is it hard to cancel?',
+    a: 'Not at all — cancel in one click. No hidden fees.',
   },
 ]
 
 export default function PricingPage() {
-  const [billing, setBilling] = useState('monthly') // 'monthly' or 'yearly'
-  const [currentPlan, setCurrentPlan] = useState('growth') // mock current plan
-  const [openFaq, setOpenFaq] = useState(null)
+  const [billing,     setBilling]     = useState('monthly')
+  const [currentPlan, setCurrentPlan] = useState('growth')
+  const [openFaq,     setOpenFaq]     = useState(null)
   const navigate = useNavigate()
 
-  const getPrice = (price) => {
-    if (billing === 'yearly') return Math.floor(price * 0.8) // 20% discount
-    return price
-  }
+  const getPrice = (price) => billing === 'yearly' ? Math.floor(price * 0.8) : price
 
   const handleSelectPlan = (tierId) => {
     if (tierId === currentPlan) return
-    // Mock — Stripe baad mein lagega
-    alert("Plan change: " + tierId + " — Stripe end of week mein lagega! 🚀")
+    alert(`Plan change: ${tierId} — Stripe integration coming soon! 🚀`)
     setCurrentPlan(tierId)
   }
 
-  return (
-    <div className="space-y-8">
-      {/* Header */}
-      <header className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Plans & Pricing 💳</h1>
-        <p className="text-gray-500 mt-2">Apni growth ke mutabiq sahi plan chunein</p>
+  const CARD = { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20 }
 
-        {/* Billing Toggle */}
-        <div className="flex items-center justify-center gap-3 mt-6">
-          <span className={"text-sm font-medium " + (billing === 'monthly' ? 'text-gray-900' : 'text-gray-400')}>
-            Monthly
-          </span>
-          <button
-            onClick={() => setBilling(billing === 'monthly' ? 'yearly' : 'monthly')}
-            className={"relative w-12 h-6 rounded-full transition-colors " + (billing === 'yearly' ? 'bg-blue-600' : 'bg-gray-300')}
-          >
-            <div className={"absolute top-1 w-4 h-4 bg-white rounded-full transition-transform shadow " + (billing === 'yearly' ? 'translate-x-7' : 'translate-x-1')}></div>
+  return (
+    <div style={{ fontFamily: "'DM Sans',sans-serif", color: '#f0f0f5', paddingBottom: 48 }}>
+      <style>{`
+        .pr-btn { cursor:pointer; border:none; transition:all .15s; font-family:'Syne',sans-serif; font-weight:700; }
+        .pr-btn:hover { filter:brightness(1.12); transform:translateY(-1px); }
+        .pr-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; filter:none; }
+        .faq-btn:hover { background:rgba(255,255,255,0.04) !important; }
+        .tier-card { transition:all .2s; }
+        .tier-card:hover { transform:translateY(-3px); }
+        .feat-row:hover { background:rgba(255,255,255,0.02); }
+      `}</style>
+
+      {/* ── HEADER ─────────────────────────────────────────────────────── */}
+      <div style={{ textAlign: 'center', marginBottom: 36 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 14px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 100, color: '#a5b4fc', fontSize: 11, fontWeight: 700, marginBottom: 16 }}>
+          💳 PLANS & PRICING
+        </div>
+        <h1 style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 32, color: '#f0f0f5', marginBottom: 8 }}>
+          Choose your plan
+        </h1>
+        <p style={{ color: '#4b5563', fontSize: 14 }}>Pick the plan that fits your growth stage</p>
+
+        {/* Billing toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 24 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: billing === 'monthly' ? '#f0f0f5' : '#4b5563' }}>Monthly</span>
+          <button className="pr-btn"
+            onClick={() => setBilling(b => b === 'monthly' ? 'yearly' : 'monthly')}
+            style={{ width: 44, height: 24, borderRadius: 100, background: billing === 'yearly' ? '#6366f1' : 'rgba(255,255,255,0.1)', position: 'relative', padding: 0 }}>
+            <div style={{ width: 16, height: 16, background: '#fff', borderRadius: '50%', position: 'absolute', top: 4, left: billing === 'yearly' ? 24 : 4, transition: 'left .25s', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
           </button>
-          <span className={"text-sm font-medium " + (billing === 'yearly' ? 'text-gray-900' : 'text-gray-400')}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: billing === 'yearly' ? '#f0f0f5' : '#4b5563', display: 'flex', alignItems: 'center', gap: 7 }}>
             Yearly
-            <span className="ml-1.5 bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">
-              Save 20%
-            </span>
+            <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#6ee7b7', borderRadius: 100 }}>Save 20%</span>
           </span>
         </div>
-      </header>
-
-      {/* Pricing Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {TIERS.map(tier => (
-          <div
-            key={tier.id}
-            className={"relative bg-white rounded-2xl border-2 p-6 shadow-sm transition-shadow hover:shadow-md " + tier.color + (tier.id === 'growth' ? ' shadow-blue-100' : '')}
-          >
-            {/* Badge */}
-            {tier.badge && (
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className={"text-xs font-bold px-3 py-1 rounded-full text-white " + (tier.id === 'growth' ? 'bg-blue-600' : 'bg-purple-600')}>
-                  {tier.badge}
-                </span>
-              </div>
-            )}
-
-            {/* Current Plan Badge */}
-            {currentPlan === tier.id && (
-              <div className="absolute top-4 right-4">
-                <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">
-                  ✅ Current
-                </span>
-              </div>
-            )}
-
-            {/* Plan Info */}
-            <div className="mb-5">
-              <h3 className="text-lg font-bold text-gray-900">{tier.name}</h3>
-              <p className="text-gray-400 text-sm mt-0.5">{tier.description}</p>
-            </div>
-
-            {/* Price */}
-            <div className="mb-6">
-              <div className="flex items-end gap-1">
-                <span className="text-4xl font-bold text-gray-900">${getPrice(tier.price)}</span>
-                <span className="text-gray-400 text-sm mb-1">/mo</span>
-              </div>
-              {billing === 'yearly' && (
-                <p className="text-green-600 text-xs mt-1">
-                  Billed ${getPrice(tier.price) * 12}/year — Save ${(tier.price - getPrice(tier.price)) * 12}!
-                </p>
-              )}
-            </div>
-
-            {/* CTA Button */}
-            <button
-              onClick={() => handleSelectPlan(tier.id)}
-              disabled={currentPlan === tier.id}
-              className={"w-full py-2.5 rounded-xl text-white font-semibold transition-colors mb-6 disabled:opacity-60 disabled:cursor-not-allowed " + tier.ctaColor}
-            >
-              {currentPlan === tier.id ? '✅ Current Plan' : tier.cta}
-            </button>
-
-            {/* Features */}
-            <div className="space-y-2.5">
-              {tier.features.map((feature, i) => (
-                <div key={i} className="flex items-start gap-2.5">
-                  <span className={"text-sm flex-shrink-0 mt-0.5 " + (feature.included ? 'text-green-500' : 'text-gray-300')}>
-                    {feature.included ? '✓' : '✗'}
-                  </span>
-                  <span className={"text-sm " + (feature.included ? 'text-gray-700' : 'text-gray-300')}>
-                    {feature.text}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
       </div>
 
-      {/* Feature Comparison Banner */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white text-center">
-        <h2 className="text-xl font-bold mb-2">Sab plans mein included 🎁</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+      {/* ── PRICING CARDS ───────────────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 18, marginBottom: 24 }}>
+        {TIERS.map(tier => {
+          const isActive  = currentPlan === tier.id
+          const isGrowth  = tier.id === 'growth'
+          const discounted = getPrice(tier.price)
+
+          return (
+            <div key={tier.id} className="tier-card" style={{
+              position: 'relative',
+              background: isGrowth
+                ? 'linear-gradient(160deg,rgba(99,102,241,0.08),rgba(139,92,246,0.06))'
+                : 'rgba(255,255,255,0.02)',
+              border: `1px solid ${isGrowth ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.07)'}`,
+              borderRadius: 22,
+              padding: 28,
+              boxShadow: isGrowth ? '0 8px 32px rgba(99,102,241,0.12)' : 'none',
+            }}>
+
+              {/* Badge */}
+              {tier.badge && (
+                <div style={{ position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, padding: '4px 14px', background: `rgba(${tier.accentRgb},0.9)`, color: '#fff', borderRadius: 100, fontFamily: 'Syne', boxShadow: `0 4px 12px rgba(${tier.accentRgb},0.35)` }}>
+                    {tier.badge}
+                  </span>
+                </div>
+              )}
+
+              {/* Current badge */}
+              {isActive && (
+                <div style={{ position: 'absolute', top: 18, right: 18 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#6ee7b7', borderRadius: 100 }}>✓ Current</span>
+                </div>
+              )}
+
+              {/* Plan name */}
+              <p style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 18, color: '#f0f0f5', marginBottom: 4 }}>{tier.name}</p>
+              <p style={{ fontSize: 12, color: '#4b5563', marginBottom: 20 }}>{tier.description}</p>
+
+              {/* Price */}
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4 }}>
+                  <span style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 44, color: '#f0f0f5', lineHeight: 1 }}>${discounted}</span>
+                  <span style={{ color: '#374151', fontSize: 13, marginBottom: 6 }}>/mo</span>
+                </div>
+                {billing === 'yearly' && (
+                  <p style={{ fontSize: 11, color: '#6ee7b7', marginTop: 4 }}>
+                    Billed ${discounted * 12}/yr — Save ${(tier.price - discounted) * 12}
+                  </p>
+                )}
+              </div>
+
+              {/* CTA */}
+              <button className="pr-btn" onClick={() => handleSelectPlan(tier.id)} disabled={isActive}
+                style={{
+                  width: '100%', padding: '11px 0', borderRadius: 14, fontSize: 14, marginBottom: 24,
+                  background: isActive
+                    ? 'rgba(16,185,129,0.12)'
+                    : tier.id === 'growth'
+                    ? 'linear-gradient(135deg,#6366f1,#8b5cf6)'
+                    : tier.id === 'pro'
+                    ? 'linear-gradient(135deg,#8b5cf6,#7c3aed)'
+                    : 'rgba(255,255,255,0.08)',
+                  border: isActive ? '1px solid rgba(16,185,129,0.3)' : 'none',
+                  color: isActive ? '#6ee7b7' : '#fff',
+                  boxShadow: !isActive && isGrowth ? '0 4px 18px rgba(99,102,241,0.35)' : 'none',
+                }}>
+                {isActive ? '✓ Current Plan' : tier.cta}
+              </button>
+
+              {/* Features */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                {tier.features.map((f, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+                    <div style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, marginTop: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: f.included ? `rgba(${tier.accentRgb},0.15)` : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${f.included ? `rgba(${tier.accentRgb},0.4)` : 'rgba(255,255,255,0.06)'}`,
+                    }}>
+                      {f.included
+                        ? <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke={tier.accent} strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
+                        : <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="#1f2937" strokeWidth="3"><path d="M18 6L6 18M6 6l12 12"/></svg>}
+                    </div>
+                    <span style={{ fontSize: 12, color: f.included ? '#9ca3af' : '#1f2937', lineHeight: 1.5 }}>{f.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── INCLUDED IN ALL PLANS BANNER ────────────────────────────────── */}
+      <div style={{ background: 'linear-gradient(135deg,rgba(99,102,241,0.12),rgba(139,92,246,0.08))', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 20, padding: '28px 32px', marginBottom: 24, textAlign: 'center' }}>
+        <p style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 17, marginBottom: 20 }}>Included in every plan 🎁</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
           {[
             { emoji: '🔒', text: 'Secure & Private' },
             { emoji: '📱', text: 'Mobile Friendly' },
             { emoji: '🔄', text: 'Regular Updates' },
             { emoji: '💬', text: 'Community Access' },
           ].map((item, i) => (
-            <div key={i} className="bg-white bg-opacity-20 rounded-xl p-3">
-              <div className="text-2xl mb-1">{item.emoji}</div>
-              <p className="text-sm font-medium">{item.text}</p>
+            <div key={i} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '14px 10px' }}>
+              <div style={{ fontSize: 22, marginBottom: 6 }}>{item.emoji}</div>
+              <p style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>{item.text}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Usage Limits Table */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-5">Detailed Usage Limits</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full">
+      {/* ── USAGE LIMITS TABLE ──────────────────────────────────────────── */}
+      <div style={{ ...CARD, padding: 28, marginBottom: 24 }}>
+        <p style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 17, marginBottom: 22 }}>Detailed Usage Limits</p>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left text-sm font-semibold text-gray-500 pb-3">Feature</th>
-                <th className="text-center text-sm font-semibold text-gray-500 pb-3">Solo $19</th>
-                <th className="text-center text-sm font-semibold text-blue-600 pb-3">Growth $49</th>
-                <th className="text-center text-sm font-semibold text-purple-600 pb-3">Pro $99</th>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                {[
+                  { label: 'Feature',     color: '#6b7280', align: 'left'   },
+                  { label: 'Solo $19',    color: '#6b7280', align: 'center' },
+                  { label: 'Growth $49',  color: '#a5b4fc', align: 'center' },
+                  { label: 'Pro $99',     color: '#c4b5fd', align: 'center' },
+                ].map((h, i) => (
+                  <th key={i} style={{ textAlign: h.align, fontSize: 11, fontWeight: 700, color: h.color, textTransform: 'uppercase', letterSpacing: 0.6, paddingBottom: 14 }}>{h.label}</th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody>
               {[
-                { feature: 'AI Repurpose', solo: '10/mo', growth: 'Unlimited', pro: 'Unlimited' },
-                { feature: 'Scheduled Posts', solo: '30/mo', growth: 'Unlimited', pro: 'Unlimited' },
-                { feature: 'Media Kit Pages', solo: '1', growth: '3', pro: 'Unlimited' },
-                { feature: 'Brand Deals', solo: '5', growth: 'Unlimited', pro: 'Unlimited' },
-                { feature: 'ROI Tracking Links', solo: '—', growth: '10', pro: 'Unlimited' },
-                { feature: 'Unified Inbox', solo: '—', growth: '✓', pro: '✓' },
-                { feature: 'YouTube Repurpose', solo: '—', growth: '✓', pro: '✓' },
-                { feature: 'AI Growth Insights', solo: '—', growth: 'Weekly', pro: 'Daily' },
-                { feature: 'Agency Creators', solo: '—', growth: '—', pro: '5' },
-                { feature: 'Support', solo: 'Email', growth: 'Chat', pro: 'Priority 24h' },
+                { feature: 'AI Repurpose',       solo: '10/mo',   growth: 'Unlimited', pro: 'Unlimited'  },
+                { feature: 'Scheduled Posts',    solo: '30/mo',   growth: 'Unlimited', pro: 'Unlimited'  },
+                { feature: 'Media Kit Pages',    solo: '1',       growth: '3',         pro: 'Unlimited'  },
+                { feature: 'Brand Deals',        solo: '5',       growth: 'Unlimited', pro: 'Unlimited'  },
+                { feature: 'ROI Tracking Links', solo: '—',       growth: '10',        pro: 'Unlimited'  },
+                { feature: 'Unified Inbox',      solo: '—',       growth: '✓',         pro: '✓'          },
+                { feature: 'YouTube Repurpose',  solo: '—',       growth: '✓',         pro: '✓'          },
+                { feature: 'AI Growth Insights', solo: '—',       growth: 'Weekly',    pro: 'Daily'      },
+                { feature: 'Agency Creators',    solo: '—',       growth: '—',         pro: '5'          },
+                { feature: 'Support',            solo: 'Email',   growth: 'Chat',      pro: 'Priority 24h'},
               ].map((row, i) => (
-                <tr key={i}>
-                  <td className="py-3 text-sm text-gray-700 font-medium">{row.feature}</td>
-                  <td className="py-3 text-sm text-center text-gray-500">{row.solo}</td>
-                  <td className="py-3 text-sm text-center text-blue-600 font-medium">{row.growth}</td>
-                  <td className="py-3 text-sm text-center text-purple-600 font-medium">{row.pro}</td>
+                <tr key={i} className="feat-row" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', transition: 'background .15s' }}>
+                  <td style={{ padding: '12px 0', fontSize: 13, color: '#9ca3af', fontWeight: 600 }}>{row.feature}</td>
+                  <td style={{ padding: '12px 0', fontSize: 13, textAlign: 'center', color: '#374151' }}>{row.solo}</td>
+                  <td style={{ padding: '12px 0', fontSize: 13, textAlign: 'center', color: '#a5b4fc', fontWeight: 600 }}>{row.growth}</td>
+                  <td style={{ padding: '12px 0', fontSize: 13, textAlign: 'center', color: '#c4b5fd', fontWeight: 600 }}>{row.pro}</td>
                 </tr>
               ))}
             </tbody>
@@ -266,29 +299,27 @@ export default function PricingPage() {
         </div>
       </div>
 
-      {/* FAQ */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-5">Aksar Pooche Jane Wale Sawal ❓</h2>
-        <div className="space-y-3">
+      {/* ── FAQ ─────────────────────────────────────────────────────────── */}
+      <div style={{ ...CARD, padding: 28 }}>
+        <p style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 17, marginBottom: 18 }}>Frequently Asked Questions ❓</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {FAQS.map((faq, i) => (
-            <div key={i} className="border border-gray-100 rounded-xl overflow-hidden">
-              <button
+            <div key={i} style={{ border: `1px solid ${openFaq === i ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.06)'}`, borderRadius: 14, overflow: 'hidden', transition: 'border-color .2s' }}>
+              <button className="pr-btn faq-btn"
                 onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
-              >
-                <span className="font-medium text-gray-800 text-sm">{faq.q}</span>
-                <span className="text-gray-400 ml-2">{openFaq === i ? '▲' : '▼'}</span>
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'transparent', textAlign: 'left', borderRadius: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: openFaq === i ? '#a5b4fc' : '#f0f0f5' }}>{faq.q}</span>
+                <span style={{ color: openFaq === i ? '#6366f1' : '#374151', fontSize: 11, flexShrink: 0, marginLeft: 12, transition: 'transform .2s', transform: openFaq === i ? 'rotate(180deg)' : 'rotate(0deg)', display: 'inline-block' }}>▼</span>
               </button>
               {openFaq === i && (
-                <div className="px-4 pb-3">
-                  <p className="text-gray-500 text-sm">{faq.a}</p>
+                <div style={{ padding: '0 18px 16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.7, marginTop: 12 }}>{faq.a}</p>
                 </div>
               )}
             </div>
           ))}
         </div>
       </div>
-
     </div>
   )
 }

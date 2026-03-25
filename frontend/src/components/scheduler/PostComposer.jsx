@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { supabase } from '../../lib/supabaseClient'
 import PlatformSelector from './PlatformSelector'
-import { Zap, Clock, Save } from 'lucide-react'
 
 export default function PostComposer({ onPostSaved }) {
   const [content, setContent] = useState('')
@@ -21,7 +20,6 @@ export default function PostComposer({ onPostSaved }) {
     if (localStorage.getItem('google_token')) connected.push('google')
     if (localStorage.getItem('linkedin_token')) connected.push('linkedin')
     setConnectedPlatforms(connected)
-
     const now = new Date()
     now.setHours(now.getHours() + 1)
     setScheduledDate(now.toISOString().split('T')[0])
@@ -37,11 +35,11 @@ export default function PostComposer({ onPostSaved }) {
   const isTwitterSelected = selectedPlatforms.includes('Twitter')
   const charLimit = isTwitterSelected ? 280 : 3000
   const isOverLimit = content.length > charLimit
+  const charPct = Math.min((content.length / charLimit) * 100, 100)
 
   const saveTokensToSupabase = async (userId, platforms) => {
     for (const platform of platforms) {
-      let token = null
-      let personId = null
+      let token = null, personId = null
       if (platform === 'Twitter') token = localStorage.getItem('twitter_token')
       if (platform === 'LinkedIn') {
         token = localStorage.getItem('linkedin_token')
@@ -49,10 +47,8 @@ export default function PostComposer({ onPostSaved }) {
       }
       if (token) {
         await supabase.from('social_tokens').upsert({
-          user_id: userId,
-          platform: platform.toLowerCase(),
-          access_token: token,
-          person_id: personId,
+          user_id: userId, platform: platform.toLowerCase(),
+          access_token: token, person_id: personId,
         })
       }
     }
@@ -60,164 +56,181 @@ export default function PostComposer({ onPostSaved }) {
 
   const handlePostNow = async () => {
     if (!content || selectedPlatforms.length === 0) return
-    setIsPosting(true)
-    setPostResult(null)
-
+    setIsPosting(true); setPostResult(null)
     try {
       const { data: sessionData } = await supabase.auth.getSession()
       const userId = sessionData.session.user.id
       const accessToken = sessionData.session.access_token
-
       await saveTokensToSupabase(userId, selectedPlatforms)
+      let successPlatforms = [], failedPlatforms = []
 
-      let successPlatforms = []
-      let failedPlatforms = []
-
-      // Twitter
       if (selectedPlatforms.includes('Twitter')) {
         const twitterToken = localStorage.getItem('twitter_token')
-        if (!twitterToken) {
-          failedPlatforms.push('Twitter (not connected)')
-        } else {
+        if (!twitterToken) { failedPlatforms.push('Twitter (not connected)') }
+        else {
           try {
-            await axios.post('http://localhost:8000/api/social/twitter/post', {
-              access_token: twitterToken,
-              text: content,
-            })
+            await axios.post('http://localhost:8000/api/social/twitter/post', { access_token: twitterToken, text: content })
             successPlatforms.push('Twitter')
           } catch (e) {
             const detail = e.response?.data?.detail || ''
-            if (detail.includes('402') || detail.includes('Payment')) {
-              failedPlatforms.push('Twitter (Paid API required)')
-            } else {
-              failedPlatforms.push('Twitter')
-            }
+            failedPlatforms.push(detail.includes('402') ? 'Twitter (Paid API required)' : 'Twitter')
           }
         }
       }
 
-      // LinkedIn
       if (selectedPlatforms.includes('LinkedIn')) {
         const linkedinToken = localStorage.getItem('linkedin_token')
         const personId = localStorage.getItem('linkedin_person_id')
-        if (!linkedinToken) {
-          failedPlatforms.push('LinkedIn (not connected)')
-        } else {
+        if (!linkedinToken) { failedPlatforms.push('LinkedIn (not connected)') }
+        else {
           try {
-            await axios.post('http://localhost:8000/api/social/linkedin/post', {
-              access_token: linkedinToken,
-              text: content,
-              person_id: personId,
-            })
+            await axios.post('http://localhost:8000/api/social/linkedin/post', { access_token: linkedinToken, text: content, person_id: personId })
             successPlatforms.push('LinkedIn')
-          } catch (e) {
-            console.error('LinkedIn error:', e.response?.data)
-            failedPlatforms.push('LinkedIn')
-          }
+          } catch (e) { failedPlatforms.push('LinkedIn') }
         }
       }
 
-      // Save to Supabase
-      await axios.post(
-        'http://localhost:8000/api/posts/create',
-        {
-          user_id: userId,
-          content,
-          platforms: selectedPlatforms,
-          scheduled_for: new Date().toISOString(),
-          status: successPlatforms.length > 0 ? 'published' : 'failed',
-          post_now: true,
-          published_platforms: successPlatforms,
-        },
+      await axios.post('http://localhost:8000/api/posts/create',
+        { user_id: userId, content, platforms: selectedPlatforms, scheduled_for: new Date().toISOString(), status: successPlatforms.length > 0 ? 'published' : 'failed', post_now: true, published_platforms: successPlatforms },
         { headers: { Authorization: `Bearer ${accessToken}` } }
       )
-
       setPostResult({ success: successPlatforms, failed: failedPlatforms })
       if (successPlatforms.length > 0) setContent('')
       if (onPostSaved) onPostSaved()
-
     } catch (e) {
       setPostResult({ success: [], failed: ['Error: ' + e.message] })
-    } finally {
-      setIsPosting(false)
-    }
+    } finally { setIsPosting(false) }
   }
 
   const handleSchedule = async () => {
     if (!content || selectedPlatforms.length === 0 || !scheduledDate || !scheduledTime) return
-    setIsSaving(true)
-    setPostResult(null)
-
+    setIsSaving(true); setPostResult(null)
     try {
       const { data: sessionData } = await supabase.auth.getSession()
       const userId = sessionData.session.user.id
       const accessToken = sessionData.session.access_token
-
       await saveTokensToSupabase(userId, selectedPlatforms)
-
       const scheduledFor = new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString()
-
-      await axios.post(
-        'http://localhost:8000/api/posts/create',
-        {
-          user_id: userId,
-          content,
-          platforms: selectedPlatforms,
-          scheduled_for: scheduledFor,
-          status: 'scheduled',
-          post_now: false,
-        },
+      await axios.post('http://localhost:8000/api/posts/create',
+        { user_id: userId, content, platforms: selectedPlatforms, scheduled_for: scheduledFor, status: 'scheduled', post_now: false },
         { headers: { Authorization: `Bearer ${accessToken}` } }
       )
-
-      const displayTime = new Date(`${scheduledDate}T${scheduledTime}`).toLocaleString()
-      setPostResult({ scheduled: true, time: displayTime })
+      setPostResult({ scheduled: true, time: new Date(`${scheduledDate}T${scheduledTime}`).toLocaleString() })
       setContent('')
       if (onPostSaved) onPostSaved()
-
     } catch (e) {
       setPostResult({ success: [], failed: ['Error: ' + e.message] })
-    } finally {
-      setIsSaving(false)
-    }
+    } finally { setIsSaving(false) }
   }
 
   const handleSaveDraft = async () => {
     if (!content || selectedPlatforms.length === 0) return
-    setIsSaving(true)
-    setPostResult(null)
-
+    setIsSaving(true); setPostResult(null)
     try {
       const { data: sessionData } = await supabase.auth.getSession()
       const userId = sessionData.session.user.id
       const accessToken = sessionData.session.access_token
-
-      await axios.post(
-        'http://localhost:8000/api/posts/create',
-        {
-          user_id: userId,
-          content,
-          platforms: selectedPlatforms,
-          scheduled_for: new Date().toISOString(),
-          status: 'draft',
-        },
+      await axios.post('http://localhost:8000/api/posts/create',
+        { user_id: userId, content, platforms: selectedPlatforms, scheduled_for: new Date().toISOString(), status: 'draft' },
         { headers: { Authorization: `Bearer ${accessToken}` } }
       )
-
       setPostResult({ draft: true })
       setContent('')
       if (onPostSaved) onPostSaved()
-
     } catch (e) {
       setPostResult({ success: [], failed: ['Error: ' + e.message] })
-    } finally {
-      setIsSaving(false)
-    }
+    } finally { setIsSaving(false) }
   }
 
+  const modes = [
+    { id: 'now',      label: 'Post Now',  icon: '⚡', accent: '#10b981' },
+    { id: 'schedule', label: 'Schedule',  icon: '🕐', accent: '#6366f1' },
+    { id: 'draft',    label: 'Draft',     icon: '📝', accent: '#6b7280' },
+  ]
+
   return (
-    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-      <h2 className="text-xl font-bold text-gray-800 mb-5">Create New Post ✍️</h2>
+    <div style={{
+      background: 'rgba(255,255,255,0.02)',
+      border: '1px solid rgba(255,255,255,0.08)',
+      borderRadius: 20, padding: 24,
+      fontFamily: "'Syne', 'DM Sans', sans-serif",
+    }}>
+      <style>{`
+        .composer-input {
+          width: 100%;
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 14px;
+          padding: 14px 16px;
+          color: #e5e7eb;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 14px;
+          resize: none;
+          outline: none;
+          transition: border-color 0.2s;
+          line-height: 1.6;
+        }
+        .composer-input:focus { border-color: rgba(99,102,241,0.5); }
+        .composer-input::placeholder { color: #4b5563; }
+
+        .mode-btn {
+          flex: 1;
+          padding: 9px 8px;
+          border-radius: 10px;
+          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(255,255,255,0.02);
+          color: #6b7280;
+          font-family: 'Syne', sans-serif;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.18s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 5px;
+        }
+        .mode-btn:hover { background: rgba(255,255,255,0.05); color: #d1d5db; }
+
+        .action-btn {
+          width: 100%;
+          padding: 13px;
+          border-radius: 12px;
+          border: none;
+          font-family: 'Syne', sans-serif;
+          font-size: 14px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+        .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .action-btn:not(:disabled):hover { transform: translateY(-1px); opacity: 0.9; }
+
+        .date-input {
+          width: 100%;
+          background: rgba(255,255,255,0.05);
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 10px;
+          padding: 10px 12px;
+          color: #e5e7eb;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 13px;
+          outline: none;
+          color-scheme: dark;
+        }
+        .date-input:focus { border-color: rgba(99,102,241,0.5); }
+      `}</style>
+
+      {/* Title */}
+      <div style={{ marginBottom: 18 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 800, color: '#f0f0f5', fontFamily: 'Syne' }}>
+          Create New Post ✍️
+        </h2>
+      </div>
 
       {/* Platform Selector */}
       <PlatformSelector
@@ -226,161 +239,138 @@ export default function PostComposer({ onPostSaved }) {
         connectedPlatforms={connectedPlatforms}
       />
 
-      {/* Not connected warning */}
+      {/* Warnings */}
       {connectedPlatforms.length === 0 && (
-        <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-xl">
-          <p className="text-xs text-yellow-700 font-medium">
-            ⚠️ Koi platform connected nahi —{' '}
-            <a href="/settings" className="underline font-bold">Settings</a>
-            {' '}mein connect karo!
+        <div style={{ marginBottom: 12, padding: '10px 14px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 10 }}>
+          <p style={{ fontSize: 12, color: '#fbbf24', fontFamily: 'DM Sans' }}>
+            ⚠️ No platform connected —{' '}
+            <a href="/settings" style={{ color: '#fbbf24', fontWeight: 700 }}>connect in Settings</a>
           </p>
         </div>
       )}
 
-      {/* Twitter paid warning */}
       {selectedPlatforms.includes('Twitter') && (
-        <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-xl">
-          <p className="text-xs text-blue-700 font-medium">
+        <div style={{ marginBottom: 12, padding: '10px 14px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 10 }}>
+          <p style={{ fontSize: 12, color: '#a5b4fc', fontFamily: 'DM Sans' }}>
             ℹ️ Twitter posting requires paid API plan. Schedule & Draft still work!
           </p>
         </div>
       )}
 
       {/* Textarea */}
-      <div className="relative">
+      <div style={{ position: 'relative', marginBottom: 14 }}>
         <textarea
+          className="composer-input"
+          rows={7}
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={e => setContent(e.target.value)}
           placeholder="What do you want to share with your audience?"
-          className={"w-full h-44 p-4 border rounded-xl resize-none focus:ring-2 focus:outline-none transition-all " +
-            (isOverLimit
-              ? 'border-red-300 focus:ring-red-100'
-              : 'border-gray-200 focus:ring-blue-100 focus:border-blue-400'
-            )}
+          style={{ borderColor: isOverLimit ? 'rgba(239,68,68,0.5)' : undefined }}
         />
-        <div className={"absolute bottom-3 right-3 text-xs font-semibold " +
-          (isOverLimit ? 'text-red-500' : 'text-gray-400')}>
-          {content.length} / {charLimit}
+        {/* Char counter */}
+        <div style={{ position: 'absolute', bottom: 12, right: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <svg width="22" height="22" viewBox="0 0 22 22">
+            <circle cx="11" cy="11" r="9" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="2.5" />
+            <circle cx="11" cy="11" r="9" fill="none"
+              stroke={isOverLimit ? '#ef4444' : charPct > 80 ? '#f59e0b' : '#6366f1'}
+              strokeWidth="2.5"
+              strokeDasharray={`${2 * Math.PI * 9}`}
+              strokeDashoffset={`${2 * Math.PI * 9 * (1 - charPct / 100)}`}
+              strokeLinecap="round"
+              transform="rotate(-90 11 11)"
+              style={{ transition: 'stroke-dashoffset 0.2s' }}
+            />
+          </svg>
+          <span style={{ fontSize: 11, color: isOverLimit ? '#ef4444' : '#4b5563', fontFamily: 'DM Sans', fontWeight: 600 }}>
+            {charLimit - content.length}
+          </span>
         </div>
       </div>
 
-      {/* Post Mode Selector */}
-      <div className="mt-4 flex gap-2 flex-wrap">
-        {[
-          { id: 'now', label: 'Post Now', icon: Zap, active: 'bg-green-500 text-white border-green-500' },
-          { id: 'schedule', label: 'Schedule', icon: Clock, active: 'bg-blue-500 text-white border-blue-500' },
-          { id: 'draft', label: 'Draft', icon: Save, active: 'bg-gray-600 text-white border-gray-600' },
-        ].map(mode => {
-          const Icon = mode.icon
-          return (
-            <button
-              key={mode.id}
-              onClick={() => { setPostMode(mode.id); setPostResult(null) }}
-              className={"flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all " +
-                (postMode === mode.id ? mode.active : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300')}
-            >
-              <Icon size={15} />
-              {mode.label}
-            </button>
-          )
-        })}
+      {/* Mode Selector */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {modes.map(m => (
+          <button
+            key={m.id}
+            className="mode-btn"
+            onClick={() => { setPostMode(m.id); setPostResult(null) }}
+            style={postMode === m.id ? {
+              background: m.accent + '18',
+              borderColor: m.accent + '40',
+              color: m.accent === '#6b7280' ? '#d1d5db' : m.accent,
+            } : {}}
+          >
+            <span>{m.icon}</span> {m.label}
+          </button>
+        ))}
       </div>
 
-      {/* Schedule Time Picker */}
+      {/* Schedule Picker */}
       {postMode === 'schedule' && (
-        <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
-          <p className="text-sm font-semibold text-blue-700 mb-3">⏰ Schedule Time</p>
-          <div className="grid grid-cols-2 gap-3">
+        <div style={{ marginBottom: 16, padding: '14px 16px', background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: 12 }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: '#a5b4fc', marginBottom: 10, fontFamily: 'Syne' }}>⏰ Schedule Time</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
-              <label className="text-xs text-blue-600 font-medium mb-1 block">Date</label>
-              <input
-                type="date"
-                value={scheduledDate}
-                min={new Date().toISOString().split('T')[0]}
-                onChange={e => setScheduledDate(e.target.value)}
-                className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white"
-              />
+              <label style={{ display: 'block', fontSize: 11, color: '#6b7280', marginBottom: 5, fontFamily: 'DM Sans' }}>Date</label>
+              <input type="date" className="date-input" value={scheduledDate} min={new Date().toISOString().split('T')[0]} onChange={e => setScheduledDate(e.target.value)} />
             </div>
             <div>
-              <label className="text-xs text-blue-600 font-medium mb-1 block">Time</label>
-              <input
-                type="time"
-                value={scheduledTime}
-                onChange={e => setScheduledTime(e.target.value)}
-                className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 bg-white"
-              />
+              <label style={{ display: 'block', fontSize: 11, color: '#6b7280', marginBottom: 5, fontFamily: 'DM Sans' }}>Time</label>
+              <input type="time" className="date-input" value={scheduledTime} onChange={e => setScheduledTime(e.target.value)} />
             </div>
           </div>
           {scheduledDate && scheduledTime && (
-            <p className="text-xs text-blue-500 mt-2 font-medium">
+            <p style={{ fontSize: 11, color: '#818cf8', marginTop: 8, fontFamily: 'DM Sans' }}>
               📅 Will post at: {new Date(`${scheduledDate}T${scheduledTime}`).toLocaleString()}
             </p>
           )}
         </div>
       )}
 
-      {/* Result Banner */}
+      {/* Result */}
       {postResult && (
-        <div className="mt-4">
+        <div style={{ marginBottom: 14 }}>
           {postResult.scheduled && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700 font-medium">
-              ⏰ Scheduled! Post will automatically publish at {postResult.time}
+            <div style={{ padding: '10px 14px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 10, fontSize: 12, color: '#a5b4fc', fontFamily: 'DM Sans' }}>
+              ⏰ Scheduled! Will publish at {postResult.time}
             </div>
           )}
           {postResult.draft && (
-            <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 font-medium">
+            <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, fontSize: 12, color: '#9ca3af', fontFamily: 'DM Sans' }}>
               📝 Draft saved successfully!
             </div>
           )}
           {postResult.success !== undefined && (
-            <div className={"p-3 rounded-xl border text-sm font-medium " +
-              (postResult.success.length > 0
-                ? 'bg-green-50 border-green-200 text-green-700'
-                : 'bg-red-50 border-red-200 text-red-700')}>
-              {postResult.success.length > 0 && (
-                <p>✅ Posted on: {postResult.success.join(', ')}</p>
-              )}
-              {postResult.failed.length > 0 && (
-                <p className="mt-1">❌ Failed: {postResult.failed.join(', ')}</p>
-              )}
+            <div style={{ padding: '10px 14px', background: postResult.success.length > 0 ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${postResult.success.length > 0 ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`, borderRadius: 10, fontSize: 12, fontFamily: 'DM Sans', color: postResult.success.length > 0 ? '#6ee7b7' : '#fca5a5' }}>
+              {postResult.success.length > 0 && <p>✅ Posted: {postResult.success.join(', ')}</p>}
+              {postResult.failed.length > 0 && <p style={{ marginTop: 4 }}>❌ Failed: {postResult.failed.join(', ')}</p>}
             </div>
           )}
         </div>
       )}
 
       {/* Action Button */}
-      <div className="mt-4">
-        {postMode === 'now' && (
-          <button
-            onClick={handlePostNow}
-            disabled={!content || isOverLimit || selectedPlatforms.length === 0 || isPosting}
-            className="w-full py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-semibold transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            <Zap size={18} />
-            {isPosting ? 'Posting...' : 'Post Now!'}
-          </button>
-        )}
-        {postMode === 'schedule' && (
-          <button
-            onClick={handleSchedule}
-            disabled={!content || isOverLimit || selectedPlatforms.length === 0 || !scheduledDate || !scheduledTime || isSaving}
-            className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-semibold transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            <Clock size={18} />
-            {isSaving ? 'Scheduling...' : 'Schedule Post!'}
-          </button>
-        )}
-        {postMode === 'draft' && (
-          <button
-            onClick={handleSaveDraft}
-            disabled={!content || isOverLimit || selectedPlatforms.length === 0 || isSaving}
-            className="w-full py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-xl font-semibold transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            <Save size={18} />
-            {isSaving ? 'Saving...' : 'Save as Draft'}
-          </button>
-        )}
-      </div>
+      {postMode === 'now' && (
+        <button className="action-btn" onClick={handlePostNow}
+          disabled={!content || isOverLimit || selectedPlatforms.length === 0 || isPosting}
+          style={{ background: 'linear-gradient(135deg,#10b981,#059669)', color: 'white' }}>
+          ⚡ {isPosting ? 'Posting...' : 'Post Now!'}
+        </button>
+      )}
+      {postMode === 'schedule' && (
+        <button className="action-btn" onClick={handleSchedule}
+          disabled={!content || isOverLimit || selectedPlatforms.length === 0 || !scheduledDate || !scheduledTime || isSaving}
+          style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: 'white' }}>
+          🕐 {isSaving ? 'Scheduling...' : 'Schedule Post!'}
+        </button>
+      )}
+      {postMode === 'draft' && (
+        <button className="action-btn" onClick={handleSaveDraft}
+          disabled={!content || isOverLimit || selectedPlatforms.length === 0 || isSaving}
+          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#d1d5db' }}>
+          📝 {isSaving ? 'Saving...' : 'Save as Draft'}
+        </button>
+      )}
     </div>
   )
 }

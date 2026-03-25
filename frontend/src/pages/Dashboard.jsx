@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { Users, CalendarCheck, TrendingUp, Link, Copy, CheckCheck, Zap, Clock, ArrowRight } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
@@ -14,25 +13,18 @@ export default function Dashboard() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-    })
+    supabase.auth.getSession().then(({ data }) => setSession(data.session))
   }, [])
 
   useEffect(() => {
-    if (session) {
-      fetchProfile()
-      fetchStats()
-    }
+    if (session) { fetchProfile(); fetchStats() }
   }, [session])
 
   const fetchProfile = async () => {
     try {
       const { data } = await supabase
-        .from('profiles')
-        .select('username, full_name')
-        .eq('id', session.user.id)
-        .single()
+        .from('profiles').select('username, full_name')
+        .eq('id', session.user.id).single()
       if (data) setProfile(data)
     } catch (e) {}
   }
@@ -45,7 +37,6 @@ export default function Dashboard() {
       )
       const posts = postsRes.data?.data || []
       setScheduledCount(posts.length)
-
       const now = new Date()
       const upcoming = posts
         .filter(p => new Date(p.scheduled_for) >= now)
@@ -64,8 +55,7 @@ export default function Dashboard() {
   }
 
   const publicUrl = profile?.username
-    ? window.location.origin + "/u/" + profile.username
-    : null
+    ? window.location.origin + "/u/" + profile.username : null
 
   const handleCopy = () => {
     if (!publicUrl) return
@@ -74,94 +64,166 @@ export default function Dashboard() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const getPlatformStyle = (platforms) => {
+    if (platforms?.includes('twitter'))  return { label: 'Twitter',  color: '#1d9bf0' }
+    if (platforms?.includes('linkedin')) return { label: 'LinkedIn', color: '#0077b5' }
+    if (platforms?.includes('youtube'))  return { label: 'YouTube',  color: '#ff0000' }
+    return { label: 'Post', color: '#6b7280' }
+  }
+
   const stats = [
-    {
-      label: 'Scheduled Posts',
-      value: scheduledCount.toString(),
-      icon: CalendarCheck,
-      sub: 'Total drafts & scheduled',
-      color: 'text-blue-600',
-      bg: 'bg-blue-50',
-      border: 'border-blue-100'
-    },
-    {
-      label: 'Pipeline Value',
-      value: '$' + pipelineValue.toLocaleString(),
-      icon: TrendingUp,
-      sub: 'Active brand deals',
-      color: 'text-emerald-600',
-      bg: 'bg-emerald-50',
-      border: 'border-emerald-100'
-    },
-    {
-      label: 'Total Audience',
-      value: '—',
-      icon: Users,
-      sub: 'Connect accounts to see',
-      color: 'text-purple-600',
-      bg: 'bg-purple-50',
-      border: 'border-purple-100'
-    },
+    { label: 'Scheduled Posts',  value: scheduledCount.toString(),         sub: 'Total drafts & scheduled', icon: '📅', accent: '#6366f1' },
+    { label: 'Pipeline Value',   value: '$' + pipelineValue.toLocaleString(), sub: 'Active brand deals',      icon: '💰', accent: '#10b981' },
+    { label: 'Total Audience',   value: '—',                               sub: 'Connect accounts to see',  icon: '👥', accent: '#8b5cf6' },
   ]
 
   const quickActions = [
-    { label: 'Schedule a Post', icon: CalendarCheck, path: '/schedule', color: 'bg-blue-600' },
-    { label: 'Generate Clips', icon: Zap, path: '/auto-clip', color: 'bg-violet-600' },
-    { label: 'Write a Script', icon: ArrowRight, path: '/script-studio', color: 'bg-emerald-600' },
+    { label: 'Schedule a Post', icon: '📅', path: '/schedule',      accent: '#6366f1' },
+    { label: 'Generate Clips',  icon: '✂️', path: '/auto-clip',     accent: '#8b5cf6' },
+    { label: 'Write a Script',  icon: '✍️', path: '/script-studio', accent: '#10b981' },
+    { label: 'Brand Deals',     icon: '🤝', path: '/deals',         accent: '#f59e0b' },
+    { label: 'YouTube Studio',  icon: '🎬', path: '/youtube-studio',accent: '#ef4444' },
+    { label: 'AI Tools',        icon: '🤖', path: '/ai-tools',      accent: '#06b6d4' },
   ]
 
-  const getPlatformStyle = (platforms) => {
-    if (platforms?.includes('twitter')) return { label: 'Twitter', cls: 'bg-blue-100 text-blue-600' }
-    if (platforms?.includes('linkedin')) return { label: 'LinkedIn', cls: 'bg-sky-100 text-sky-700' }
-    if (platforms?.includes('youtube')) return { label: 'YouTube', cls: 'bg-red-100 text-red-600' }
-    return { label: 'Post', cls: 'bg-gray-100 text-gray-600' }
+  const greeting = () => {
+    const h = new Date().getHours()
+    if (h < 12) return 'Good morning'
+    if (h < 18) return 'Good afternoon'
+    return 'Good evening'
   }
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div style={{ fontFamily: "'Syne', 'DM Sans', sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+        @keyframes fadeUp { from { opacity:0; transform:translateY(16px) } to { opacity:1; transform:translateY(0) } }
+        @keyframes shimmer {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+        .dash-fadein { animation: fadeUp 0.5s ease both; }
+        .dash-fadein-2 { animation: fadeUp 0.5s 0.08s ease both; }
+        .dash-fadein-3 { animation: fadeUp 0.5s 0.16s ease both; }
+        .dash-fadein-4 { animation: fadeUp 0.5s 0.24s ease both; }
+        .dash-fadein-5 { animation: fadeUp 0.5s 0.32s ease both; }
 
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">
-          Welcome back, {profile?.full_name || 'Creator'}! 🚀
-        </h1>
-        <p className="text-gray-500 mt-1 text-sm">Here's a summary of your brand's performance today.</p>
-      </div>
+        .shimmer-text {
+          background: linear-gradient(90deg, #a5b4fc, #818cf8, #c4b5fd, #818cf8, #a5b4fc);
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          animation: shimmer 3s linear infinite;
+        }
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {stats.map((stat, i) => {
-          const Icon = stat.icon
-          return (
-            <div key={i} className={`bg-white p-5 rounded-xl border ${stat.border} shadow-sm flex items-center justify-between`}>
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{stat.label}</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
-                <p className="text-xs mt-1.5 text-gray-400">{stat.sub}</p>
+        .stat-card {
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.07);
+          border-radius: 18px;
+          padding: 22px 20px;
+          transition: transform 0.2s, border-color 0.2s;
+        }
+        .stat-card:hover {
+          transform: translateY(-2px);
+          border-color: rgba(255,255,255,0.12);
+        }
+
+        .action-card {
+          background: rgba(255,255,255,0.02);
+          border: 1px solid rgba(255,255,255,0.06);
+          border-radius: 14px;
+          padding: 16px;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          text-align: left;
+        }
+        .action-card:hover {
+          background: rgba(255,255,255,0.05);
+          border-color: rgba(255,255,255,0.12);
+          transform: translateY(-2px);
+        }
+
+        .post-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 14px;
+          background: rgba(255,255,255,0.02);
+          border: 1px solid rgba(255,255,255,0.05);
+          border-radius: 12px;
+          transition: background 0.2s;
+        }
+        .post-row:hover { background: rgba(255,255,255,0.04); }
+
+        .section-card {
+          background: rgba(255,255,255,0.02);
+          border: 1px solid rgba(255,255,255,0.07);
+          border-radius: 20px;
+          padding: 24px;
+        }
+      `}</style>
+
+      <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+        {/* ── Header ── */}
+        <div className="dash-fadein">
+          <p style={{ fontSize: 13, color: '#6b7280', fontFamily: 'DM Sans', marginBottom: 4 }}>
+            {greeting()},
+          </p>
+          <h1 style={{ fontSize: 32, fontWeight: 800, color: '#f0f0f5', letterSpacing: '-1px', lineHeight: 1.1 }}>
+            {profile?.full_name || 'Creator'} <span className="shimmer-text">🚀</span>
+          </h1>
+          <p style={{ fontSize: 13, color: '#6b7280', marginTop: 6, fontFamily: 'DM Sans' }}>
+            Here's your brand performance summary for today.
+          </p>
+        </div>
+
+        {/* ── Stats ── */}
+        <div className="dash-fadein-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          {stats.map((s, i) => (
+            <div key={i} className="stat-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+                <p style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.8, fontFamily: 'DM Sans' }}>
+                  {s.label}
+                </p>
+                <div style={{
+                  width: 34, height: 34, borderRadius: 10,
+                  background: s.accent + '18',
+                  border: `1px solid ${s.accent}30`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                }}>{s.icon}</div>
               </div>
-              <div className={`p-3 rounded-xl ${stat.bg}`}>
-                <Icon size={22} className={stat.color} />
-              </div>
+              <p style={{ fontSize: 28, fontWeight: 800, color: '#f0f0f5', letterSpacing: '-1px' }}>{s.value}</p>
+              <p style={{ fontSize: 12, color: '#4b5563', marginTop: 4, fontFamily: 'DM Sans' }}>{s.sub}</p>
             </div>
-          )
-        })}
-      </div>
+          ))}
+        </div>
 
-      {/* Media Kit Banner */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-5 text-white">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white bg-opacity-20 rounded-lg">
-              <Link size={18} />
-            </div>
+        {/* ── Media Kit Banner ── */}
+        <div className="dash-fadein-3" style={{
+          background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.15))',
+          border: '1px solid rgba(99,102,241,0.3)',
+          borderRadius: 20, padding: '20px 24px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 12,
+              background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+            }}>🔗</div>
             <div>
-              <p className="font-semibold text-sm">Your Public Media Kit</p>
+              <p style={{ fontSize: 14, fontWeight: 700, color: '#f0f0f5' }}>Your Public Media Kit</p>
               {publicUrl ? (
-                <p className="text-blue-200 text-xs mt-0.5">{publicUrl}</p>
+                <p style={{ fontSize: 12, color: '#a5b4fc', marginTop: 2, fontFamily: 'DM Sans' }}>{publicUrl}</p>
               ) : (
-                <p className="text-blue-200 text-xs mt-0.5">
+                <p style={{ fontSize: 12, color: '#6b7280', marginTop: 2, fontFamily: 'DM Sans' }}>
                   No username set —{' '}
-                  <button onClick={() => navigate('/settings')} className="underline hover:text-white">
+                  <button onClick={() => navigate('/settings')} style={{ background: 'none', border: 'none', color: '#a5b4fc', cursor: 'pointer', padding: 0, fontSize: 12, textDecoration: 'underline' }}>
                     Set it in Settings
                   </button>
                 </p>
@@ -169,83 +231,104 @@ export default function Dashboard() {
             </div>
           </div>
           {publicUrl && (
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 rounded-lg font-semibold text-sm hover:bg-blue-50 transition-colors shadow-sm"
-            >
-              {copied ? <><CheckCheck size={14} /> Copied!</> : <><Copy size={14} /> Copy Link</>}
+            <button onClick={handleCopy} style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '9px 18px',
+              background: copied ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.08)',
+              border: `1px solid ${copied ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.15)'}`,
+              borderRadius: 10, color: copied ? '#6ee7b7' : '#f0f0f5',
+              fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              fontFamily: 'Syne', transition: 'all 0.2s', whiteSpace: 'nowrap',
+            }}>
+              {copied ? '✅ Copied!' : '📋 Copy Link'}
             </button>
           )}
         </div>
-      </div>
 
-      {/* Quick Actions */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Quick Actions</h2>
-        <div className="grid grid-cols-3 gap-3">
-          {quickActions.map((action, i) => {
-            const Icon = action.icon
-            return (
-              <button
-                key={i}
-                onClick={() => navigate(action.path)}
-                className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:border-blue-200 hover:bg-blue-50 transition-all text-left group"
-              >
-                <div className={`p-2 rounded-lg ${action.color}`}>
-                  <Icon size={14} className="text-white" />
-                </div>
-                <span className="text-sm font-medium text-gray-700 group-hover:text-blue-700">{action.label}</span>
+        {/* ── Quick Actions ── */}
+        <div className="dash-fadein-4 section-card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.8, fontFamily: 'DM Sans' }}>
+              Quick Actions
+            </p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            {quickActions.map((a, i) => (
+              <button key={i} className="action-card" onClick={() => navigate(a.path)}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                  background: a.accent + '18', border: `1px solid ${a.accent}30`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
+                }}>{a.icon}</div>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#d1d5db', fontFamily: 'Syne' }}>{a.label}</span>
               </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Upcoming Content */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Clock size={16} className="text-gray-400" />
-            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Upcoming Content</h2>
+            ))}
           </div>
-          <button
-            onClick={() => navigate('/schedule')}
-            className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-          >
-            View All <ArrowRight size={12} />
-          </button>
         </div>
 
-        {upcomingPosts.length > 0 ? (
-          <div className="space-y-2">
-            {upcomingPosts.map((post, i) => {
-              const platform = getPlatformStyle(post.platforms)
-              return (
-                <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                  <span className={`px-2 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap ${platform.cls}`}>
-                    {platform.label}
-                  </span>
-                  <p className="text-sm text-gray-700 flex-1 truncate">{post.content}</p>
-                  <p className="text-xs text-gray-400 whitespace-nowrap">
-                    {new Date(post.scheduled_for).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </p>
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center">
-            <p className="text-gray-400 text-sm">No upcoming posts scheduled.</p>
-            <button
-              onClick={() => navigate('/schedule')}
-              className="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-            >
-              Create New Post
+        {/* ── Upcoming Content ── */}
+        <div className="dash-fadein-5 section-card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 15 }}>🕐</span>
+              <p style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.8, fontFamily: 'DM Sans' }}>
+                Upcoming Content
+              </p>
+            </div>
+            <button onClick={() => navigate('/schedule')} style={{
+              background: 'none', border: 'none', color: '#a5b4fc',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Syne',
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}>
+              View All →
             </button>
           </div>
-        )}
-      </div>
 
+          {upcomingPosts.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {upcomingPosts.map((post, i) => {
+                const platform = getPlatformStyle(post.platforms)
+                return (
+                  <div key={i} className="post-row">
+                    <span style={{
+                      padding: '3px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                      background: platform.color + '18', color: platform.color,
+                      border: `1px solid ${platform.color}30`, whiteSpace: 'nowrap', fontFamily: 'Syne',
+                    }}>
+                      {platform.label}
+                    </span>
+                    <p style={{ fontSize: 13, color: '#9ca3af', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'DM Sans' }}>
+                      {post.content}
+                    </p>
+                    <p style={{ fontSize: 12, color: '#4b5563', whiteSpace: 'nowrap', fontFamily: 'DM Sans' }}>
+                      {new Date(post.scheduled_for).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div style={{
+              border: '2px dashed rgba(255,255,255,0.08)', borderRadius: 14,
+              padding: '40px 20px', textAlign: 'center',
+            }}>
+              <p style={{ fontSize: 32, marginBottom: 10 }}>📭</p>
+              <p style={{ fontSize: 14, color: '#4b5563', fontFamily: 'DM Sans', marginBottom: 16 }}>
+                No upcoming posts scheduled yet.
+              </p>
+              <button onClick={() => navigate('/schedule')} style={{
+                background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                color: 'white', border: 'none', padding: '10px 22px',
+                borderRadius: 10, fontSize: 13, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'Syne',
+              }}>
+                Create New Post
+              </button>
+            </div>
+          )}
+        </div>
+
+      </div>
     </div>
   )
 }
