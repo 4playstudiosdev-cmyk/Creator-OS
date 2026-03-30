@@ -374,3 +374,4 @@ export default function PostComposer({ onPostSaved }) {
     </div>
   )
 }
+

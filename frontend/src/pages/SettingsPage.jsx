@@ -357,9 +357,9 @@ export default function SettingsPage() {
                 <p style={{ fontSize: 12, color: '#fbbf24', lineHeight: 1.7 }}>
                   <span style={{ fontWeight: 700 }}>⚠️ One-time setup:</span> Add{' '}
                   <code style={{ background: 'rgba(245,158,11,0.12)', padding: '1px 6px', borderRadius: 5, fontFamily: 'monospace', fontSize: 11 }}>
-                    ' + import.meta.env.VITE_API_URL + '/api/clipping/oauth-callback
+                    
                   </code>{' '}
-                  as a redirect URI in Google Cloud Console, then click Connect.
+                  
                 </p>
               </div>
             )}
@@ -482,3 +482,4 @@ function StatBox({ label, value, accent = '#6366f1' }) {
     </div>
   )
 }
+
