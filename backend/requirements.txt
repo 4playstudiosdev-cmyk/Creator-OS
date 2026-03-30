@@ -12,3 +12,6 @@ google-auth
 google-auth-oauthlib
 google-api-python-client
 python-multipart
+youtube-transcript-api
+tweepy
+apscheduler
