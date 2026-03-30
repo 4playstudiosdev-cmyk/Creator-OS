@@ -22,7 +22,7 @@ async function callAI(prompt) {
   try {
     const { data: { session } } = await supabase.auth.getSession()
     const token = session?.access_token || ''
-    const res = await fetch('http://localhost:8000/api/ai/generate', {
+    const res = await fetch('' + import.meta.env.VITE_API_URL + '/api/ai/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({ prompt, max_tokens: 600 })

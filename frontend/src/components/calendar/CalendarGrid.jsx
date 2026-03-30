@@ -34,7 +34,7 @@ export default function CalendarGrid() {
       const { data: s } = await supabase.auth.getSession()
       if (!s.session) return
       const res = await axios.get(
-        `http://localhost:8000/api/posts/user/${s.session.user.id}`,
+        `' + import.meta.env.VITE_API_URL + '/api/posts/user/${s.session.user.id}`,
         { headers: { Authorization: `Bearer ${s.session.access_token}` } }
       )
       setPosts(res.data.data || [])
@@ -62,7 +62,7 @@ export default function CalendarGrid() {
     try {
       const { data: s } = await supabase.auth.getSession()
       await axios.put(
-        `http://localhost:8000/api/posts/${draggableId}/reschedule`,
+        `' + import.meta.env.VITE_API_URL + '/api/posts/${draggableId}/reschedule`,
         { scheduled_for: newDate },
         { headers: { Authorization: `Bearer ${s.session.access_token}`, 'Content-Type': 'application/json' } }
       )

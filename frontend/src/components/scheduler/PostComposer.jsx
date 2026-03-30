@@ -69,7 +69,7 @@ export default function PostComposer({ onPostSaved }) {
         if (!twitterToken) { failedPlatforms.push('Twitter (not connected)') }
         else {
           try {
-            await axios.post('http://localhost:8000/api/social/twitter/post', { access_token: twitterToken, text: content })
+            await axios.post('' + import.meta.env.VITE_API_URL + '/api/social/twitter/post', { access_token: twitterToken, text: content })
             successPlatforms.push('Twitter')
           } catch (e) {
             const detail = e.response?.data?.detail || ''
@@ -84,13 +84,13 @@ export default function PostComposer({ onPostSaved }) {
         if (!linkedinToken) { failedPlatforms.push('LinkedIn (not connected)') }
         else {
           try {
-            await axios.post('http://localhost:8000/api/social/linkedin/post', { access_token: linkedinToken, text: content, person_id: personId })
+            await axios.post('' + import.meta.env.VITE_API_URL + '/api/social/linkedin/post', { access_token: linkedinToken, text: content, person_id: personId })
             successPlatforms.push('LinkedIn')
           } catch (e) { failedPlatforms.push('LinkedIn') }
         }
       }
 
-      await axios.post('http://localhost:8000/api/posts/create',
+      await axios.post('' + import.meta.env.VITE_API_URL + '/api/posts/create',
         { user_id: userId, content, platforms: selectedPlatforms, scheduled_for: new Date().toISOString(), status: successPlatforms.length > 0 ? 'published' : 'failed', post_now: true, published_platforms: successPlatforms },
         { headers: { Authorization: `Bearer ${accessToken}` } }
       )
@@ -111,7 +111,7 @@ export default function PostComposer({ onPostSaved }) {
       const accessToken = sessionData.session.access_token
       await saveTokensToSupabase(userId, selectedPlatforms)
       const scheduledFor = new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString()
-      await axios.post('http://localhost:8000/api/posts/create',
+      await axios.post('' + import.meta.env.VITE_API_URL + '/api/posts/create',
         { user_id: userId, content, platforms: selectedPlatforms, scheduled_for: scheduledFor, status: 'scheduled', post_now: false },
         { headers: { Authorization: `Bearer ${accessToken}` } }
       )
@@ -130,7 +130,7 @@ export default function PostComposer({ onPostSaved }) {
       const { data: sessionData } = await supabase.auth.getSession()
       const userId = sessionData.session.user.id
       const accessToken = sessionData.session.access_token
-      await axios.post('http://localhost:8000/api/posts/create',
+      await axios.post('' + import.meta.env.VITE_API_URL + '/api/posts/create',
         { user_id: userId, content, platforms: selectedPlatforms, scheduled_for: new Date().toISOString(), status: 'draft' },
         { headers: { Authorization: `Bearer ${accessToken}` } }
       )

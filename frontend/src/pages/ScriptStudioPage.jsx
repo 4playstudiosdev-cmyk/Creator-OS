@@ -50,7 +50,7 @@ export default function ScriptStudioPage() {
     try {
       const { data: sd } = await supabase.auth.getSession()
       if (!sd.session) throw new Error('Login zaroori hai')
-      const res = await fetch('http://localhost:8000/api/ai/script', {
+      const res = await fetch('' + import.meta.env.VITE_API_URL + '/api/ai/script', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sd.session.access_token}` },
         body: JSON.stringify({ topic: topic.trim(), platform, duration, tone, target_audience: targetAudience || 'General audience' }),

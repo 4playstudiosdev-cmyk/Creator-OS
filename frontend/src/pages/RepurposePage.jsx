@@ -38,7 +38,7 @@ async function callGroqAI(prompt) {
   const { data: { session } } = await supabase.auth.getSession()
   const token = session?.access_token || ''
 
-  const res = await fetch('http://localhost:8000/api/repurpose/generate', {
+  const res = await fetch('' + import.meta.env.VITE_API_URL + '/api/repurpose/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     body: JSON.stringify({ prompt })
@@ -102,7 +102,7 @@ export default function RepurposePage() {
         const { data: { session } } = await supabase.auth.getSession()
         const token = session?.access_token || ''
 
-        const transcriptRes = await fetch(`http://localhost:8000/api/repurpose/transcript?video_id=${videoId}`, {
+        const transcriptRes = await fetch(`' + import.meta.env.VITE_API_URL + '/api/repurpose/transcript?video_id=${videoId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
 

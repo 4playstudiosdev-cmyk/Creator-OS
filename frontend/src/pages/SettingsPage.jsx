@@ -60,7 +60,7 @@ export default function SettingsPage() {
     setTwitterConnected(!!localStorage.getItem('twitter_token'))
     setLinkedinConnected(!!localStorage.getItem('linkedin_token'))
     try {
-      const r = await fetch('http://localhost:8000/api/clipping/youtube-status')
+      const r = await fetch('' + import.meta.env.VITE_API_URL + '/api/clipping/youtube-status')
       const d = await r.json()
       setYtConnected(d.connected)
     } catch { setYtConnected(false) }
@@ -72,15 +72,15 @@ export default function SettingsPage() {
     const lToken = localStorage.getItem('linkedin_token')
     try {
       if (tToken) {
-        const r = await fetch(`http://localhost:8000/api/social/twitter/stats?access_token=${tToken}`)
+        const r = await fetch(`' + import.meta.env.VITE_API_URL + '/api/social/twitter/stats?access_token=${tToken}`)
         const d = await r.json()
         if (!d.error) setTwitterStats(d)
       }
-      const ytR = await fetch('http://localhost:8000/api/social/youtube/stats')
+      const ytR = await fetch('' + import.meta.env.VITE_API_URL + '/api/social/youtube/stats')
       const ytD = await ytR.json()
       if (!ytD.error) setYoutubeStats(ytD)
       if (lToken) {
-        const r = await fetch(`http://localhost:8000/api/social/linkedin/stats?access_token=${lToken}`)
+        const r = await fetch(`' + import.meta.env.VITE_API_URL + '/api/social/linkedin/stats?access_token=${lToken}`)
         const d = await r.json()
         if (!d.error) setLinkedinStats(d)
       }
@@ -111,13 +111,13 @@ export default function SettingsPage() {
     setSaving(false)
   }
 
-  const handleConnectTwitter  = async () => { const r = await fetch('http://localhost:8000/api/social/twitter/auth'); const d = await r.json(); window.location.href = d.url }
-  const handleConnectLinkedIn = async () => { const r = await fetch('http://localhost:8000/api/social/linkedin/auth'); const d = await r.json(); window.location.href = d.url }
+  const handleConnectTwitter  = async () => { const r = await fetch('' + import.meta.env.VITE_API_URL + '/api/social/twitter/auth'); const d = await r.json(); window.location.href = d.url }
+  const handleConnectLinkedIn = async () => { const r = await fetch('' + import.meta.env.VITE_API_URL + '/api/social/linkedin/auth'); const d = await r.json(); window.location.href = d.url }
 
   const handleConnectYouTube = async () => {
     setYtConnecting(true)
     try {
-      const r = await fetch('http://localhost:8000/api/clipping/connect-youtube', { method: 'POST' })
+      const r = await fetch('' + import.meta.env.VITE_API_URL + '/api/clipping/connect-youtube', { method: 'POST' })
       const d = await r.json()
       if (d.auth_url) window.location.href = d.auth_url
       else setMessage({ type: 'error', text: d.detail || 'Auth URL not received' })
@@ -357,7 +357,7 @@ export default function SettingsPage() {
                 <p style={{ fontSize: 12, color: '#fbbf24', lineHeight: 1.7 }}>
                   <span style={{ fontWeight: 700 }}>⚠️ One-time setup:</span> Add{' '}
                   <code style={{ background: 'rgba(245,158,11,0.12)', padding: '1px 6px', borderRadius: 5, fontFamily: 'monospace', fontSize: 11 }}>
-                    http://localhost:8000/api/clipping/oauth-callback
+                    ' + import.meta.env.VITE_API_URL + '/api/clipping/oauth-callback
                   </code>{' '}
                   as a redirect URI in Google Cloud Console, then click Connect.
                 </p>

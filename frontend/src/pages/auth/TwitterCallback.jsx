@@ -9,7 +9,7 @@ export default function TwitterCallback() {
     const code = params.get('code')
 
     if (code) {
-      fetch('http://localhost:8000/api/social/twitter/token', {
+      fetch('' + import.meta.env.VITE_API_URL + '/api/social/twitter/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code }),

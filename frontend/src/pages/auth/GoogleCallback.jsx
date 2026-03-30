@@ -9,7 +9,7 @@ export default function GoogleCallback() {
     const code = params.get('code')
 
     if (code) {
-      fetch('http://localhost:8000/api/social/google/token', {
+      fetch('' + import.meta.env.VITE_API_URL + '/api/social/google/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code }),

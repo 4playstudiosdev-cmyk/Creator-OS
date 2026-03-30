@@ -111,7 +111,7 @@ export default function BrandDeals() {
     if (!session) return
     setLoading(true)
     try {
-      const res = await axios.get(`http://localhost:8000/api/deals/user/${session.user.id}`, { headers: { Authorization:'Bearer '+session.access_token } })
+      const res = await axios.get(`' + import.meta.env.VITE_API_URL + '/api/deals/user/${session.user.id}`, { headers: { Authorization:'Bearer '+session.access_token } })
       setDeals(res.data || [])
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
@@ -126,7 +126,7 @@ export default function BrandDeals() {
     const newStatus = destination.droppableId
     setDeals(prev => prev.map(d => d.id === draggableId ? { ...d, status: newStatus } : d))
     try {
-      await axios.put(`http://localhost:8000/api/deals/${draggableId}/status`, { status: newStatus }, { headers: { Authorization:'Bearer '+session.access_token } })
+      await axios.put(`' + import.meta.env.VITE_API_URL + '/api/deals/${draggableId}/status`, { status: newStatus }, { headers: { Authorization:'Bearer '+session.access_token } })
     } catch { fetchDeals() }
   }
 
@@ -134,7 +134,7 @@ export default function BrandDeals() {
     if (!formData.brand_name.trim()) return
     setSaving(true)
     try {
-      await axios.post('http://localhost:8000/api/deals/create', {
+      await axios.post('' + import.meta.env.VITE_API_URL + '/api/deals/create', {
         brand_name: formData.brand_name, contact_email: formData.contact_email,
         amount: parseFloat(formData.amount)||0, deliverables: formData.deliverables,
         status: formData.status, due_date: formData.due_date||null,
@@ -147,7 +147,7 @@ export default function BrandDeals() {
   const handleDelete = async (id) => {
     if (!window.confirm('Ye deal delete karein?')) return
     try {
-      await axios.delete(`http://localhost:8000/api/deals/${id}`, { headers: { Authorization:'Bearer '+session.access_token } })
+      await axios.delete(`' + import.meta.env.VITE_API_URL + '/api/deals/${id}`, { headers: { Authorization:'Bearer '+session.access_token } })
       setDeals(prev => prev.filter(d => d.id !== id))
     } catch (e) { alert('Delete nahi hua: '+e.message) }
   }
