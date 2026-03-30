@@ -9,7 +9,7 @@ import Dashboard from './pages/Dashboard'
 import SchedulerPage from './pages/SchedulerPage'
 import MediaKitPage from './pages/MediaKitPage'
 import PublicProfile from './pages/PublicProfile'
-import ROIRedirect from './pages/ROIRedirect'
+import ROIRedirect from "./pages/Roiredirect";
 import RepurposePage from './pages/RepurposePage'
 import BrandDeals from './pages/BrandDeals'
 import SettingsPage from './pages/SettingsPage'
