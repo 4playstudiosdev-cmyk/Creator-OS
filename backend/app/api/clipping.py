@@ -88,7 +88,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/youtube.readonly",
     "https://www.googleapis.com/auth/youtube.force-ssl",
 ]
-REDIRECT_URI = "http://localhost:8000/api/clipping/oauth-callback"
+REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/clipping/oauth-callback")
 
 
 # ── YouTube Status ────────────────────────────────────────────────────────────
