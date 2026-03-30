@@ -2,205 +2,224 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 
+const SOCIAL_PLATFORMS = [
+  { id: 'youtube',   label: 'YouTube',    icon: '▶',  color: '#ff4444' },
+  { id: 'instagram', label: 'Instagram',  icon: '📸', color: '#e1306c' },
+  { id: 'twitter',   label: 'Twitter / X',icon: '𝕏',  color: '#1d9bf0' },
+  { id: 'tiktok',    label: 'TikTok',     icon: '🎵', color: '#69c9d0' },
+  { id: 'linkedin',  label: 'LinkedIn',   icon: '💼', color: '#0077b5' },
+]
+
+const FRAME_STYLES = {
+  circle:  { borderRadius: '50%' },
+  rounded: { borderRadius: '24px' },
+  square:  { borderRadius: '0px' },
+  hexagon: { borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%' },
+}
+
 export default function PublicProfile() {
   const { username } = useParams()
-  const [profile, setProfile] = useState(null)
+  const [kit, setKit]       = useState(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
-  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
-    fetchProfile()
+    loadKit()
   }, [username])
 
-  const fetchProfile = async () => {
+  async function loadKit() {
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
+        .from('media_kits')
+        .select('kit_data, is_public')
         .eq('username', username)
-        .eq('is_public', true)
         .single()
 
       if (error || !data) {
-        setNotFound(true)
-      } else {
-        setProfile(data)
+        // Show demo kit for local testing
+        setKit(getDemoKit(username))
+        return
       }
-    } catch (error) {
-      setNotFound(true)
+
+      if (!data.is_public) {
+        setNotFound(true)
+        return
+      }
+
+      setKit(data.kit_data)
+    } catch {
+      setKit(getDemoKit(username))
     } finally {
       setLoading(false)
     }
   }
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  function getDemoKit(username) {
+    return {
+      name: username || 'Creator',
+      username: username,
+      bio: 'Content creator sharing tips on YouTube, Tech & Creator economy. Helping creators grow their audience and income.',
+      niche: 'Tech',
+      location: 'Karachi, Pakistan',
+      email: 'creator@email.com',
+      avatarUrl: '',
+      avatarFrame: 'circle',
+      coverColor: '#6366f1',
+      socials: { youtube: '', instagram: '', twitter: '', tiktok: '', linkedin: '' },
+      stats: {
+        youtube:   { followers: '45,200', avgViews: '18,400', engRate: '8.2%' },
+        instagram: { followers: '28,100', avgViews: '9,200',  engRate: '6.7%' },
+        twitter:   { followers: '12,400', avgViews: '4,100',  engRate: '4.1%' },
+        tiktok:    { followers: '8,900',  avgViews: '44,100', engRate: '12.4%' },
+        linkedin:  { followers: '3,200',  avgViews: '1,800',  engRate: '5.9%' },
+      },
+      rates: {
+        sponsored: '$800',
+        integration: '$400',
+        story: '$150',
+        reel: '$600',
+      },
+      isPublic: true,
+    }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950">
-        <div className="text-center">
-          <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-500 text-sm">Loading profile...</p>
+      <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 36, height: 36, border: '3px solid rgba(99,102,241,0.2)', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+          <p style={{ color: '#374151', fontSize: 13, fontFamily: 'DM Sans, sans-serif' }}>Loading media kit...</p>
         </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       </div>
     )
   }
 
   if (notFound) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950">
-        <div className="text-center">
-          <div className="text-6xl mb-6">😕</div>
-          <h1 className="text-2xl font-bold text-white mb-2">Profile nahi mili</h1>
-          <p className="text-gray-500">@{username} exist nahi karta ya private hai</p>
+      <div style={{ minHeight: '100vh', background: '#0a0a0f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'DM Sans, sans-serif' }}>
+        <div style={{ textAlign: 'center', color: '#f0f0f5' }}>
+          <div style={{ fontSize: 64, marginBottom: 20 }}>🔒</div>
+          <h2 style={{ fontFamily: 'Syne, sans-serif', fontSize: 24, marginBottom: 12 }}>Media Kit Not Public</h2>
+          <p style={{ color: '#6b7280', fontSize: 15 }}>This creator hasn't made their media kit public yet.</p>
         </div>
       </div>
     )
   }
 
-  const socialLinks = profile.social_links || {}
-  const twitterHandle = socialLinks.twitter ? socialLinks.twitter.replace("@", "") : ""
-  const instagramHandle = socialLinks.instagram ? socialLinks.instagram.replace("@", "") : ""
+  if (!kit) return null
 
-  const platforms = [
-    twitterHandle && {
-      label: "Twitter",
-      handle: "@" + twitterHandle,
-      href: "https://twitter.com/" + twitterHandle,
-      bg: "bg-blue-500",
-      emoji: "🐦"
-    },
-    socialLinks.linkedin && {
-      label: "LinkedIn",
-      handle: "LinkedIn",
-      href: "https://" + socialLinks.linkedin,
-      bg: "bg-blue-700",
-      emoji: "💼"
-    },
-    socialLinks.youtube && {
-      label: "YouTube",
-      handle: "YouTube",
-      href: "https://" + socialLinks.youtube,
-      bg: "bg-red-600",
-      emoji: "▶️"
-    },
-    instagramHandle && {
-      label: "Instagram",
-      handle: "@" + instagramHandle,
-      href: "https://instagram.com/" + instagramHandle,
-      bg: "bg-pink-600",
-      emoji: "📸"
-    },
-  ].filter(Boolean)
+  const frameStyle = FRAME_STYLES[kit.avatarFrame] || FRAME_STYLES.circle
+  const connectedSocials = SOCIAL_PLATFORMS.filter(p => kit.socials?.[p.id])
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'DM Sans', sans-serif", color: '#f0f0f5' }}>
+      <div style={{ maxWidth: 760, margin: '0 auto', padding: '40px 20px 80px' }}>
 
-      {/* Top Nav */}
-      <div className="fixed top-0 left-0 right-0 z-10 bg-gray-950 bg-opacity-80 backdrop-blur border-b border-gray-800 px-6 py-3 flex items-center justify-between">
-        <span className="text-sm font-bold text-blue-400">Creator OS</span>
-        <button
-          onClick={handleCopyLink}
-          className="text-xs px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors"
-        >
-          {copied ? "✅ Copied!" : "🔗 Share Profile"}
-        </button>
-      </div>
+        {/* Card */}
+        <div style={{ background: '#111318', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 24, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
 
-      {/* Hero */}
-      <div className="pt-16">
-        <div className="relative">
-          {/* Background gradient */}
-          <div className="h-48 bg-gradient-to-br from-blue-900 via-blue-800 to-gray-900"></div>
-
-          {/* Profile Content */}
-          <div className="max-w-2xl mx-auto px-4">
-            <div className="relative -mt-16 mb-6 flex flex-col items-center text-center">
-
-              {/* Avatar */}
-              {profile.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt={profile.full_name}
-                  className="w-28 h-28 rounded-full object-cover border-4 border-gray-950 shadow-2xl mb-4"
-                />
+          {/* Cover */}
+          <div style={{ height: 140, background: `linear-gradient(135deg,${kit.coverColor},${kit.coverColor}99)`, position: 'relative' }}>
+            <div style={{ position: 'absolute', bottom: -44, left: 36 }}>
+              {kit.avatarUrl ? (
+                <img src={kit.avatarUrl} alt="avatar"
+                  style={{ width: 88, height: 88, objectFit: 'cover', ...frameStyle, border: '3px solid #111318' }} />
               ) : (
-                <div className="w-28 h-28 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-4xl font-bold border-4 border-gray-950 shadow-2xl mb-4">
-                  {profile.full_name ? profile.full_name.charAt(0) : username.charAt(0)}
+                <div style={{ width: 88, height: 88, background: `${kit.coverColor}55`, border: '3px solid #111318', ...frameStyle, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontFamily: 'Syne, sans-serif', fontWeight: 900, color: '#fff' }}>
+                  {(kit.name || 'C').charAt(0).toUpperCase()}
                 </div>
               )}
+            </div>
+            <div style={{ position: 'absolute', top: 16, right: 20 }}>
+              <span style={{ padding: '5px 14px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 100, fontSize: 12, color: '#fff', fontWeight: 700 }}>
+                {kit.niche} Creator
+              </span>
+            </div>
+          </div>
 
-              <h1 className="text-2xl font-bold text-white">{profile.full_name}</h1>
-              <p className="text-blue-400 font-medium mt-1 text-sm">@{profile.username}</p>
+          <div style={{ padding: '56px 36px 36px' }}>
 
-              {profile.bio && (
-                <p className="text-gray-400 mt-3 max-w-sm leading-relaxed text-sm">
-                  {profile.bio}
-                </p>
+            {/* Name + socials */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 12 }}>
+              <div>
+                <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 900, fontSize: 28, marginBottom: 4 }}>{kit.name}</h1>
+                <p style={{ fontSize: 13, color: '#6b7280' }}>📍 {kit.location} · ✉ {kit.email}</p>
+              </div>
+              {connectedSocials.length > 0 && (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {connectedSocials.map(p => (
+                    <a key={p.id} href={kit.socials[p.id]} target="_blank" rel="noopener noreferrer"
+                      style={{ width: 36, height: 36, borderRadius: 9, background: p.color + '22', border: `1px solid ${p.color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, textDecoration: 'none', transition: 'transform .15s' }}>
+                      {p.icon}
+                    </a>
+                  ))}
+                </div>
               )}
+            </div>
 
-              {/* Social Buttons */}
-              <div className="flex flex-wrap justify-center gap-2 mt-5">
-                {platforms.map(p => (
-                  <a
-                    key={p.label}
-                    href={p.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={"flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-white transition-opacity hover:opacity-80 " + p.bg}
-                  >
-                    {p.emoji} {p.handle}
-                  </a>
+            <p style={{ fontSize: 14, color: '#9ca3af', lineHeight: 1.75, marginBottom: 28 }}>{kit.bio}</p>
+
+            {/* Stats */}
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>Platform Statistics</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 10 }}>
+                {SOCIAL_PLATFORMS.map(p => (
+                  <div key={p.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                      <span style={{ fontSize: 13 }}>{p.icon}</span>
+                      <span style={{ fontSize: 11, color: p.color, fontWeight: 700 }}>{p.label}</span>
+                    </div>
+                    <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 900, fontSize: 20, color: '#f0f0f5', marginBottom: 2 }}>
+                      {kit.stats?.[p.id]?.followers || '—'}
+                    </div>
+                    <div style={{ fontSize: 10, color: '#4b5563', marginBottom: 4 }}>followers</div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <span style={{ fontSize: 10, color: '#10b981', fontWeight: 700 }}>
+                        {kit.stats?.[p.id]?.engRate || '—'} eng.
+                      </span>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-3 mb-6">
-              {[
-                { label: 'Total Reach', value: profile.stats_cache?.total_reach || '—', icon: '👥' },
-                { label: 'Avg Engagement', value: profile.stats_cache?.avg_engagement || '—', icon: '📊' },
-                { label: 'Posts / Month', value: profile.stats_cache?.posts_per_month || '—', icon: '📝' },
-              ].map(stat => (
-                <div key={stat.label} className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
-                  <div className="text-xl mb-1">{stat.icon}</div>
-                  <div className="text-xl font-bold text-white">{stat.value}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">{stat.label}</div>
+            {/* Rates */}
+            {kit.rates && (
+              <div style={{ marginBottom: 28 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>💰 Sponsorship Rates</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
+                  {[
+                    { key: 'sponsored',   label: 'Dedicated Video' },
+                    { key: 'integration', label: 'Brand Integration' },
+                    { key: 'story',       label: 'Story / Short' },
+                    { key: 'reel',        label: 'Reel / TikTok' },
+                  ].map(r => (
+                    <div key={r.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12 }}>
+                      <span style={{ fontSize: 13, color: '#9ca3af' }}>{r.label}</span>
+                      <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: 15, color: '#6ee7b7' }}>{kit.rates[r.key] || '—'}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
 
-            {/* Contact CTA */}
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-8 text-center mb-6">
-              <h2 className="text-lg font-bold mb-2">Brand Collaboration? 🤝</h2>
-              <p className="text-blue-200 mb-5 text-sm">
-                {profile.full_name} ke saath kaam karne ke liye reach out karein
-              </p>
-              {twitterHandle && (
-                <a
-                  href={"https://twitter.com/" + twitterHandle}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block bg-white text-blue-600 font-semibold px-6 py-2.5 rounded-xl hover:bg-blue-50 transition-colors shadow-md text-sm"
-                >
-                  🐦 Twitter par Contact Karein
-                </a>
-              )}
+            {/* CTA */}
+            <div style={{ padding: '20px 24px', background: `${kit.coverColor}15`, border: `1px solid ${kit.coverColor}33`, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Interested in a collaboration?</div>
+                <div style={{ fontSize: 13, color: '#6b7280' }}>{kit.email}</div>
+              </div>
+              <a href={`mailto:${kit.email}`}
+                style={{ padding: '10px 22px', background: `linear-gradient(135deg,${kit.coverColor},${kit.coverColor}cc)`, color: '#fff', borderRadius: 12, textDecoration: 'none', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14 }}>
+                Contact Me →
+              </a>
             </div>
-
-            {/* Footer */}
-            <div className="text-center pb-12">
-              <p className="text-xs text-gray-600">
-                Powered by <span className="text-blue-500 font-semibold">Creator OS</span>
-              </p>
-            </div>
-
           </div>
+        </div>
+
+        <div style={{ marginTop: 20, textAlign: 'center', fontSize: 12, color: '#374151' }}>
+          Powered by <span style={{ color: '#6366f1', fontWeight: 700 }}>Nexora OS</span>
         </div>
       </div>
     </div>

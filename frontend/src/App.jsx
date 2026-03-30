@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard'
 import SchedulerPage from './pages/SchedulerPage'
 import MediaKitPage from './pages/MediaKitPage'
 import PublicProfile from './pages/PublicProfile'
+import ROIRedirect from './pages/ROIRedirect'
 import RepurposePage from './pages/RepurposePage'
 import BrandDeals from './pages/BrandDeals'
 import SettingsPage from './pages/SettingsPage'
@@ -28,6 +29,11 @@ import YouTubeStudioPage from './pages/YouTubeStudioPage'
 import VideoEditorPage from './pages/VideoEditorPage'
 import AutoClippingPage from './pages/AutoClippingPage'
 import './index.css'
+
+// ── IMPORTANT: HashRouter uses /#/path format
+// ── So /u/username → /#/u/username in browser
+// ── And /r/slug    → /#/r/slug in browser
+// ── Both routes are PUBLIC — no auth needed
 
 function ProtectedRoute() {
   const [session,     setSession]     = useState(undefined)
@@ -65,7 +71,7 @@ function ProtectedRoute() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0f' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ width: 36, height: 36, border: '3px solid rgba(99,102,241,0.2)', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+          <div style={{ width: 36, height: 36, border: '3px solid rgba(99,102,241,0.15)', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
           <p style={{ color: '#374151', fontSize: 13, fontFamily: 'DM Sans, sans-serif' }}>Loading...</p>
         </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
@@ -129,16 +135,23 @@ export default function App() {
     <Router>
       <Routes>
 
-        {/* ── Public ── */}
+        {/* ══ PUBLIC ROUTES (no auth) ══ */}
         <Route path="/"                       element={<LandingPage />} />
         <Route path="/login"                  element={<Login />} />
-        <Route path="/u/:username"            element={<PublicProfile />} />
         <Route path="/onboarding"             element={<OnboardingPage />} />
+
+        {/* PUBLIC: Media Kit — /#/u/username */}
+        <Route path="/u/:username"            element={<PublicProfile />} />
+
+        {/* PUBLIC: ROI Redirect/Tracking — /#/r/slug */}
+        <Route path="/r/:slug"                element={<ROIRedirect />} />
+
+        {/* OAuth Callbacks */}
         <Route path="/auth/twitter/callback"  element={<TwitterCallback />} />
         <Route path="/auth/google/callback"   element={<GoogleCallback />} />
         <Route path="/auth/linkedin/callback" element={<LinkedInCallback />} />
 
-        {/* ── Protected ── */}
+        {/* ══ PROTECTED ROUTES ══ */}
         <Route element={<ProtectedRoute />}>
 
           {/* Individual Creator */}

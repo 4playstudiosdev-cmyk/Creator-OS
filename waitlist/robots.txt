@@ -1,0 +1,13 @@
+# Nexora OS - robots.txt
+# https://nexoraos.online
+
+User-agent: *
+Allow: /
+
+# Block any admin or api paths if they exist later
+Disallow: /api/
+Disallow: /admin/
+Disallow: /dashboard/
+
+# Sitemap location
+Sitemap: https://nexoraos.online/sitemap.xml

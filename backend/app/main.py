@@ -1,12 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from app.api import posts, media_kit, ai, deals, social
+from app.api import posts, media_kit, ai, deals, social, captions, clipping
 from app.api.scheduler import start_scheduler
-from app.api import posts, media_kit, ai, deals, social, captions
-from fastapi.middleware.cors import CORSMiddleware
-from app.api import captions
-from app.api import clipping
 
 load_dotenv()
 
@@ -25,7 +21,6 @@ app.include_router(media_kit.router, prefix="/api/media-kit")
 app.include_router(ai.router, prefix="/api/ai")
 app.include_router(deals.router, prefix="/api/deals")
 app.include_router(social.router, prefix="/api/social")
-app.include_router(captions.router, prefix="/api/captions")
 app.include_router(captions.router, prefix="/api/captions")
 app.include_router(clipping.router, prefix="/api/clipping")
 

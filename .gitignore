@@ -26,3 +26,8 @@ dist/
 .vscode/
 .idea/
 *.DS_Store
+backend/.env
+backend/client_secret.json
+frontend/electron/main.cjs
+frontend/electron/preload.cjs
+frontend/electron/login.html

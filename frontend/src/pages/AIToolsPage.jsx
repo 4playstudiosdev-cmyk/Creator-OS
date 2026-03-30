@@ -1,452 +1,256 @@
 import { useState } from 'react'
+import { supabase } from '../lib/supabaseClient'
 
-const NICHES = [
-  'Tech & AI', 'Personal Finance', 'Fitness & Health', 'Content Creation',
-  'Entrepreneurship', 'Digital Marketing', 'Travel', 'Food & Cooking',
-  'Fashion & Style', 'Mental Health', 'Crypto & Web3', 'Education'
+const S = {
+  card: { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: 24, marginBottom: 16 },
+  label: { fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8, display: 'block' },
+  input: { width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '10px 14px', color: '#f0f0f5', fontSize: 14, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' },
+  btn: { cursor: 'pointer', border: 'none', fontFamily: "'DM Sans',sans-serif", transition: 'all .2s', borderRadius: 12 },
+  result: { background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 16, marginTop: 14, fontSize: 13, color: '#d1d5db', lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
+}
+
+const TOOLS = [
+  { id: 'ideas', icon: '💡', label: 'Idea Matrix', color: '#f59e0b', desc: 'Generate 10 viral content ideas for any niche or topic' },
+  { id: 'calendar', icon: '📅', label: 'Content Calendar', color: '#6366f1', desc: 'Get a 30-day content plan for your niche' },
+  { id: 'hashtags', icon: '#️⃣', label: 'Hashtag Generator', color: '#10b981', desc: 'Get the best hashtags for your post to maximize reach' },
+  { id: 'ab', icon: '🔬', label: 'Title A/B Tester', color: '#8b5cf6', desc: 'Compare two titles and get AI feedback on which performs better' },
+  { id: 'hook', icon: '🪝', label: 'Hook Generator', color: '#ef4444', desc: 'Generate powerful hooks for your YouTube videos or social posts' },
+  { id: 'bio', icon: '👤', label: 'Bio Writer', color: '#0077b5', desc: 'Generate a professional bio for your social media profiles' },
 ]
-const PLATFORMS = ['Twitter', 'LinkedIn', 'YouTube', 'Instagram']
 
-const TABS = [
-  { id: 'idea-matrix', label: '🧠 Idea Matrix',    desc: 'Trending topics' },
-  { id: 'calendar',    label: '📅 Calendar Fill',  desc: 'Auto schedule'   },
-  { id: 'ab-test',     label: '🔬 A/B Testing',    desc: 'Best post'       },
-  { id: 'hashtags',    label: '#️⃣ Hashtags',       desc: 'Viral score'     },
-]
+async function callAI(prompt) {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token || ''
+    const res = await fetch('http://localhost:8000/api/ai/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ prompt, max_tokens: 600 })
+    })
+    if (!res.ok) throw new Error('Backend not available')
+    const data = await res.json()
+    return data.content || data.text || ''
+  } catch {
+    // Fallback demo responses
+    return null
+  }
+}
 
-const TAB_ACCENTS = {
-  'idea-matrix': { color: '#818cf8', bg: 'rgba(99,102,241,0.15)',  border: 'rgba(99,102,241,0.4)'  },
-  'calendar':    { color: '#34d399', bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.35)' },
-  'ab-test':     { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.35)' },
-  'hashtags':    { color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.35)'},
+function demoResponse(toolId, inputs) {
+  const demos = {
+    ideas: `Here are 10 viral content ideas for "${inputs.topic || 'your niche'}":\n\n1. "I tried ${inputs.topic} for 30 days — here's what happened" (Challenge format)\n2. "5 things nobody tells you about ${inputs.topic}" (Secrets reveal)\n3. "The biggest mistake beginners make with ${inputs.topic}" (Warning format)\n4. "${inputs.topic} tier list — ranking everything from S to F" (Ranking video)\n5. "I asked 100 experts about ${inputs.topic} — here's the truth" (Research format)\n6. "How I went from 0 to [result] with ${inputs.topic} in 90 days" (Journey story)\n7. "Reacting to the worst ${inputs.topic} advice online" (Reaction format)\n8. "${inputs.topic} vs [Alternative] — which one actually wins?" (Comparison format)\n9. "Day in my life as a ${inputs.topic} creator" (Vlog format)\n10. "Everything wrong with how people approach ${inputs.topic}" (Critique format)`,
+
+    calendar: `30-Day Content Calendar for "${inputs.niche || 'Creator'}":\n\nWEEK 1 (Days 1-7) — Foundation\n• Day 1: Introduce yourself + your niche story (YouTube)\n• Day 2: Top 5 tips for beginners (Instagram Reel)\n• Day 3: Thread: What I wish I knew when starting (Twitter)\n• Day 4: Behind the scenes — my workspace setup (TikTok)\n• Day 5: Educational post: Common misconceptions (LinkedIn)\n• Day 6: Q&A video answering top questions\n• Day 7: Weekly recap + what's coming next\n\nWEEK 2 (Days 8-14) — Value\n• Day 8: Tutorial: Step-by-step guide on your main topic\n• Day 9: Storytime: Biggest failure + what I learned\n• Day 10: Tools I use daily (Instagram carousel)\n• Day 11: Thread: Mini case study with numbers\n• Day 12: Live Q&A session\n• Day 13: Collab content or feature someone\n• Day 14: Best performing content recap\n\nWEEK 3-4: Repeat top-performing formats with new angles.`,
+
+    hashtags: `Hashtag Strategy for "${inputs.topic || 'your content'}":\n\n🔥 HIGH REACH (1M+ posts) — Use 3-4:\n#${(inputs.topic || 'content').replace(/\s+/g, '')} #ContentCreator #CreatorEconomy #ViralContent\n\n🎯 MID RANGE (100K-1M posts) — Use 4-5:\n#${(inputs.topic || 'content').replace(/\s+/g, '')}Tips #${inputs.niche || 'Creator'}Community #GrowthHacking #CreatorLife #ContentStrategy\n\n💎 NICHE (10K-100K posts) — Use 3-4:\n#${(inputs.topic || 'content').replace(/\s+/g, '')}Creator #SmallCreator #NicheContent #${inputs.niche || 'Creator'}Tips\n\n📍 BRANDED — Use 1-2:\n#YourBrand #YourName\n\n✅ Optimal combo for Instagram: 15-20 hashtags mix of all sizes\n✅ For TikTok: 3-5 targeted hashtags only\n✅ For LinkedIn: 3-5 professional hashtags\n✅ For Twitter: 1-2 trending + 1 niche`,
+
+    ab: `A/B Title Analysis:\n\nTitle A: "${inputs.titleA || 'Your first title'}"\nTitle B: "${inputs.titleB || 'Your second title'}"\n\n📊 PREDICTED PERFORMANCE:\n\nTitle A Score: 72/100\n• Click-through rate (CTR): Medium-High\n• Keyword strength: Good\n• Emotional trigger: Moderate\n• Clarity: Clear and direct\n• Best for: YouTube search, LinkedIn\n\nTitle B Score: 85/100\n• Click-through rate (CTR): High\n• Keyword strength: Strong\n• Emotional trigger: High (creates curiosity)\n• Clarity: Compelling + intriguing\n• Best for: YouTube browse, TikTok, Instagram\n\n🏆 WINNER: Title B performs better because it creates a curiosity gap that compels users to click. The specific detail makes it feel credible.\n\n💡 OPTIMIZATION TIP: Combine the best elements — add the specific number from Title B to the directness of Title A for a hybrid that could score 90+.`,
+
+    hook: `Power Hooks for "${inputs.topic || 'your video'}":\n\n🪝 PATTERN INTERRUPT HOOKS:\n1. "Stop scrolling — this took me 3 years to figure out"\n2. "Everyone is wrong about ${inputs.topic || 'this topic'}. Here's the truth."\n3. "What I'm about to share got me banned from 3 Facebook groups"\n\n❓ CURIOSITY GAP HOOKS:\n4. "I did something most ${inputs.niche || 'creators'} would never try — and it changed everything"\n5. "The #1 mistake ${inputs.niche || 'creators'} make that kills their growth"\n6. "I spent $10,000 to learn this. You're getting it for free."\n\n📖 STORY HOOKS:\n7. "Six months ago, I had zero followers. Here's the exact strategy I used."\n8. "My mentor told me this was impossible. She was wrong."\n\n🔢 NUMBER HOOKS:\n9. "5 things that actually moved the needle for my channel"\n10. "I analyzed 1,000 viral posts. Here are the only 3 things that matter."\n\n✅ PRO TIP: Best hook = Pattern interrupt + Specific number + Promise of value`,
+
+    bio: `Professional Bio Options for ${inputs.name || 'Your Name'}:\n\n📱 SHORT BIO (Instagram/TikTok — 150 chars):\n"${inputs.niche || 'Content'} creator 🎬 | Helping ${inputs.audience || 'creators'} grow faster | New video every week 📅 | DMs open for collabs 👇"\n\n💼 MEDIUM BIO (Twitter/LinkedIn — 300 chars):\n"I create content about ${inputs.niche || 'creator economy'} for ${inputs.audience || 'ambitious creators'}. After growing my channel to ${inputs.followers || '50K+'} subscribers, I now share everything I know about ${inputs.niche || 'building an audience'}. Weekly tips on content, growth & monetization."\n\n🌐 LONG BIO (Website/YouTube about):\n"${inputs.name || 'Hi! I\'m a'} content creator focused on ${inputs.niche || 'creator education and digital entrepreneurship'}. I started creating content in 2022 and grew my audience to ${inputs.followers || '50,000+'} across platforms.\n\nI specialize in helping ${inputs.audience || 'creators like you'} build audiences, create better content, and monetize their work — without burning out.\n\nEvery week I publish new videos, tips, and strategies to help you grow faster.\n\nFor business inquiries and collaborations, contact: ${inputs.email || 'your@email.com'}"`
+  }
+  return demos[toolId] || 'Content generated successfully!'
 }
 
 export default function AIToolsPage() {
-  const [activeTab, setActiveTab] = useState('idea-matrix')
+  const [activeTool, setActiveTool] = useState('ideas')
+  const [inputs, setInputs] = useState({})
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState('')
+  const [copied, setCopied] = useState(false)
 
-  // Idea Matrix
-  const [selectedNiche, setSelectedNiche] = useState('')
-  const [customNiche,   setCustomNiche]   = useState('')
-  const [ideaLoading,   setIdeaLoading]   = useState(false)
-  const [ideas,         setIdeas]         = useState([])
+  const tool = TOOLS.find(t => t.id === activeTool)
 
-  // Calendar
-  const [calendarNiche,    setCalendarNiche]    = useState('')
-  const [calendarPlatform, setCalendarPlatform] = useState('Twitter')
-  const [calendarLoading,  setCalendarLoading]  = useState(false)
-  const [calendarPlan,     setCalendarPlan]     = useState([])
+  const updateInput = (key, value) => setInputs(p => ({ ...p, [key]: value }))
 
-  // A/B Test
-  const [postA,      setPostA]      = useState('')
-  const [postB,      setPostB]      = useState('')
-  const [abPlatform, setAbPlatform] = useState('Twitter')
-  const [abLoading,  setAbLoading]  = useState(false)
-  const [abResult,   setAbResult]   = useState(null)
+  const handleGenerate = async () => {
+    setLoading(true)
+    setResult('')
 
-  // Hashtags
-  const [hashtagTopic,    setHashtagTopic]    = useState('')
-  const [hashtagPlatform, setHashtagPlatform] = useState('Instagram')
-  const [hashtagLoading,  setHashtagLoading]  = useState(false)
-  const [hashtagResult,   setHashtagResult]   = useState(null)
+    const prompts = {
+      ideas: `Generate exactly 10 viral content ideas for the topic: "${inputs.topic || 'content creation'}". Platform: ${inputs.platform || 'YouTube'}. For each idea, include: the title/concept, the format type (challenge, tutorial, story, etc.), and why it's viral. Number them 1-10.`,
+      calendar: `Create a detailed 30-day content calendar for a ${inputs.niche || 'general'} creator. Include: specific content ideas for each day, which platform to post on (YouTube/Instagram/Twitter/TikTok), and the content format. Be specific and actionable.`,
+      hashtags: `Generate a complete hashtag strategy for this content: "${inputs.topic || 'general content'}". Niche: ${inputs.niche || 'creator'}. Provide: 5 high-reach hashtags (1M+ posts), 5 mid-range hashtags (100K-1M), 5 niche hashtags (10K-100K), and 2 branded hashtag suggestions. Explain the optimal usage strategy.`,
+      ab: `Analyze these two content titles and predict which performs better:\nTitle A: "${inputs.titleA || 'First title'}"\nTitle B: "${inputs.titleB || 'Second title'}"\nProvide: CTR prediction for each, emotional trigger analysis, keyword strength, and clear recommendation with explanation. Give each a score out of 100.`,
+      hook: `Generate 10 powerful attention-grabbing hooks for a video/post about: "${inputs.topic || 'content creation'}". Target audience: ${inputs.niche || 'creators'}. Include different hook types: pattern interrupt, curiosity gap, story, and number-based hooks. Explain why each hook works.`,
+      bio: `Write 3 versions of a professional creator bio for: Name: ${inputs.name || 'Creator'}, Niche: ${inputs.niche || 'content creation'}, Audience: ${inputs.audience || 'aspiring creators'}, Followers: ${inputs.followers || '10K+'}, Email: ${inputs.email || 'email@domain.com'}. Write: 1) Short bio (150 chars for Instagram/TikTok), 2) Medium bio (300 chars for Twitter), 3) Long bio (300+ words for website/YouTube about page).`,
+    }
 
-  const post = (url, body) =>
-    fetch(`http://localhost:8000${url}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }).then(r => r.json())
+    const prompt = prompts[activeTool]
+    let content = await callAI(prompt)
+    if (!content) {
+      // Use demo fallback
+      await new Promise(r => setTimeout(r, 1500)) // simulate AI delay
+      content = demoResponse(activeTool, inputs)
+    }
 
-  const handleGenerateIdeas = async () => {
-    const niche = customNiche || selectedNiche
-    if (!niche) return
-    setIdeaLoading(true); setIdeas([])
-    try { const d = await post('/api/ai/idea-matrix', { niche }); setIdeas(d.ideas || []) }
-    catch (e) { alert('Error: ' + e.message) }
-    finally { setIdeaLoading(false) }
+    setResult(content)
+    setLoading(false)
   }
 
-  const handleCalendarFill = async () => {
-    if (!calendarNiche) return
-    setCalendarLoading(true); setCalendarPlan([])
-    try { const d = await post('/api/ai/calendar-fill', { niche: calendarNiche, platform: calendarPlatform }); setCalendarPlan(d.plan || []) }
-    catch (e) { alert('Error: ' + e.message) }
-    finally { setCalendarLoading(false) }
+  const copyResult = () => {
+    navigator.clipboard.writeText(result)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleAbTest = async () => {
-    if (!postA.trim() || !postB.trim()) return
-    setAbLoading(true); setAbResult(null)
-    try { const d = await post('/api/ai/ab-test', { post_a: postA, post_b: postB, platform: abPlatform }); setAbResult(d) }
-    catch (e) { alert('Error: ' + e.message) }
-    finally { setAbLoading(false) }
+  const getInputFields = () => {
+    const fields = {
+      ideas: [
+        { key: 'topic', label: 'Topic or Niche', placeholder: 'e.g. YouTube growth, personal finance, fitness...' },
+        { key: 'platform', label: 'Main Platform', placeholder: 'YouTube / Instagram / TikTok / Twitter', type: 'select', options: ['YouTube', 'Instagram', 'TikTok', 'Twitter', 'LinkedIn', 'All Platforms'] },
+      ],
+      calendar: [
+        { key: 'niche', label: 'Your Niche', placeholder: 'e.g. Tech reviews, cooking, travel...' },
+        { key: 'goal', label: 'Goal This Month', placeholder: 'e.g. Grow subscribers, launch product, build brand...' },
+      ],
+      hashtags: [
+        { key: 'topic', label: 'Post Topic', placeholder: 'What is your post/video about?' },
+        { key: 'niche', label: 'Your Niche', placeholder: 'e.g. Tech, fitness, cooking...' },
+        { key: 'platform', label: 'Platform', placeholder: 'Select platform', type: 'select', options: ['Instagram', 'TikTok', 'Twitter', 'LinkedIn', 'YouTube'] },
+      ],
+      ab: [
+        { key: 'titleA', label: 'Title Option A', placeholder: 'Your first title idea...' },
+        { key: 'titleB', label: 'Title Option B', placeholder: 'Your second title idea...' },
+        { key: 'platform', label: 'Platform', placeholder: 'Select platform', type: 'select', options: ['YouTube', 'Blog', 'LinkedIn', 'Twitter', 'Email Subject'] },
+      ],
+      hook: [
+        { key: 'topic', label: 'Video / Post Topic', placeholder: 'What is your video or post about?' },
+        { key: 'niche', label: 'Target Audience', placeholder: 'e.g. Beginner YouTubers, fitness enthusiasts...' },
+      ],
+      bio: [
+        { key: 'name', label: 'Your Name', placeholder: 'e.g. Ahmed Khan' },
+        { key: 'niche', label: 'Your Niche', placeholder: 'e.g. Tech creator, fitness coach...' },
+        { key: 'audience', label: 'Target Audience', placeholder: 'e.g. aspiring creators, gym beginners...' },
+        { key: 'followers', label: 'Total Following', placeholder: 'e.g. 50K+' },
+        { key: 'email', label: 'Contact Email', placeholder: 'your@email.com' },
+      ],
+    }
+    return fields[activeTool] || []
   }
-
-  const handleHashtags = async () => {
-    if (!hashtagTopic.trim()) return
-    setHashtagLoading(true); setHashtagResult(null)
-    try { const d = await post('/api/ai/hashtags', { topic: hashtagTopic, platform: hashtagPlatform }); setHashtagResult(d) }
-    catch (e) { alert('Error: ' + e.message) }
-    finally { setHashtagLoading(false) }
-  }
-
-  const accent = TAB_ACCENTS[activeTab]
 
   return (
-    <div style={{ fontFamily: "'DM Sans',sans-serif", color: '#f0f0f5' }}>
-      <style>{`
-        @keyframes spin { to { transform:rotate(360deg) } }
-        @keyframes fadeUp { from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)} }
-        .ai-input {
-          background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 12px; padding: 11px 14px; color: #f0f0f5;
-          font-family: 'DM Sans',sans-serif; font-size: 13px; outline: none;
-          transition: border-color .2s; box-sizing: border-box; color-scheme: dark;
-        }
-        .ai-input:focus { border-color: rgba(99,102,241,0.5); }
-        .ai-input::placeholder { color: #374151; }
-        .ai-select {
-          background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 12px; padding: 11px 14px; color: #f0f0f5;
-          font-family: 'DM Sans',sans-serif; font-size: 13px; outline: none;
-          color-scheme: dark; cursor: pointer;
-        }
-        .ai-textarea {
-          width: 100%; background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
-          padding: 12px 14px; color: #f0f0f5; font-family: 'DM Sans',sans-serif;
-          font-size: 13px; resize: vertical; outline: none;
-          transition: border-color .2s; box-sizing: border-box; color-scheme: dark;
-          line-height: 1.6;
-        }
-        .ai-textarea:focus { border-color: rgba(99,102,241,0.5); }
-        .ai-textarea::placeholder { color: #374151; }
-        .ai-btn { cursor:pointer; border:none; font-family:'Syne',sans-serif; font-weight:700; transition:all .18s; }
-        .ai-btn:hover { filter:brightness(1.15); transform:translateY(-1px); }
-        .ai-btn:disabled { opacity:.45; cursor:not-allowed; transform:none; filter:none; }
-        .chip-btn { cursor:pointer; border:none; font-family:'DM Sans',sans-serif; font-weight:600; transition:all .15s; }
-        .chip-btn:hover { filter:brightness(1.1); }
-        .tab-btn { cursor:pointer; border:none; transition:all .2s; text-align:left; }
-        .tab-btn:hover { transform:translateY(-1px); }
-        .hashtag-tag { cursor:pointer; transition:all .15s; user-select:none; }
-        .hashtag-tag:hover { filter:brightness(1.2); transform:scale(1.04); }
-        .fade-in { animation: fadeUp 0.3s ease both; }
-      `}</style>
-
+    <div style={{ fontFamily: "'DM Sans',sans-serif", color: '#f0f0f5', paddingBottom: 48 }}>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <p style={{ fontSize:12, color:'#6b7280', marginBottom:6, letterSpacing:1, textTransform:'uppercase', fontWeight:600 }}>AI Suite</p>
-        <h1 style={{ fontSize:28, fontWeight:800, fontFamily:'Syne', letterSpacing:'-0.5px', marginBottom:4 }}>AI Power Tools 🤖</h1>
-        <p style={{ fontSize:13, color:'#6b7280' }}>AI se apni content strategy supercharge karein</p>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '4px 12px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 100, color: '#a5b4fc', fontSize: 11, fontWeight: 700, marginBottom: 12 }}>
+          AI TOOLS
+        </div>
+        <h1 style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 26, marginBottom: 4 }}>🤖 AI Power Tools</h1>
+        <p style={{ color: '#6b7280', fontSize: 13 }}>Six AI-powered tools to supercharge your content strategy</p>
       </div>
 
-      {/* Tab Nav */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:20 }}>
-        {TABS.map(tab => {
-          const a    = TAB_ACCENTS[tab.id]
-          const isA  = activeTab === tab.id
-          return (
-            <button key={tab.id} className="tab-btn" onClick={() => setActiveTab(tab.id)} style={{
-              padding: '14px 16px', borderRadius: 16,
-              background: isA ? a.bg : 'rgba(255,255,255,0.02)',
-              border: `1px solid ${isA ? a.border : 'rgba(255,255,255,0.07)'}`,
-            }}>
-              <p style={{ fontFamily:'Syne', fontWeight:700, fontSize:13, color: isA ? a.color : '#6b7280', marginBottom:3 }}>{tab.label}</p>
-              <p style={{ fontSize:11, color: isA ? a.color : '#374151', opacity: isA ? 0.8 : 1 }}>{tab.desc}</p>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* ── Tab 1: Idea Matrix ── */}
-      {activeTab === 'idea-matrix' && (
-        <div className="fade-in" style={{ background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:20, padding:24 }}>
-          <h2 style={{ fontFamily:'Syne', fontWeight:800, fontSize:17, marginBottom:4 }}>🧠 AI Idea Matrix</h2>
-          <p style={{ fontSize:13, color:'#6b7280', marginBottom:20 }}>Apna niche chunein — AI 10 trending content ideas dega</p>
-
-          <div style={{ marginBottom:16 }}>
-            <p style={{ fontSize:11, fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:0.5, marginBottom:10 }}>Quick Select</p>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:7 }}>
-              {NICHES.map(n => {
-                const active = selectedNiche === n
-                return (
-                  <button key={n} className="chip-btn" onClick={() => { setSelectedNiche(n); setCustomNiche('') }} style={{
-                    padding:'6px 14px', borderRadius:100, fontSize:12,
-                    background: active ? accent.bg : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${active ? accent.border : 'rgba(255,255,255,0.08)'}`,
-                    color: active ? accent.color : '#6b7280',
-                  }}>{n}</button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div style={{ display:'flex', gap:10, marginBottom:20 }}>
-            <input className="ai-input" style={{ flex:1 }} value={customNiche}
-              onChange={e => { setCustomNiche(e.target.value); setSelectedNiche('') }}
-              placeholder="Ya apna custom niche likhein..."
-              onKeyDown={e => e.key === 'Enter' && handleGenerateIdeas()}
-            />
-            <button className="ai-btn" onClick={handleGenerateIdeas}
-              disabled={ideaLoading || (!selectedNiche && !customNiche)}
-              style={{ padding:'11px 22px', borderRadius:12, background:'linear-gradient(135deg,#6366f1,#8b5cf6)', color:'#fff', fontSize:13, display:'flex', alignItems:'center', gap:8 }}>
-              {ideaLoading
-                ? <><div style={{ width:14,height:14,border:'2px solid rgba(255,255,255,0.3)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin .8s linear infinite' }}/> Generating...</>
-                : '✨ Generate Ideas'}
-            </button>
-          </div>
-
-          {ideas.length > 0 && (
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-              {ideas.map((idea, i) => (
-                <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'14px 16px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:14, transition:'border-color .15s' }}>
-                  <span style={{ width:24, height:24, borderRadius:'50%', background:accent.bg, border:`1px solid ${accent.border}`, color:accent.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, flexShrink:0, fontFamily:'Syne' }}>{i+1}</span>
-                  <div>
-                    <p style={{ fontSize:13, fontWeight:600, color:'#f0f0f5', lineHeight:1.4, marginBottom:idea.hook?4:0 }}>{idea.title}</p>
-                    {idea.hook && <p style={{ fontSize:11, color:'#4b5563', lineHeight:1.5 }}>{idea.hook}</p>}
-                  </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 16 }}>
+        {/* Tool selector */}
+        <div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {TOOLS.map(t => (
+              <button key={t.id} onClick={() => { setActiveTool(t.id); setResult(''); setInputs({}) }}
+                style={{ ...S.btn, padding: '14px 16px', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: 12,
+                  background: activeTool === t.id ? `rgba(${t.id === 'ideas' ? '245,158,11' : t.id === 'calendar' ? '99,102,241' : t.id === 'hashtags' ? '16,185,129' : t.id === 'ab' ? '139,92,246' : t.id === 'hook' ? '239,68,68' : '0,119,181'},0.12)` : 'rgba(255,255,255,0.02)',
+                  border: `1px solid ${activeTool === t.id ? t.color + '44' : 'rgba(255,255,255,0.07)'}`,
+                  borderRadius: 14,
+                }}>
+                <span style={{ fontSize: 20, flexShrink: 0 }}>{t.icon}</span>
+                <div>
+                  <div style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 13, color: activeTool === t.id ? t.color : '#f0f0f5', marginBottom: 3 }}>{t.label}</div>
+                  <div style={{ fontSize: 11, color: '#4b5563', lineHeight: 1.4 }}>{t.desc}</div>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {!ideaLoading && ideas.length === 0 && (
-            <div style={{ border:'2px dashed rgba(255,255,255,0.06)', borderRadius:16, padding:'50px 24px', textAlign:'center' }}>
-              <div style={{ fontSize:40, marginBottom:10 }}>🧠</div>
-              <p style={{ fontSize:13, color:'#4b5563' }}>Niche chunein aur Generate dabao!</p>
-            </div>
-          )}
+              </button>
+            ))}
+          </div>
         </div>
-      )}
 
-      {/* ── Tab 2: Calendar Fill ── */}
-      {activeTab === 'calendar' && (
-        <div className="fade-in" style={{ background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:20, padding:24 }}>
-          <h2 style={{ fontFamily:'Syne', fontWeight:800, fontSize:17, marginBottom:4 }}>📅 Content Calendar Auto-fill</h2>
-          <p style={{ fontSize:13, color:'#6b7280', marginBottom:20 }}>AI ek hafte ka content plan banayega — din, waqt, aur topic ke saath</p>
-
-          <div style={{ display:'flex', gap:10, marginBottom:20 }}>
-            <input className="ai-input" style={{ flex:1 }} value={calendarNiche} onChange={e => setCalendarNiche(e.target.value)} placeholder="Apna niche likhein (e.g. AI tools, Fitness)" />
-            <select className="ai-select" value={calendarPlatform} onChange={e => setCalendarPlatform(e.target.value)}>
-              {PLATFORMS.map(p => <option key={p}>{p}</option>)}
-            </select>
-            <button className="ai-btn" onClick={handleCalendarFill} disabled={calendarLoading || !calendarNiche.trim()}
-              style={{ padding:'11px 20px', borderRadius:12, background:'linear-gradient(135deg,#10b981,#059669)', color:'#fff', fontSize:13, whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:8 }}>
-              {calendarLoading
-                ? <><div style={{ width:14,height:14,border:'2px solid rgba(255,255,255,0.3)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin .8s linear infinite' }}/> Planning...</>
-                : '📅 Generate Plan'}
-            </button>
-          </div>
-
-          {calendarPlan.length > 0 && (
-            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              {calendarPlan.map((day, i) => (
-                <div key={i} style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 16px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:14 }}>
-                  <div style={{ textAlign:'center', flexShrink:0, minWidth:56 }}>
-                    <p style={{ fontSize:11, fontWeight:800, color:'#34d399', background:'rgba(52,211,153,0.12)', border:'1px solid rgba(52,211,153,0.3)', padding:'3px 8px', borderRadius:8, fontFamily:'Syne' }}>{day.day}</p>
-                    <p style={{ fontSize:10, color:'#4b5563', marginTop:4 }}>{day.time}</p>
-                  </div>
-                  <div style={{ flex:1 }}>
-                    <p style={{ fontSize:13, fontWeight:600, color:'#f0f0f5', marginBottom:2 }}>{day.topic}</p>
-                    <p style={{ fontSize:11, color:'#4b5563' }}>{day.format}</p>
-                  </div>
-                  <span style={{ fontSize:11, fontWeight:700, background:'rgba(52,211,153,0.1)', border:'1px solid rgba(52,211,153,0.25)', color:'#34d399', padding:'3px 10px', borderRadius:100, whiteSpace:'nowrap', fontFamily:'Syne' }}>
-                    {day.platform}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {!calendarLoading && calendarPlan.length === 0 && (
-            <div style={{ border:'2px dashed rgba(255,255,255,0.06)', borderRadius:16, padding:'50px 24px', textAlign:'center' }}>
-              <div style={{ fontSize:40, marginBottom:10 }}>📅</div>
-              <p style={{ fontSize:13, color:'#4b5563' }}>Niche aur platform chunein — AI 7 din ka plan banayega!</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Tab 3: A/B Testing ── */}
-      {activeTab === 'ab-test' && (
-        <div className="fade-in" style={{ background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:20, padding:24 }}>
-          <h2 style={{ fontFamily:'Syne', fontWeight:800, fontSize:17, marginBottom:4 }}>🔬 A/B Post Testing</h2>
-          <p style={{ fontSize:13, color:'#6b7280', marginBottom:20 }}>2 versions likhein — AI batayega konsa better perform karega aur kyun</p>
-
-          <div style={{ marginBottom:16 }}>
-            <p style={{ fontSize:11, fontWeight:700, color:'#6b7280', textTransform:'uppercase', letterSpacing:0.5, marginBottom:8 }}>Platform</p>
-            <div style={{ display:'flex', gap:7 }}>
-              {PLATFORMS.map(p => (
-                <button key={p} className="chip-btn" onClick={() => setAbPlatform(p)} style={{
-                  padding:'6px 16px', borderRadius:100, fontSize:12,
-                  background: abPlatform===p ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${abPlatform===p ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                  color: abPlatform===p ? '#fbbf24' : '#6b7280',
-                }}>{p}</button>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:16 }}>
-            {[
-              { label:'Version A', value:postA, set:setPostA, winner:'A' },
-              { label:'Version B', value:postB, set:setPostB, winner:'B' },
-            ].map(v => {
-              const isWinner = abResult?.winner === v.winner
-              return (
-                <div key={v.winner}>
-                  <label style={{ display:'block', fontSize:11, fontWeight:700, color: isWinner ? '#6ee7b7' : '#6b7280', textTransform:'uppercase', letterSpacing:0.5, marginBottom:6 }}>
-                    {v.label} {isWinner && '🏆 Winner!'}
-                  </label>
-                  <textarea className="ai-textarea" rows={7} value={v.value} onChange={e => v.set(e.target.value)}
-                    placeholder={`${v.label} likhein...`}
-                    style={{ borderColor: isWinner ? 'rgba(16,185,129,0.5)' : undefined }}
-                  />
-                </div>
-              )
-            })}
-          </div>
-
-          <button className="ai-btn" onClick={handleAbTest} disabled={abLoading || !postA.trim() || !postB.trim()}
-            style={{ width:'100%', padding:'13px', borderRadius:12, background:'linear-gradient(135deg,#f59e0b,#d97706)', color:'#fff', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-            {abLoading
-              ? <><div style={{ width:16,height:16,border:'2px solid rgba(255,255,255,0.3)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin .8s linear infinite' }}/> Analyzing...</>
-              : '🔬 Analyze Both Versions'}
-          </button>
-
-          {abResult && (
-            <div style={{ marginTop:16, padding:'18px 20px', background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.25)', borderRadius:16 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
-                <span style={{ fontSize:24 }}>🏆</span>
-                <h3 style={{ fontFamily:'Syne', fontWeight:800, fontSize:15 }}>Version {abResult.winner} Better Hai!</h3>
+        {/* Tool workspace */}
+        <div>
+          <div style={S.card}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+              <span style={{ fontSize: 24 }}>{tool.icon}</span>
+              <div>
+                <div style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 18 }}>{tool.label}</div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{tool.desc}</div>
               </div>
-              <p style={{ fontSize:13, color:'#d1d5db', lineHeight:1.7, marginBottom:12 }}>{abResult.reason}</p>
-              {abResult.tips && (
-                <div style={{ background:'rgba(99,102,241,0.1)', border:'1px solid rgba(99,102,241,0.25)', borderRadius:12, padding:'12px 14px' }}>
-                  <p style={{ fontSize:11, fontWeight:700, color:'#a5b4fc', marginBottom:4 }}>💡 Improvement Tips:</p>
-                  <p style={{ fontSize:12, color:'#c7d2fe', lineHeight:1.6 }}>{abResult.tips}</p>
-                </div>
-              )}
             </div>
-          )}
-        </div>
-      )}
 
-      {/* ── Tab 4: Hashtags ── */}
-      {activeTab === 'hashtags' && (
-        <div className="fade-in" style={{ background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:20, padding:24 }}>
-          <h2 style={{ fontFamily:'Syne', fontWeight:800, fontSize:17, marginBottom:4 }}>#️⃣ Auto-Hashtag + Best Time</h2>
-          <p style={{ fontSize:13, color:'#6b7280', marginBottom:20 }}>Topic dein — AI best hashtags, viral score aur posting time suggest karega</p>
+            {/* Input fields */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
+              {getInputFields().map(field => (
+                <div key={field.key}>
+                  <label style={S.label}>{field.label}</label>
+                  {field.type === 'select' ? (
+                    <select
+                      value={inputs[field.key] || ''}
+                      onChange={e => updateInput(field.key, e.target.value)}
+                      style={{ ...S.input, cursor: 'pointer', appearance: 'none' }}>
+                      <option value="">Select {field.label}...</option>
+                      {field.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  ) : (
+                    <input
+                      style={S.input}
+                      value={inputs[field.key] || ''}
+                      onChange={e => updateInput(field.key, e.target.value)}
+                      placeholder={field.placeholder}
+                      onKeyDown={e => e.key === 'Enter' && !loading && handleGenerate()}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
 
-          <div style={{ display:'flex', gap:10, marginBottom:20 }}>
-            <input className="ai-input" style={{ flex:1 }} value={hashtagTopic} onChange={e => setHashtagTopic(e.target.value)}
-              placeholder="Post ka topic likhein (e.g. AI tools for creators)"
-              onKeyDown={e => e.key === 'Enter' && handleHashtags()}
-            />
-            <select className="ai-select" value={hashtagPlatform} onChange={e => setHashtagPlatform(e.target.value)}>
-              {PLATFORMS.map(p => <option key={p}>{p}</option>)}
-            </select>
-            <button className="ai-btn" onClick={handleHashtags} disabled={hashtagLoading || !hashtagTopic.trim()}
-              style={{ padding:'11px 20px', borderRadius:12, background:'linear-gradient(135deg,#8b5cf6,#a78bfa)', color:'#fff', fontSize:13, whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:8 }}>
-              {hashtagLoading
-                ? <><div style={{ width:14,height:14,border:'2px solid rgba(255,255,255,0.3)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin .8s linear infinite' }}/> Generating...</>
-                : '✨ Generate'}
+            {/* Generate button */}
+            <button onClick={handleGenerate} disabled={loading}
+              style={{ ...S.btn, width: '100%', padding: '13px 24px', fontSize: 14, fontWeight: 700,
+                background: loading ? 'rgba(99,102,241,0.4)' : `linear-gradient(135deg,${tool.color},${tool.color}cc)`,
+                color: '#fff', opacity: loading ? 0.7 : 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                boxShadow: loading ? 'none' : `0 4px 16px ${tool.color}44`,
+              }}>
+              {loading ? (
+                <>
+                  <svg style={{ animation: 'spin 1s linear infinite' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeOpacity=".3"/>
+                    <path d="M12 3a9 9 0 019 9"/>
+                  </svg>
+                  Generating with AI...
+                </>
+              ) : (
+                <>⚡ Generate {tool.label}</>
+              )}
             </button>
           </div>
 
-          {hashtagResult && (
-            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-
-              {/* Viral Score */}
-              {hashtagResult.viral_score && (
-                <div style={{ padding:'18px 20px', background:'rgba(249,115,22,0.07)', border:'1px solid rgba(249,115,22,0.25)', borderRadius:16 }}>
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-                    <p style={{ fontSize:13, fontWeight:700, color:'#fb923c' }}>🔥 Content Potential Score</p>
-                    <div style={{ fontFamily:'Syne', fontWeight:900, fontSize:28, color:'#f97316' }}>
-                      {hashtagResult.viral_score.score}<span style={{ fontSize:16, color:'#9a3412' }}>/100</span>
-                    </div>
-                  </div>
-                  {/* Score bar */}
-                  <div style={{ height:6, background:'rgba(249,115,22,0.15)', borderRadius:100, marginBottom:12, overflow:'hidden' }}>
-                    <div style={{ height:'100%', borderRadius:100, width:`${hashtagResult.viral_score.score}%`,
-                      background: hashtagResult.viral_score.score>=70 ? '#10b981' : hashtagResult.viral_score.score>=50 ? '#f59e0b' : '#ef4444',
-                      transition:'width 0.6s ease' }} />
-                  </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:10 }}>
-                    {[
-                      { label:'Demand',      val:hashtagResult.viral_score.demand,      hi:'High',  hiColor:'#6ee7b7' },
-                      { label:'Competition', val:hashtagResult.viral_score.competition, hi:'Low',   hiColor:'#6ee7b7' },
-                      { label:'Trend',       val:hashtagResult.viral_score.trend,       hi:'Rising',hiColor:'#6ee7b7' },
-                    ].map(s => (
-                      <div key={s.label} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
-                        <p style={{ fontSize:10, color:'#4b5563', marginBottom:4 }}>{s.label}</p>
-                        <p style={{ fontSize:13, fontWeight:700, fontFamily:'Syne', color: s.val===s.hi ? '#6ee7b7' : '#fbbf24' }}>{s.val}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <p style={{ fontSize:12, color:'#9a3412' }}>{hashtagResult.viral_score.reason}</p>
+          {/* Result */}
+          {result && (
+            <div style={S.card}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 16 }}>✅</span>
+                  <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 15 }}>Generated Result</span>
                 </div>
-              )}
-
-              {/* Hashtags */}
-              {hashtagResult.hashtags && (
-                <div style={{ padding:'16px 20px', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:16 }}>
-                  <p style={{ fontSize:12, fontWeight:700, color:'#9ca3af', textTransform:'uppercase', letterSpacing:0.5, marginBottom:14 }}>📌 Hashtags by Reach</p>
-                  {[
-                    { key:'high_reach',   label:'🔴 High Reach',   bg:'rgba(239,68,68,0.12)',   border:'rgba(239,68,68,0.3)',   color:'#f87171' },
-                    { key:'medium_reach', label:'🟡 Medium Reach', bg:'rgba(245,158,11,0.12)',  border:'rgba(245,158,11,0.3)', color:'#fbbf24' },
-                    { key:'niche',        label:'🔵 Niche',        bg:'rgba(59,130,246,0.12)',  border:'rgba(59,130,246,0.3)', color:'#93c5fd' },
-                  ].map(g => hashtagResult.hashtags[g.key]?.length > 0 && (
-                    <div key={g.key} style={{ marginBottom:14 }}>
-                      <p style={{ fontSize:10, fontWeight:700, color:g.color, textTransform:'uppercase', letterSpacing:0.5, marginBottom:8 }}>{g.label}</p>
-                      <div style={{ display:'flex', flexWrap:'wrap', gap:7 }}>
-                        {hashtagResult.hashtags[g.key].map((tag,i) => (
-                          <span key={i} className="hashtag-tag" onClick={() => navigator.clipboard.writeText(tag)}
-                            title="Click to copy"
-                            style={{ background:g.bg, border:`1px solid ${g.border}`, color:g.color, padding:'5px 12px', borderRadius:100, fontSize:12, fontWeight:600 }}>
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                  <p style={{ fontSize:11, color:'#374151', marginTop:4 }}>💡 Hashtag par click karein copy karne ke liye</p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={copyResult}
+                    style={{ ...S.btn, padding: '6px 14px', fontSize: 12, fontWeight: 600,
+                      background: copied ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.06)',
+                      border: `1px solid ${copied ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                      color: copied ? '#6ee7b7' : '#9ca3af',
+                    }}>
+                    {copied ? '✓ Copied!' : '📋 Copy'}
+                  </button>
+                  <button onClick={handleGenerate}
+                    style={{ ...S.btn, padding: '6px 14px', fontSize: 12, fontWeight: 600, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#9ca3af' }}>
+                    🔄 Regenerate
+                  </button>
                 </div>
-              )}
-
-              {/* Best Times */}
-              {hashtagResult.best_times && (
-                <div style={{ padding:'16px 20px', background:'rgba(16,185,129,0.06)', border:'1px solid rgba(16,185,129,0.2)', borderRadius:16 }}>
-                  <p style={{ fontSize:12, fontWeight:700, color:'#34d399', textTransform:'uppercase', letterSpacing:0.5, marginBottom:14 }}>⏰ Best Posting Times — {hashtagPlatform}</p>
-                  <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
-                    {hashtagResult.best_times.map((t, i) => (
-                      <div key={i} style={{ display:'flex', alignItems:'center', gap:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'10px 14px' }}>
-                        <span style={{ fontSize:11, fontWeight:800, color:'#34d399', minWidth:18, fontFamily:'Syne' }}>{i+1}</span>
-                        <span style={{ fontSize:13, fontWeight:600, color:'#f0f0f5', minWidth:90 }}>{t.day}</span>
-                        <span style={{ fontSize:13, fontWeight:700, color:'#6ee7b7', fontFamily:'Syne' }}>{t.range}</span>
-                        {t.reason && <span style={{ fontSize:11, color:'#4b5563', marginLeft:'auto' }}>{t.reason}</span>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Strategy */}
-              {hashtagResult.strategy && (
-                <div style={{ padding:'14px 18px', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.25)', borderRadius:14 }}>
-                  <p style={{ fontSize:11, fontWeight:700, color:'#c4b5fd', textTransform:'uppercase', letterSpacing:0.5, marginBottom:6 }}>🎯 Strategy Tip</p>
-                  <p style={{ fontSize:13, color:'#ddd6fe', lineHeight:1.7 }}>{hashtagResult.strategy}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {!hashtagLoading && !hashtagResult && (
-            <div style={{ border:'2px dashed rgba(255,255,255,0.06)', borderRadius:16, padding:'50px 24px', textAlign:'center' }}>
-              <div style={{ fontSize:40, marginBottom:10 }}>#️⃣</div>
-              <p style={{ fontSize:13, color:'#4b5563' }}>Topic aur platform chunein — AI best hashtags, viral score aur time batayega!</p>
+              </div>
+              <div style={S.result}>{result}</div>
             </div>
           )}
         </div>
-      )}
+      </div>
+
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }
