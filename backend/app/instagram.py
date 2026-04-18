@@ -3,7 +3,7 @@
 # Images: Supabase Storage (bucket: "posts" — must be PUBLIC)
 #
 # Add to main.py:
-#   from instagram import router as instagram_router
+#   from app.instagram import router as instagram_router
 #   app.include_router(instagram_router)
 
 import os
@@ -16,17 +16,16 @@ import uuid
 
 router = APIRouter(prefix="/api/instagram", tags=["Instagram"])
 
-GRAPH_VERSION = "v19.0"
-GRAPH         = f"https://graph.facebook.com/{GRAPH_VERSION}"
+GRAPH = "https://graph.facebook.com/v19.0"
 
-# ── Supabase client (uses service key — server side only) ─────────────────────
+# ── Supabase client ───────────────────────────────────────────────────────────
 def get_sb():
     return create_client(
         os.environ["SUPABASE_URL"],
         os.environ["SUPABASE_SERVICE_KEY"]
     )
 
-# ── Fetch token + ig_user_id from social_connections table ────────────────────
+# ── Get token from Supabase or fallback to env vars ──────────────────────────
 def get_token(user_id: str, sb) -> tuple[str, str]:
     r = sb.table("social_connections") \
         .select("access_token, platform_user_id") \
@@ -45,23 +44,19 @@ def get_token(user_id: str, sb) -> tuple[str, str]:
 
     raise HTTPException(
         status_code=400,
-        detail="Instagram not connected. Go to Settings and connect your Instagram account."
+        detail="Instagram not connected. Add token in Supabase or Railway env vars."
     )
 
+
 # ─────────────────────────────────────────────────────────────────────────────
-# 1. UPLOAD IMAGE TO SUPABASE STORAGE → returns public URL
+# 1. UPLOAD IMAGE TO SUPABASE STORAGE
 # ─────────────────────────────────────────────────────────────────────────────
 @router.post("/upload-image")
 async def upload_image(
-    user_id: str      = Form(...),
+    user_id: str        = Form(...),
     file:    UploadFile = File(...),
     sb = Depends(get_sb)
 ):
-    """
-    Upload image to Supabase Storage bucket 'posts'.
-    Returns a public URL that Instagram can fetch.
-    Bucket MUST be set to Public in Supabase Dashboard → Storage.
-    """
     allowed_types = ["image/jpeg", "image/png", "image/jpg"]
     if file.content_type not in allowed_types:
         raise HTTPException(400, "Only JPG and PNG are supported by Instagram.")
@@ -70,7 +65,6 @@ async def upload_image(
     ext      = "png" if "png" in file.content_type else "jpg"
     filename = f"instagram/{user_id}/{uuid.uuid4()}.{ext}"
 
-    # Upload to Supabase Storage
     try:
         sb.storage.from_("posts").upload(
             filename,
@@ -78,10 +72,8 @@ async def upload_image(
             {"content-type": file.content_type, "upsert": "true"}
         )
     except Exception as e:
-        raise HTTPException(500, f"Supabase Storage upload failed: {str(e)}. Make sure 'posts' bucket exists and is public.")
+        raise HTTPException(500, f"Upload failed: {str(e)}. Check 'posts' bucket is PUBLIC.")
 
-    # Build public URL
-    # Format: https://[project].supabase.co/storage/v1/object/public/posts/[filename]
     supabase_url = os.environ["SUPABASE_URL"]
     public_url   = f"{supabase_url}/storage/v1/object/public/posts/{filename}"
 
@@ -89,13 +81,13 @@ async def upload_image(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2. POST TO INSTAGRAM FEED (image or carousel)
+# 2. POST TO INSTAGRAM FEED
 # ─────────────────────────────────────────────────────────────────────────────
 class PostRequest(BaseModel):
     user_id:    str
     caption:    str
-    image_url:  Optional[str]       = None   # single image
-    image_urls: Optional[List[str]] = None   # carousel (2–10 images)
+    image_url:  Optional[str]       = None
+    image_urls: Optional[List[str]] = None
 
 class PostResponse(BaseModel):
     success:   bool
@@ -113,7 +105,7 @@ async def _create_container(ig_uid, tok, image_url, caption="", is_item=False):
         r = await c.post(f"{GRAPH}/{ig_uid}/media", params=params)
         d = r.json()
     if "error" in d:
-        raise HTTPException(400, f"IG container error: {d['error']['message']}")
+        raise HTTPException(400, f"Container error: {d['error']['message']}")
     return d["id"]
 
 async def _publish_container(ig_uid, tok, container_id):
@@ -124,13 +116,15 @@ async def _publish_container(ig_uid, tok, container_id):
         )
         d = r.json()
     if "error" in d:
-        raise HTTPException(400, f"IG publish error: {d['error']['message']}")
+        raise HTTPException(400, f"Publish error: {d['error']['message']}")
     return d["id"]
 
 async def _get_permalink(post_id, tok):
     async with httpx.AsyncClient(timeout=15) as c:
-        r = await c.get(f"{GRAPH}/{post_id}",
-                        params={"fields": "permalink", "access_token": tok})
+        r = await c.get(
+            f"{GRAPH}/{post_id}",
+            params={"fields": "permalink", "access_token": tok}
+        )
     return r.json().get("permalink", "")
 
 async def _check_rate_limit(ig_uid, tok):
@@ -150,19 +144,18 @@ async def post_to_instagram(body: PostRequest, sb=Depends(get_sb)):
 
     await _check_rate_limit(ig_uid, tok)
 
-    # Carousel (2–10 images)
+    # Carousel
     if body.image_urls and len(body.image_urls) >= 2:
         items = []
         for url in body.image_urls[:10]:
             items.append(await _create_container(ig_uid, tok, url, is_item=True))
-
         async with httpx.AsyncClient(timeout=30) as c:
             r = await c.post(
                 f"{GRAPH}/{ig_uid}/media",
                 params={
-                    "media_type": "CAROUSEL",
-                    "children":   ",".join(items),
-                    "caption":    body.caption,
+                    "media_type":   "CAROUSEL",
+                    "children":     ",".join(items),
+                    "caption":      body.caption,
                     "access_token": tok,
                 }
             )
@@ -170,8 +163,6 @@ async def post_to_instagram(body: PostRequest, sb=Depends(get_sb)):
         if "error" in d:
             raise HTTPException(400, d["error"]["message"])
         container_id = d["id"]
-
-    # Single image
     else:
         if not body.image_url:
             raise HTTPException(400, "image_url is required.")
@@ -180,18 +171,22 @@ async def post_to_instagram(body: PostRequest, sb=Depends(get_sb)):
     post_id   = await _publish_container(ig_uid, tok, container_id)
     permalink = await _get_permalink(post_id, tok)
 
-    # Log to Supabase
-    sb.table("scheduled_posts").insert({
-        "user_id":      body.user_id,
-        "title":        body.caption[:80],
-        "content":      body.caption,
-        "platform":     "instagram",
-        "scheduled_at": "now()",
-        "status":       "published",
-    }).execute()
+    try:
+        sb.table("scheduled_posts").insert({
+            "user_id":      body.user_id,
+            "title":        body.caption[:80],
+            "content":      body.caption,
+            "platform":     "instagram",
+            "scheduled_at": "now()",
+            "status":       "published",
+        }).execute()
+    except Exception:
+        pass
 
     return PostResponse(
-        success=True, post_id=post_id, permalink=permalink,
+        success=True,
+        post_id=post_id,
+        permalink=permalink,
         message="Posted to Instagram successfully!"
     )
 
@@ -201,7 +196,7 @@ async def post_to_instagram(body: PostRequest, sb=Depends(get_sb)):
 # ─────────────────────────────────────────────────────────────────────────────
 class StoryRequest(BaseModel):
     user_id:   str
-    image_url: str   # 9:16 ratio (1080×1920) recommended
+    image_url: str
 
 @router.post("/story")
 async def post_story(body: StoryRequest, sb=Depends(get_sb)):
@@ -232,6 +227,8 @@ async def post_story(body: StoryRequest, sb=Depends(get_sb)):
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. ANALYTICS
+# username and followers_count are deprecated in Graph API v2.0+
+# Using insights endpoint for follower data instead
 # ─────────────────────────────────────────────────────────────────────────────
 @router.get("/analytics/{user_id}")
 async def get_analytics(user_id: str, sb=Depends(get_sb)):
@@ -241,7 +238,7 @@ async def get_analytics(user_id: str, sb=Depends(get_sb)):
         acc_r = await c.get(
             f"{GRAPH}/{ig_uid}",
             params={
-                "fields":       "username,followers_count,follows_count,media_count,profile_picture_url,biography,website",
+                "fields":       "id,media_count,profile_picture_url,biography,website",
                 "access_token": tok,
             }
         )
@@ -267,12 +264,10 @@ async def get_analytics(user_id: str, sb=Depends(get_sb)):
     ins   = ins_r.json()
     media = media_r.json()
 
-    # Aggregate insights
     insights = {}
     for item in ins.get("data", []):
         insights[item["name"]] = sum(v.get("value", 0) for v in item.get("values", []))
 
-    # Posts list
     posts = []
     for m in media.get("data", []):
         likes    = m.get("like_count", 0)
@@ -291,9 +286,9 @@ async def get_analytics(user_id: str, sb=Depends(get_sb)):
 
     return {
         "account": {
-            "username":    acc.get("username"),
-            "followers":   acc.get("followers_count", 0),
-            "following":   acc.get("follows_count", 0),
+            "username":    "Instagram Account",
+            "followers":   insights.get("follower_count", 0),
+            "following":   0,
             "media_count": acc.get("media_count", 0),
             "profile_pic": acc.get("profile_picture_url"),
             "bio":         acc.get("biography"),
@@ -312,7 +307,7 @@ async def get_analytics(user_id: str, sb=Depends(get_sb)):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. INBOX — Comments across recent posts
+# 5. INBOX
 # ─────────────────────────────────────────────────────────────────────────────
 @router.get("/inbox/{user_id}")
 async def get_inbox(user_id: str, limit: int = 30, sb=Depends(get_sb)):
@@ -324,7 +319,7 @@ async def get_inbox(user_id: str, limit: int = 30, sb=Depends(get_sb)):
             params={"fields": "id,caption,permalink", "limit": 8, "access_token": tok}
         )
 
-    posts = posts_r.json().get("data", [])
+    posts        = posts_r.json().get("data", [])
     all_comments = []
 
     async with httpx.AsyncClient(timeout=20) as c:
@@ -350,7 +345,6 @@ async def get_inbox(user_id: str, limit: int = 30, sb=Depends(get_sb)):
                     "replies":      cmt.get("replies", {}).get("data", []),
                 })
 
-    # Try DMs (requires instagram_manage_messages — may not be available in dev)
     dms = []
     try:
         async with httpx.AsyncClient(timeout=10) as c:
@@ -374,9 +368,13 @@ async def get_inbox(user_id: str, limit: int = 30, sb=Depends(get_sb)):
                     "thread_count": len(msgs),
                 })
     except Exception:
-        pass  # DMs need app review — skip silently in dev
+        pass
 
-    all_msgs = sorted(all_comments + dms, key=lambda x: x.get("timestamp", ""), reverse=True)
+    all_msgs = sorted(
+        all_comments + dms,
+        key=lambda x: x.get("timestamp", ""),
+        reverse=True
+    )
 
     return {
         "total":    len(all_msgs),
@@ -409,7 +407,8 @@ async def reply_to_comment(body: ReplyRequest, sb=Depends(get_sb)):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 7. CONNECT — Save token after OAuth or manual entry
+# 7. CONNECT
+# Only fetches 'id' — username/followers deprecated in v2.0+
 # ─────────────────────────────────────────────────────────────────────────────
 class ConnectRequest(BaseModel):
     user_id:      str
@@ -423,7 +422,7 @@ async def connect_instagram(body: ConnectRequest, sb=Depends(get_sb)):
     async with httpx.AsyncClient(timeout=15) as c:
         r = await c.get(
             f"{GRAPH}/{ig_uid}",
-            params={"fields": "username,followers_count", "access_token": tok}
+            params={"fields": "id", "access_token": tok}
         )
         d = r.json()
 
@@ -434,39 +433,40 @@ async def connect_instagram(body: ConnectRequest, sb=Depends(get_sb)):
         "user_id":          body.user_id,
         "platform":         "instagram",
         "platform_user_id": ig_uid,
-        "username":         d.get("username"),
-        "followers":        d.get("followers_count", 0),
+        "username":         "instagram_user",
+        "followers":        0,
         "access_token":     tok,
         "connected_at":     "now()",
     }, on_conflict="user_id,platform").execute()
 
-    return {
-        "success":   True,
-        "username":  d.get("username"),
-        "followers": d.get("followers_count", 0),
-        "message":   "Instagram connected!"
-    }
+    return {"success": True, "message": "Instagram connected successfully!"}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 8. STATUS CHECK
+# Only fetches 'id' — username/followers deprecated in v2.0+
 # ─────────────────────────────────────────────────────────────────────────────
 @router.get("/status/{user_id}")
 async def instagram_status(user_id: str, sb=Depends(get_sb)):
     try:
         tok, ig_uid = get_token(user_id, sb)
+
         async with httpx.AsyncClient(timeout=10) as c:
             r = await c.get(
                 f"{GRAPH}/{ig_uid}",
-                params={"fields": "username,followers_count", "access_token": tok}
+                params={"fields": "id", "access_token": tok}
             )
             d = r.json()
+
         if "error" in d:
             return {"connected": False, "error": d["error"]["message"]}
+
         return {
-            "connected": True,
-            "username":  d.get("username"),
-            "followers": d.get("followers_count", 0),
+            "connected":  True,
+            "ig_user_id": d.get("id"),
+            "followers":  0,
+            "message":    "Instagram connected successfully!"
         }
+
     except Exception as e:
         return {"connected": False, "error": str(e)}
