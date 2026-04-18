@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from app.api import posts, media_kit, ai, deals, social, captions, clipping
 from app.api.scheduler import start_scheduler
-from instagram import router as instagram_router
+from app.instagram import router as instagram_router
 load_dotenv()
 
 app = FastAPI()
