@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #333; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1024" height="1024"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+// Background
+ctx.fillStyle = '#070D0A';
+ctx.fillRect(0, 0, 1024, 1024);
+
+// Rounded corners (simulate with clip)
+const r = 180;
+ctx.beginPath();
+ctx.moveTo(r, 0);
+ctx.lineTo(1024 - r, 0);
+ctx.quadraticCurveTo(1024, 0, 1024, r);
+ctx.lineTo(1024, 1024 - r);
+ctx.quadraticCurveTo(1024, 1024, 1024 - r, 1024);
+ctx.lineTo(r, 1024);
+ctx.quadraticCurveTo(0, 1024, 0, 1024 - r);
+ctx.lineTo(0, r);
+ctx.quadraticCurveTo(0, 0, r, 0);
+ctx.closePath();
+ctx.clip();
+
+// Background fill
+ctx.fillStyle = '#070D0A';
+ctx.fillRect(0, 0, 1024, 1024);
+
+// Subtle teal glow in top-right
+const grd = ctx.createRadialGradient(900, 100, 0, 900, 100, 500);
+grd.addColorStop(0,   'rgba(0,229,160,0.15)');
+grd.addColorStop(1,   'rgba(0,229,160,0)');
+ctx.fillStyle = grd;
+ctx.fillRect(0, 0, 1024, 1024);
+
+// Teal accent bar at top
+ctx.fillStyle = '#00E5A0';
+ctx.fillRect(0, 0, 1024, 8);
+
+// Draw ⚡ lightning bolt as polygon (clean, no emoji rendering issues)
+ctx.fillStyle = '#00E5A0';
+ctx.shadowColor = '#00E5A0';
+ctx.shadowBlur = 40;
+
+// Lightning bolt path — centered in 1024x1024
+ctx.beginPath();
+// Top-right point
+ctx.moveTo(620, 80);
+// Down to middle-right
+ctx.lineTo(480, 480);
+// Right bump
+ctx.lineTo(590, 480);
+// Down to bottom-left
+ctx.lineTo(404, 944);
+// Up to middle-left
+ctx.lineTo(544, 544);
+// Left bump
+ctx.lineTo(434, 544);
+// Back to top
+ctx.lineTo(620, 80);
+ctx.closePath();
+ctx.fill();
+
+// Remove shadow for text
+ctx.shadowBlur = 0;
+
+// "NX" text at bottom — subtle
+ctx.fillStyle = 'rgba(0,229,160,0.3)';
+ctx.font = 'bold 72px Arial';
+ctx.textAlign = 'center';
+ctx.fillText('NEXORA OS', 512, 980);
+
+// Download button
+const btn = document.createElement('button');
+btn.textContent = '⬇ Download 1024×1024 PNG';
+btn.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:14px 28px;background:#00E5A0;color:#070D0A;border:none;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;';
+btn.onclick = () => {
+  const link = document.createElement('a');
+  link.download = 'nexora-os-icon-1024.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+};
+document.body.appendChild(btn);
+</script>
+</body>
+</html>

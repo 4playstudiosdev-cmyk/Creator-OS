@@ -1,133 +1,124 @@
-import { HashRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom'
+// ─────────────────────────────────────────────────────────────────────────────
+// App.jsx — SWITCHED TO BrowserRouter
+//
+// WHY: HashRouter (#) breaks Google OAuth because Supabase returns
+//      ?code=xxx BEFORE the hash: http://localhost:5173/?code=xxx#/login
+//      BrowserRouter uses real paths (/login, /dashboard) so OAuth works.
+//
+// NETLIFY FIX: Add a _redirects file in /public with:
+//      /*  /index.html  200
+// This ensures Netlify serves index.html for all routes.
+//
+// PUBLIC ROUTES (no auth):
+//   /              → LandingPage
+//   /login         → Login
+//   /setup-username→ UsernameSetup (after first signup)
+//   /u/:username   → PublicProfile (media kit)
+//   /r/:slug       → ROIRedirect   (brand tracking)
+//
+// PROTECTED ROUTES (need session + username):
+//   /dashboard, /schedule, /repurpose, /inbox, /analytics, /ai-tools
+//   /deals, /mediakit, /funding, /earnings, /script-studio
+//   /youtube-studio, /video-editor, /auto-clip, /pricing, /settings
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabaseClient'
-import Login from './pages/Login'
-import LandingPage from './pages/LandingPage'
-import Layout from './components/Layout'
-import AgencyLayout from './components/AgencyLayout'
-import Dashboard from './pages/Dashboard'
-import SchedulerPage from './pages/SchedulerPage'
-import MediaKitPage from './pages/MediaKitPage'
-import PublicProfile from './pages/PublicProfile'
-import ROIRedirect from "./pages/Roiredirect";
-import RepurposePage from './pages/RepurposePage'
-import BrandDeals from './pages/BrandDeals'
-import SettingsPage from './pages/SettingsPage'
-import InboxPage from './pages/InboxPage'
-import AnalyticsPage from './pages/AnalyticsPage'
-import PricingPage from './pages/PricingPage'
-import AIToolsPage from './pages/AIToolsPage'
-import AgencyPage from './pages/AgencyPage'
+
+// Pages
+import Login          from './pages/Login'
+import UsernameSetup  from './pages/UsernameSetup'
+import LandingPage    from './pages/LandingPage'
+import PublicProfile  from './pages/PublicProfile'
+import ROIRedirect    from './pages/ROIRedirect'
 import OnboardingPage from './pages/OnboardingPage'
-import FundingPage from './pages/FundingPage'
-import EarningsPage from './pages/EarningsPage'
-import TwitterCallback from './pages/auth/TwitterCallback'
-import GoogleCallback from './pages/auth/GoogleCallback'
+
+// Auth callbacks (social OAuth)
+import TwitterCallback  from './pages/auth/TwitterCallback'
+import GoogleCallback   from './pages/auth/GoogleCallback'
 import LinkedInCallback from './pages/auth/LinkedInCallback'
+
+// App layouts
+import Layout       from './components/Layout'
+import AgencyLayout from './components/AgencyLayout'
+
+// App pages
+import Dashboard        from './pages/Dashboard'
+import SchedulerPage    from './pages/SchedulerPage'
+import RepurposePage    from './pages/RepurposePage'
+import InboxPage        from './pages/InboxPage'
+import AnalyticsPage    from './pages/AnalyticsPage'
+import AIToolsPage      from './pages/AIToolsPage'
+import BrandDeals       from './pages/BrandDeals'
+import MediaKitPage     from './pages/MediaKitPage'
+import FundingPage      from './pages/FundingPage'
+import EarningsPage     from './pages/EarningsPage'
 import ScriptStudioPage from './pages/ScriptStudioPage'
 import YouTubeStudioPage from './pages/YouTubeStudioPage'
-import VideoEditorPage from './pages/VideoEditorPage'
+import VideoEditorPage  from './pages/VideoEditorPage'
 import AutoClippingPage from './pages/AutoClippingPage'
+import PricingPage      from './pages/PricingPage'
+import SettingsPage     from './pages/SettingsPage'
+import AgencyPage       from './pages/AgencyPage'
+import InstagramPage from './pages/InstagramPage'
+
 import './index.css'
 
-// ── IMPORTANT: HashRouter uses /#/path format
-// ── So /u/username → /#/u/username in browser
-// ── And /r/slug    → /#/r/slug in browser
-// ── Both routes are PUBLIC — no auth needed
+// ── Loading spinner (dark theme) ──────────────────────────────────────────────
+function Loader() {
+  return (
+    <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'#070D0A', gap:14 }}>
+      <div style={{ width:40, height:40, border:'3px solid rgba(0,229,160,0.15)', borderTopColor:'#00E5A0', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+      <p style={{ color:'#4A6357', fontSize:13, margin:0, fontFamily:'sans-serif' }}>Loading...</p>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  )
+}
 
+// ── ProtectedRoute ─────────────────────────────────────────────────────────────
+// Checks: logged in? has username? → render children OR redirect
 function ProtectedRoute() {
-  const [session,     setSession]     = useState(undefined)
-  const [accountType, setAccountType] = useState(undefined)
-  const [checking,    setChecking]    = useState(true)
+  const [state, setState] = useState('loading') // loading | no-session | no-username | ready
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      setSession(data.session ?? null)
-      if (data.session) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('account_type')
-          .eq('id', data.session.user.id)
-          .single()
-        setAccountType(profile?.account_type ?? null)
-      } else {
-        setAccountType(null)
-      }
-      setChecking(false)
-    })
+    let cancelled = false
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    async function check() {
+      const { data: { session } } = await supabase.auth.getSession()
+
       if (!session) {
-        setSession(null)
-        setAccountType(null)
-        setChecking(false)
+        if (!cancelled) setState('no-session')
+        return
       }
+
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', session.user.id)
+        .maybeSingle()
+
+      if (!cancelled) {
+        setState(prof?.username ? 'ready' : 'no-username')
+      }
+    }
+
+    check()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT' && !cancelled) setState('no-session')
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      cancelled = true
+      subscription.unsubscribe()
+    }
   }, [])
 
-  if (checking) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0f' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ width: 36, height: 36, border: '3px solid rgba(99,102,241,0.15)', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
-          <p style={{ color: '#374151', fontSize: 13, fontFamily: 'DM Sans, sans-serif' }}>Loading...</p>
-        </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-      </div>
-    )
-  }
-
-  if (!session)     return <Navigate to="/login"      replace />
-  if (!accountType) return <Navigate to="/onboarding" replace />
-  return <Outlet context={{ accountType }} />
-}
-
-function IndividualRoute({ children }) {
-  const [accountType, setAccountType] = useState(null)
-  const [checking,    setChecking]    = useState(true)
-
-  useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (data.session) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('account_type')
-          .eq('id', data.session.user.id)
-          .single()
-        setAccountType(profile?.account_type ?? null)
-      }
-      setChecking(false)
-    })
-  }, [])
-
-  if (checking) return null
-  if (accountType === 'agency') return <Navigate to="/agency" replace />
-  return children
-}
-
-function AgencyRoute({ children }) {
-  const [accountType, setAccountType] = useState(null)
-  const [checking,    setChecking]    = useState(true)
-
-  useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (data.session) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('account_type')
-          .eq('id', data.session.user.id)
-          .single()
-        setAccountType(profile?.account_type ?? null)
-      }
-      setChecking(false)
-    })
-  }, [])
-
-  if (checking) return null
-  if (accountType === 'individual') return <Navigate to="/dashboard" replace />
-  return children
+  if (state === 'loading')     return <Loader />
+  if (state === 'no-session')  return <Navigate to="/login"          replace />
+  if (state === 'no-username') return <Navigate to="/setup-username" replace />
+  return <Outlet />
 }
 
 export default function App() {
@@ -135,54 +126,46 @@ export default function App() {
     <Router>
       <Routes>
 
-        {/* ══ PUBLIC ROUTES (no auth) ══ */}
+        {/* ── PUBLIC (no auth needed) ── */}
         <Route path="/"                       element={<LandingPage />} />
         <Route path="/login"                  element={<Login />} />
+        <Route path="/setup-username"         element={<UsernameSetup />} />
         <Route path="/onboarding"             element={<OnboardingPage />} />
-
-        {/* PUBLIC: Media Kit — /#/u/username */}
         <Route path="/u/:username"            element={<PublicProfile />} />
-
-        {/* PUBLIC: ROI Redirect/Tracking — /#/r/slug */}
         <Route path="/r/:slug"                element={<ROIRedirect />} />
-
-        {/* OAuth Callbacks */}
         <Route path="/auth/twitter/callback"  element={<TwitterCallback />} />
         <Route path="/auth/google/callback"   element={<GoogleCallback />} />
         <Route path="/auth/linkedin/callback" element={<LinkedInCallback />} />
+        <Route path="/instagram" element={<InstagramPage />} />
 
-        {/* ══ PROTECTED ROUTES ══ */}
+        {/* ── PROTECTED (must be logged in + have username) ── */}
         <Route element={<ProtectedRoute />}>
-
-          {/* Individual Creator */}
           <Route element={<Layout />}>
-            <Route path="/dashboard"      element={<IndividualRoute><Dashboard /></IndividualRoute>} />
-            <Route path="/schedule"       element={<IndividualRoute><SchedulerPage /></IndividualRoute>} />
-            <Route path="/repurpose"      element={<IndividualRoute><RepurposePage /></IndividualRoute>} />
-            <Route path="/inbox"          element={<IndividualRoute><InboxPage /></IndividualRoute>} />
-            <Route path="/analytics"      element={<IndividualRoute><AnalyticsPage /></IndividualRoute>} />
-            <Route path="/ai-tools"       element={<IndividualRoute><AIToolsPage /></IndividualRoute>} />
-            <Route path="/deals"          element={<IndividualRoute><BrandDeals /></IndividualRoute>} />
-            <Route path="/mediakit"       element={<IndividualRoute><MediaKitPage /></IndividualRoute>} />
-            <Route path="/funding"        element={<IndividualRoute><FundingPage /></IndividualRoute>} />
-            <Route path="/earnings"       element={<IndividualRoute><EarningsPage /></IndividualRoute>} />
-            <Route path="/script-studio"  element={<IndividualRoute><ScriptStudioPage /></IndividualRoute>} />
-            <Route path="/youtube-studio" element={<IndividualRoute><YouTubeStudioPage /></IndividualRoute>} />
-            <Route path="/video-editor"   element={<IndividualRoute><VideoEditorPage /></IndividualRoute>} />
-            <Route path="/auto-clip"      element={<IndividualRoute><AutoClippingPage /></IndividualRoute>} />
+            <Route path="/dashboard"      element={<Dashboard />} />
+            <Route path="/schedule"       element={<SchedulerPage />} />
+            <Route path="/repurpose"      element={<RepurposePage />} />
+            <Route path="/inbox"          element={<InboxPage />} />
+            <Route path="/analytics"      element={<AnalyticsPage />} />
+            <Route path="/ai-tools"       element={<AIToolsPage />} />
+            <Route path="/deals"          element={<BrandDeals />} />
+            <Route path="/mediakit"       element={<MediaKitPage />} />
+            <Route path="/funding"        element={<FundingPage />} />
+            <Route path="/earnings"       element={<EarningsPage />} />
+            <Route path="/script-studio"  element={<ScriptStudioPage />} />
+            <Route path="/youtube-studio" element={<YouTubeStudioPage />} />
+            <Route path="/video-editor"   element={<VideoEditorPage />} />
+            <Route path="/auto-clip"      element={<AutoClippingPage />} />
             <Route path="/pricing"        element={<PricingPage />} />
             <Route path="/settings"       element={<SettingsPage />} />
           </Route>
 
-          {/* Agency */}
           <Route element={<AgencyLayout />}>
-            <Route path="/agency"           element={<AgencyRoute><AgencyPage /></AgencyRoute>} />
-            <Route path="/agency/settings"  element={<AgencyRoute><SettingsPage /></AgencyRoute>} />
-            <Route path="/agency/pricing"   element={<AgencyRoute><PricingPage /></AgencyRoute>} />
-            <Route path="/agency/analytics" element={<AgencyRoute><AgencyPage /></AgencyRoute>} />
-            <Route path="/agency/schedule"  element={<AgencyRoute><AgencyPage /></AgencyRoute>} />
+            <Route path="/agency"           element={<AgencyPage />} />
+            <Route path="/agency/settings"  element={<SettingsPage />} />
+            <Route path="/agency/pricing"   element={<PricingPage />} />
+            <Route path="/agency/analytics" element={<AgencyPage />} />
+            <Route path="/agency/schedule"  element={<AgencyPage />} />
           </Route>
-
         </Route>
 
         {/* Fallback */}
@@ -192,4 +175,3 @@ export default function App() {
     </Router>
   )
 }
-

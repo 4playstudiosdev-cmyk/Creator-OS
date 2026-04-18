@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — Nexora OS</title>
+<link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@400;500;700;800;900&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --teal:#00E5A0; --teal-d:#00B87A; --ink:#070D0A; --ink2:#0F1A14;
+    --muted:#4A6357; --muted2:#7A9E8E; --text:#D8EEE5; --text2:#9DC4B0;
+    --glass:rgba(0,229,160,0.05); --border:rgba(0,229,160,0.12);
+    --font-h:'Cabinet Grotesk',sans-serif; --font-b:'Instrument Sans',sans-serif;
+  }
+  html { scroll-behavior: smooth; }
+  body { background:var(--ink); color:var(--text); font-family:var(--font-b); font-size:16px; line-height:1.75; min-height:100vh; }
+  .bg { position:fixed; inset:0; z-index:0; pointer-events:none; background: radial-gradient(ellipse 60% 50% at 85% 10%,rgba(0,180,120,0.06) 0%,transparent 70%), radial-gradient(ellipse 40% 40% at 5% 90%,rgba(0,229,160,0.04) 0%,transparent 60%); }
+  .grid { position:fixed; inset:0; z-index:0; pointer-events:none; opacity:0.02; background-image:linear-gradient(var(--teal) 1px,transparent 1px),linear-gradient(90deg,var(--teal) 1px,transparent 1px); background-size:80px 80px; }
+
+  nav { position:sticky; top:0; z-index:100; background:rgba(7,13,10,0.92); backdrop-filter:blur(20px); border-bottom:1px solid var(--border); padding:0 40px; display:flex; align-items:center; justify-content:space-between; height:64px; }
+  .nav-brand { display:flex; align-items:center; gap:10px; text-decoration:none; }
+  .nav-icon { width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,var(--teal),var(--teal-d)); display:flex; align-items:center; justify-content:center; font-size:18px; box-shadow:0 4px 16px rgba(0,229,160,0.25); }
+  .nav-name { font-family:var(--font-h); font-size:18px; font-weight:900; color:#fff; }
+  .nav-name span { color:var(--teal); }
+  .nav-links { display:flex; gap:28px; align-items:center; }
+  .nav-link { font-size:13px; color:var(--muted2); text-decoration:none; font-weight:500; transition:color .2s; }
+  .nav-link:hover, .nav-link.active { color:var(--teal); }
+
+  .wrapper { position:relative; z-index:1; max-width:860px; margin:0 auto; padding:64px 40px 100px; }
+
+  .page-chip { display:inline-flex; align-items:center; gap:8px; padding:5px 14px; border:1px solid var(--border); border-radius:100px; background:var(--glass); font-size:11px; font-weight:700; letter-spacing:0.1em; color:var(--teal); text-transform:uppercase; margin-bottom:20px; }
+  .page-chip-dot { width:6px; height:6px; border-radius:50%; background:var(--teal); animation:pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+  .page-title { font-family:var(--font-h); font-size:clamp(36px,5vw,56px); font-weight:900; line-height:1.0; letter-spacing:-0.03em; color:#fff; margin-bottom:16px; }
+  .page-title span { color:var(--teal); }
+  .page-meta { font-size:14px; color:var(--muted2); margin-bottom:0; }
+  .page-meta strong { color:var(--text2); }
+
+  .meta-bar { display:flex; gap:32px; flex-wrap:wrap; padding:18px 24px; margin:28px 0 48px; border:1px solid var(--border); border-radius:14px; background:var(--glass); }
+  .meta-item .ml { font-size:10px; font-weight:700; color:var(--muted2); text-transform:uppercase; letter-spacing:.1em; margin-bottom:3px; }
+  .meta-item .mv { font-size:14px; color:var(--text); font-weight:600; }
+
+  .toc { padding:24px 28px; margin-bottom:56px; border:1px solid var(--border); border-radius:16px; background:rgba(0,229,160,0.03); }
+  .toc-title { font-family:var(--font-h); font-size:13px; font-weight:800; color:var(--teal); text-transform:uppercase; letter-spacing:.08em; margin-bottom:16px; }
+  .toc-list { display:flex; flex-direction:column; gap:8px; }
+  .toc-link { font-size:13.5px; color:var(--text2); text-decoration:none; display:flex; align-items:center; gap:10px; transition:color .2s; }
+  .toc-link:hover { color:var(--teal); }
+  .toc-num { font-family:var(--font-h); font-size:11px; font-weight:700; color:var(--teal); min-width:22px; }
+
+  .sec { margin-bottom:52px; scroll-margin-top:88px; }
+  .sec-head { display:flex; align-items:center; gap:14px; margin-bottom:20px; padding-bottom:14px; border-bottom:1px solid var(--border); }
+  .sec-num { font-family:var(--font-h); font-size:13px; font-weight:800; color:var(--teal); min-width:28px; }
+  .sec-title { font-family:var(--font-h); font-size:22px; font-weight:800; color:#fff; }
+  .sec p { font-size:15px; color:var(--text2); margin-bottom:14px; line-height:1.78; }
+  .sec p:last-child { margin-bottom:0; }
+
+  ul.pl { list-style:none; display:flex; flex-direction:column; gap:10px; margin:16px 0; }
+  ul.pl li { font-size:15px; color:var(--text2); padding-left:22px; position:relative; line-height:1.65; }
+  ul.pl li::before { content:''; position:absolute; left:0; top:9px; width:6px; height:6px; border-radius:50%; background:var(--teal); opacity:.7; }
+
+  .hl { padding:20px 24px; margin:20px 0; border-left:3px solid var(--teal); background:rgba(0,229,160,0.04); border-radius:0 12px 12px 0; font-size:14px; color:var(--text2); line-height:1.7; }
+  .hl strong { color:var(--teal); }
+
+  .ig { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin:20px 0; }
+  .ic { padding:18px 16px; border:1px solid var(--border); border-radius:12px; background:rgba(0,229,160,0.03); }
+  .ic-icon { font-size:20px; margin-bottom:8px; }
+  .ic-title { font-family:var(--font-h); font-size:13px; font-weight:700; color:#fff; margin-bottom:5px; }
+  .ic-body { font-size:12px; color:var(--muted2); line-height:1.55; }
+
+  .sub-title { font-family:var(--font-h); font-size:16px; font-weight:700; color:var(--text); margin:24px 0 10px; }
+
+  .cbox { margin-top:20px; padding:24px 28px; border:1px solid var(--teal); border-radius:16px; background:rgba(0,229,160,0.04); }
+  .cbox-title { font-family:var(--font-h); font-size:16px; font-weight:800; color:var(--teal); margin-bottom:14px; }
+  .crow { display:flex; gap:10px; align-items:flex-start; margin-bottom:8px; font-size:14px; }
+  .cl { color:var(--muted2); min-width:80px; font-weight:600; }
+  .cv { color:var(--text2); }
+  .cv a { color:var(--teal); text-decoration:none; }
+  .cv a:hover { text-decoration:underline; }
+
+  footer { position:relative; z-index:1; border-top:1px solid var(--border); padding:32px 40px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; font-size:13px; color:var(--muted2); }
+  .fb { font-family:var(--font-h); font-size:15px; font-weight:800; color:var(--text2); }
+  .fb span { color:var(--teal); }
+  .fl { display:flex; gap:24px; }
+  .fl a { color:var(--muted2); text-decoration:none; transition:color .2s; }
+  .fl a:hover, .fl a.active { color:var(--teal); }
+
+  @media(max-width:600px){ nav{padding:0 20px;} .wrapper{padding:40px 20px 80px;} footer{padding:24px 20px;} .nav-links{display:none;} }
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="grid"></div>
+
+<nav>
+  <a href="index.html" class="nav-brand">
+    <div class="nav-icon">⚡</div>
+    <div class="nav-name">Nexora <span>OS</span></div>
+  </a>
+  <div class="nav-links">
+    <a href="index.html" class="nav-link">Home</a>
+    <a href="privacy-policy.html" class="nav-link active">Privacy Policy</a>
+    <a href="terms-and-conditions.html" class="nav-link">Terms &amp; Conditions</a>
+  </div>
+</nav>
+
+<div class="wrapper">
+
+  <div class="page-chip"><div class="page-chip-dot"></div> Legal Document</div>
+  <h1 class="page-title">Privacy <span>Policy</span></h1>
+  <p class="page-meta">This Privacy Policy explains how <strong>Nexora OS</strong> collects, uses, stores, and protects your personal information when you use our platform, website, and services.</p>
+
+  <div class="meta-bar">
+    <div class="meta-item"><div class="ml">Effective Date</div><div class="mv">April 12, 2026</div></div>
+    <div class="meta-item"><div class="ml">Last Updated</div><div class="mv">April 12, 2026</div></div>
+    <div class="meta-item"><div class="ml">Company</div><div class="mv">Nexora OS</div></div>
+    <div class="meta-item"><div class="ml">Location</div><div class="mv">Karachi, Pakistan</div></div>
+  </div>
+
+  <div class="toc">
+    <div class="toc-title">Table of Contents</div>
+    <div class="toc-list">
+      <a href="#s1"  class="toc-link"><span class="toc-num">01</span> Information We Collect</a>
+      <a href="#s2"  class="toc-link"><span class="toc-num">02</span> How We Use Your Information</a>
+      <a href="#s3"  class="toc-link"><span class="toc-num">03</span> Data Storage &amp; Security</a>
+      <a href="#s4"  class="toc-link"><span class="toc-num">04</span> Third-Party Services</a>
+      <a href="#s5"  class="toc-link"><span class="toc-num">05</span> Cookies &amp; Tracking</a>
+      <a href="#s6"  class="toc-link"><span class="toc-num">06</span> Social Media Integrations</a>
+      <a href="#s7"  class="toc-link"><span class="toc-num">07</span> Your Rights &amp; Choices</a>
+      <a href="#s8"  class="toc-link"><span class="toc-num">08</span> Data Retention</a>
+      <a href="#s9"  class="toc-link"><span class="toc-num">09</span> Children's Privacy</a>
+      <a href="#s10" class="toc-link"><span class="toc-num">10</span> International Users</a>
+      <a href="#s11" class="toc-link"><span class="toc-num">11</span> Changes to This Policy</a>
+      <a href="#s12" class="toc-link"><span class="toc-num">12</span> Contact Us</a>
+    </div>
+  </div>
+
+  <div class="hl"><strong>Plain-English Summary:</strong> We collect only what we need to run the platform. We never sell your data to advertisers or third parties. Your content, brand deals, earnings, and social credentials stay private and belong to you. You can delete your account and all associated data at any time.</div>
+
+  <!-- 01 -->
+  <div class="sec" id="s1">
+    <div class="sec-head"><span class="sec-num">01</span><h2 class="sec-title">Information We Collect</h2></div>
+
+    <div class="sub-title">1.1 Information You Provide Directly</div>
+    <p>When you create an account or use our services, we collect:</p>
+    <ul class="pl">
+      <li><strong>Account information</strong> — your name, email address, and password (stored as a secure bcrypt hash, never in plain text).</li>
+      <li><strong>Creator profile data</strong> — your channel handle, niche, bio, social links, and other details you add to your Media Kit or profile.</li>
+      <li><strong>Content you create</strong> — scripts, repurposed posts, scheduled content, captions, and any text generated or saved within Nexora OS.</li>
+      <li><strong>Brand deal information</strong> — deal names, brand names, contract values, invoices, notes, and pipeline stages entered in the Brand Deals CRM.</li>
+      <li><strong>Earnings data</strong> — revenue figures you manually enter or that sync from connected platforms such as YouTube AdSense.</li>
+      <li><strong>Support communications</strong> — messages you send to our team via email or contact forms.</li>
+    </ul>
+
+    <div class="sub-title">1.2 Information Collected Automatically</div>
+    <p>When you use Nexora OS, we automatically collect limited technical information to operate and secure the platform:</p>
+    <ul class="pl">
+      <li><strong>Usage data</strong> — pages visited, features used, session duration, and navigation paths within the platform (anonymized in aggregate).</li>
+      <li><strong>Device information</strong> — browser type, operating system, and screen resolution.</li>
+      <li><strong>IP address</strong> — used to detect your approximate country for compliance purposes and to prevent unauthorized access.</li>
+      <li><strong>Session and authentication data</strong> — login timestamps and encrypted session tokens.</li>
+      <li><strong>Error logs</strong> — technical error reports used to diagnose and fix bugs (no personal content is included).</li>
+    </ul>
+
+    <div class="sub-title">1.3 Information from Connected Social Accounts</div>
+    <p>When you connect social media accounts via OAuth, we may receive:</p>
+    <ul class="pl">
+      <li>Your public profile information (name, username, profile picture) from those platforms.</li>
+      <li>Channel or account analytics data you explicitly authorize (views, follower counts, engagement metrics).</li>
+      <li>OAuth access tokens, which are encrypted with AES-256 before being stored.</li>
+    </ul>
+    <div class="hl"><strong>Important:</strong> We never access your social media passwords. All connections use official OAuth 2.0 protocols. You can revoke access at any time from your Settings page or from the connected platform's own security settings.</div>
+  </div>
+
+  <!-- 02 -->
+  <div class="sec" id="s2">
+    <div class="sec-head"><span class="sec-num">02</span><h2 class="sec-title">How We Use Your Information</h2></div>
+    <p>We use the information we collect solely to operate and improve Nexora OS for you.</p>
+    <div class="ig">
+      <div class="ic"><div class="ic-icon">⚙️</div><div class="ic-title">Platform Operation</div><div class="ic-body">To deliver all Nexora OS features — scheduling, repurposing, analytics, CRM, and inbox management.</div></div>
+      <div class="ic"><div class="ic-icon">🤖</div><div class="ic-title">AI Processing</div><div class="ic-body">To run your content through Groq AI and Whisper. Your inputs are never used to train AI models.</div></div>
+      <div class="ic"><div class="ic-icon">🔐</div><div class="ic-title">Security</div><div class="ic-body">To authenticate users, detect fraud, and prevent unauthorized access to your account.</div></div>
+      <div class="ic"><div class="ic-icon">📧</div><div class="ic-title">Transactional Email</div><div class="ic-body">To send account verification, password resets, invoices, and critical service notifications.</div></div>
+      <div class="ic"><div class="ic-icon">📊</div><div class="ic-title">Product Improvement</div><div class="ic-body">To analyze anonymized, aggregate usage patterns and improve the platform experience.</div></div>
+      <div class="ic"><div class="ic-icon">💳</div><div class="ic-title">Billing</div><div class="ic-body">To process subscription payments through Stripe. We never store your full card details.</div></div>
+    </div>
+    <p>We do <strong style="color:#fff;">not</strong> use your data to:</p>
+    <ul class="pl">
+      <li>Sell your personal information to advertisers, data brokers, or any third parties.</li>
+      <li>Train AI models with your content, brand deal information, or personal data.</li>
+      <li>Send unsolicited marketing or share your email with third-party marketers without consent.</li>
+      <li>Profile you for targeted advertising on external platforms.</li>
+    </ul>
+  </div>
+
+  <!-- 03 -->
+  <div class="sec" id="s3">
+    <div class="sec-head"><span class="sec-num">03</span><h2 class="sec-title">Data Storage &amp; Security</h2></div>
+    <p>We take data security seriously and implement multiple layers of technical protection.</p>
+
+    <div class="sub-title">3.1 Where Your Data Is Stored</div>
+    <p>Your data is stored in <strong style="color:#fff;">Supabase</strong> (PostgreSQL), hosted on secure cloud infrastructure with enterprise-grade protections:</p>
+    <ul class="pl">
+      <li>All data is encrypted at rest using AES-256 encryption.</li>
+      <li>All data in transit is encrypted using TLS 1.3 (HTTPS).</li>
+      <li>Automated database backups are performed daily and stored securely.</li>
+      <li>Profile images and uploaded media are stored in Supabase Storage with access-controlled private URLs.</li>
+    </ul>
+
+    <div class="sub-title">3.2 Security Measures We Implement</div>
+    <ul class="pl">
+      <li><strong>Password hashing</strong> — Passwords are hashed using bcrypt with per-user salting. We cannot read your password.</li>
+      <li><strong>OAuth token encryption</strong> — Social media access tokens are encrypted with AES-256 before storage.</li>
+      <li><strong>Environment variable secrets</strong> — All API credentials (Groq, Stripe, Resend) are stored in environment variables, never in source code or repositories.</li>
+      <li><strong>Row-level security (RLS)</strong> — Supabase RLS policies ensure each user can only access their own data — database-level enforcement.</li>
+      <li><strong>Session management</strong> — Sessions expire after inactivity. All sessions are invalidated immediately upon password change.</li>
+      <li><strong>HTTPS enforcement</strong> — All communication between your browser and our servers is encrypted end-to-end.</li>
+      <li><strong>GitHub secret scanning</strong> — Our repositories are protected against accidental credential commits via GitHub push protection.</li>
+    </ul>
+    <div class="hl"><strong>Security Incident Response:</strong> If we discover a data breach affecting your personal information, we will notify you via email within 72 hours of becoming aware, describe what was affected, and explain the steps taken to address it.</div>
+  </div>
+
+  <!-- 04 -->
+  <div class="sec" id="s4">
+    <div class="sec-head"><span class="sec-num">04</span><h2 class="sec-title">Third-Party Services</h2></div>
+    <p>Nexora OS relies on the following trusted third-party services to operate. We share your data with these services only to the extent required to deliver platform functionality.</p>
+    <ul class="pl">
+      <li><strong>Supabase</strong> — Database, authentication, and file storage. Primary data residence. <a href="https://supabase.com/privacy" target="_blank" rel="noopener" style="color:var(--teal)">Privacy Policy ↗</a></li>
+      <li><strong>Groq AI</strong> — Powers AI content repurposing, scriptwriting, and tool features. Content submitted is processed via API and not used for model training. <a href="https://groq.com/privacy-policy/" target="_blank" rel="noopener" style="color:var(--teal)">Privacy Policy ↗</a></li>
+      <li><strong>OpenAI Whisper (via Groq)</strong> — Audio transcription for the Auto Clip Generator. Audio is processed temporarily and not stored beyond the processing request.</li>
+      <li><strong>Stripe</strong> — Subscription payment processing. We never see or store your full card number. <a href="https://stripe.com/privacy" target="_blank" rel="noopener" style="color:var(--teal)">Privacy Policy ↗</a></li>
+      <li><strong>Resend</strong> — Transactional email delivery (welcome emails, invoices, notifications). Your email address is shared with Resend for this purpose only. <a href="https://resend.com/legal/privacy-policy" target="_blank" rel="noopener" style="color:var(--teal)">Privacy Policy ↗</a></li>
+      <li><strong>Netlify</strong> — Frontend web application hosting. <a href="https://www.netlify.com/privacy/" target="_blank" rel="noopener" style="color:var(--teal)">Privacy Policy ↗</a></li>
+      <li><strong>Railway</strong> — Backend API server hosting. <a href="https://railway.app/legal/privacy" target="_blank" rel="noopener" style="color:var(--teal)">Privacy Policy ↗</a></li>
+    </ul>
+    <p>We do not share your personal information with any other third parties without your explicit consent, except as required by applicable law or legal process.</p>
+  </div>
+
+  <!-- 05 -->
+  <div class="sec" id="s5">
+    <div class="sec-head"><span class="sec-num">05</span><h2 class="sec-title">Cookies &amp; Tracking</h2></div>
+    <p>Nexora OS uses only the minimal cookies necessary for the platform to function properly.</p>
+    <ul class="pl">
+      <li><strong>Authentication cookies</strong> — Essential cookies that maintain your login session. Cannot be disabled without preventing platform access.</li>
+      <li><strong>Preference cookies</strong> — Store your in-app settings such as display preferences.</li>
+      <li><strong>Analytics cookies</strong> — Basic, anonymized analytics to understand aggregate platform usage. No personally identifiable information is used.</li>
+    </ul>
+    <div class="hl">We do <strong>not</strong> use advertising cookies, Facebook Pixel, Google Ads tracking, cross-site tracking technologies, or any third-party ad network cookies. Nexora OS is not an ad-supported platform and never will be.</div>
+    <p>You can manage cookie preferences through your browser settings. Disabling essential authentication cookies will prevent you from using the platform.</p>
+  </div>
+
+  <!-- 06 -->
+  <div class="sec" id="s6">
+    <div class="sec-head"><span class="sec-num">06</span><h2 class="sec-title">Social Media Integrations</h2></div>
+
+    <div class="sub-title">6.1 What We Access</div>
+    <ul class="pl">
+      <li><strong>YouTube</strong> — Channel analytics, video list, and content upload capability (when you authorize). We do not access your private Google data or Gmail.</li>
+      <li><strong>Twitter / X</strong> — Post creation and engagement metrics (when you authorize). We do not access your direct messages.</li>
+      <li><strong>LinkedIn</strong> — Post creation and basic profile analytics (when you authorize).</li>
+      <li><strong>Instagram / TikTok</strong> — Scheduling and inbox DM access limited to what you explicitly authorize during the OAuth flow.</li>
+    </ul>
+
+    <div class="sub-title">6.2 Token Security</div>
+    <ul class="pl">
+      <li>All OAuth access tokens are encrypted with AES-256 before being stored.</li>
+      <li>Tokens are stored per-user and are never accessible to other users or our staff.</li>
+      <li>Tokens are deleted immediately and permanently when you disconnect a social account.</li>
+    </ul>
+
+    <div class="sub-title">6.3 How to Disconnect</div>
+    <p>You can disconnect any social account at any time from your Nexora OS Settings page. You can also revoke access directly from each platform's security settings (e.g. Google Account Permissions, Twitter Connected Apps). Upon disconnection, we permanently delete all stored tokens for that platform within 24 hours.</p>
+  </div>
+
+  <!-- 07 -->
+  <div class="sec" id="s7">
+    <div class="sec-head"><span class="sec-num">07</span><h2 class="sec-title">Your Rights &amp; Choices</h2></div>
+    <p>You have full ownership of and control over your personal data. The following rights are available to all users:</p>
+    <div class="ig">
+      <div class="ic"><div class="ic-icon">👁️</div><div class="ic-title">Access</div><div class="ic-body">View all personal data stored in your Nexora OS account at any time from Settings.</div></div>
+      <div class="ic"><div class="ic-icon">✏️</div><div class="ic-title">Correct</div><div class="ic-body">Update or correct any inaccurate personal information directly from your profile page.</div></div>
+      <div class="ic"><div class="ic-icon">🗑️</div><div class="ic-title">Delete</div><div class="ic-body">Delete your account and all associated data permanently. Deletion is completed within 30 days.</div></div>
+      <div class="ic"><div class="ic-icon">📦</div><div class="ic-title">Export</div><div class="ic-body">Request a full data export including your content, deals, and analytics. Contact us to initiate.</div></div>
+      <div class="ic"><div class="ic-icon">🚫</div><div class="ic-title">Opt Out</div><div class="ic-body">Opt out of non-essential analytics and data processing from your Settings page at any time.</div></div>
+      <div class="ic"><div class="ic-icon">📧</div><div class="ic-title">Email Control</div><div class="ic-body">Unsubscribe from non-essential emails at any time. Critical security and invoice emails cannot be disabled.</div></div>
+    </div>
+    <p>To exercise any of these rights, email us at <a href="mailto:syedsafeer830@gmail.com" style="color:var(--teal)">syedsafeer830@gmail.com</a>. We respond to all data requests within 30 days.</p>
+  </div>
+
+  <!-- 08 -->
+  <div class="sec" id="s8">
+    <div class="sec-head"><span class="sec-num">08</span><h2 class="sec-title">Data Retention</h2></div>
+    <ul class="pl">
+      <li><strong>Active accounts</strong> — Your data is retained for as long as your account remains active.</li>
+      <li><strong>After account deletion</strong> — Personal data is deleted within 30 days. Encrypted backups may hold data for up to 90 days before being permanently purged.</li>
+      <li><strong>Financial records</strong> — Invoices and billing records are retained for up to 7 years for legal and accounting compliance.</li>
+      <li><strong>Anonymized analytics</strong> — Aggregate usage data that cannot be traced back to any individual may be retained indefinitely for platform research.</li>
+      <li><strong>Legal holds</strong> — If required by law or legal proceedings, certain data may be retained beyond standard periods.</li>
+    </ul>
+  </div>
+
+  <!-- 09 -->
+  <div class="sec" id="s9">
+    <div class="sec-head"><span class="sec-num">09</span><h2 class="sec-title">Children's Privacy</h2></div>
+    <p>Nexora OS is not designed for or directed at children under the age of 13. We do not knowingly collect personal information from anyone under 13. If we become aware that a child under 13 has provided us with personal data, we will delete it promptly.</p>
+    <p>If you are a parent or guardian and believe your child has registered on Nexora OS, please contact us immediately at <a href="mailto:syedsafeer830@gmail.com" style="color:var(--teal)">syedsafeer830@gmail.com</a>.</p>
+    <p>Users between 13 and 18 should use the platform only with parental or guardian consent and supervision.</p>
+  </div>
+
+  <!-- 10 -->
+  <div class="sec" id="s10">
+    <div class="sec-head"><span class="sec-num">10</span><h2 class="sec-title">International Users</h2></div>
+    <p>Nexora OS is operated from Karachi, Pakistan and serves a global user base. If you are located outside Pakistan, your data may be transferred to and processed in Pakistan and in countries where our service providers (Supabase, Groq, Stripe, Resend) operate.</p>
+    <p>We ensure that all international data transfers are conducted with adequate safeguards in place to protect your personal information consistent with applicable data protection laws.</p>
+    <div class="hl"><strong>For EEA / GDPR users:</strong> We process your data under the lawful bases of contractual necessity (providing our services), legitimate interests (improving the platform), and your consent (for optional features). You have rights under GDPR including access, correction, deletion, and portability. Contact us to exercise these rights at any time.</div>
+  </div>
+
+  <!-- 11 -->
+  <div class="sec" id="s11">
+    <div class="sec-head"><span class="sec-num">11</span><h2 class="sec-title">Changes to This Policy</h2></div>
+    <p>We may update this Privacy Policy periodically to reflect changes in our practices, technology, or legal requirements.</p>
+    <ul class="pl">
+      <li>We will notify you of material changes by email at least 14 days before they take effect.</li>
+      <li>We will post a notice within the Nexora OS platform when significant changes are made.</li>
+      <li>The "Last Updated" date at the top of this page reflects when the most recent revision was made.</li>
+      <li>Continuing to use Nexora OS after the effective date of any changes constitutes your acceptance of the updated policy.</li>
+    </ul>
+    <p>If you disagree with any changes, you may close your account before the effective date.</p>
+  </div>
+
+  <!-- 12 -->
+  <div class="sec" id="s12">
+    <div class="sec-head"><span class="sec-num">12</span><h2 class="sec-title">Contact Us</h2></div>
+    <p>If you have any questions, concerns, or requests about this Privacy Policy or how we handle your data, please contact us. We are committed to resolving all inquiries promptly and transparently.</p>
+    <div class="cbox">
+      <div class="cbox-title">Data &amp; Privacy Contact</div>
+      <div class="crow"><span class="cl">Company</span><span class="cv">Nexora OS</span></div>
+      <div class="crow"><span class="cl">Email</span><span class="cv"><a href="mailto:syedsafeer830@gmail.com">syedsafeer830@gmail.com</a></span></div>
+      <div class="crow"><span class="cl">Website</span><span class="cv"><a href="https://nexoraos.online" target="_blank">nexoraos.online</a></span></div>
+      <div class="crow"><span class="cl">Location</span><span class="cv">Karachi, Sindh, Pakistan</span></div>
+      <div class="crow"><span class="cl">Response</span><span class="cv">We aim to respond within 3 business days</span></div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <div class="fb">Nexora <span>OS</span></div>
+  <div>© 2026 Nexora OS. All rights reserved.</div>
+  <div class="fl">
+    <a href="index.html">Home</a>
+    <a href="privacy-policy.html" class="active">Privacy Policy</a>
+    <a href="terms-and-conditions.html">Terms &amp; Conditions</a>
+  </div>
+</footer>
+</body>
+</html>

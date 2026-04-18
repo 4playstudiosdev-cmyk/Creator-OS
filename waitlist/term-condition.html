@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terms & Conditions — Nexora OS</title>
+<link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@400;500;700;800;900&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --teal:#00E5A0; --teal-d:#00B87A; --ink:#070D0A; --ink2:#0F1A14;
+    --muted:#4A6357; --muted2:#7A9E8E; --text:#D8EEE5; --text2:#9DC4B0;
+    --glass:rgba(0,229,160,0.05); --border:rgba(0,229,160,0.12);
+    --font-h:'Cabinet Grotesk',sans-serif; --font-b:'Instrument Sans',sans-serif;
+  }
+  html { scroll-behavior: smooth; }
+  body { background:var(--ink); color:var(--text); font-family:var(--font-b); font-size:16px; line-height:1.75; min-height:100vh; }
+  .bg { position:fixed; inset:0; z-index:0; pointer-events:none; background: radial-gradient(ellipse 60% 50% at 15% 10%,rgba(0,180,120,0.06) 0%,transparent 70%), radial-gradient(ellipse 40% 40% at 90% 85%,rgba(0,229,160,0.04) 0%,transparent 60%); }
+  .grid { position:fixed; inset:0; z-index:0; pointer-events:none; opacity:0.02; background-image:linear-gradient(var(--teal) 1px,transparent 1px),linear-gradient(90deg,var(--teal) 1px,transparent 1px); background-size:80px 80px; }
+
+  nav { position:sticky; top:0; z-index:100; background:rgba(7,13,10,0.92); backdrop-filter:blur(20px); border-bottom:1px solid var(--border); padding:0 40px; display:flex; align-items:center; justify-content:space-between; height:64px; }
+  .nav-brand { display:flex; align-items:center; gap:10px; text-decoration:none; }
+  .nav-icon { width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,var(--teal),var(--teal-d)); display:flex; align-items:center; justify-content:center; font-size:18px; box-shadow:0 4px 16px rgba(0,229,160,0.25); }
+  .nav-name { font-family:var(--font-h); font-size:18px; font-weight:900; color:#fff; }
+  .nav-name span { color:var(--teal); }
+  .nav-links { display:flex; gap:28px; align-items:center; }
+  .nav-link { font-size:13px; color:var(--muted2); text-decoration:none; font-weight:500; transition:color .2s; }
+  .nav-link:hover, .nav-link.active { color:var(--teal); }
+
+  .wrapper { position:relative; z-index:1; max-width:860px; margin:0 auto; padding:64px 40px 100px; }
+
+  .page-chip { display:inline-flex; align-items:center; gap:8px; padding:5px 14px; border:1px solid var(--border); border-radius:100px; background:var(--glass); font-size:11px; font-weight:700; letter-spacing:0.1em; color:var(--teal); text-transform:uppercase; margin-bottom:20px; }
+  .page-chip-dot { width:6px; height:6px; border-radius:50%; background:var(--teal); animation:pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+  .page-title { font-family:var(--font-h); font-size:clamp(36px,5vw,56px); font-weight:900; line-height:1.0; letter-spacing:-0.03em; color:#fff; margin-bottom:16px; }
+  .page-title span { color:var(--teal); }
+  .page-meta { font-size:14px; color:var(--muted2); }
+  .page-meta strong { color:var(--text2); }
+
+  .meta-bar { display:flex; gap:32px; flex-wrap:wrap; padding:18px 24px; margin:28px 0 48px; border:1px solid var(--border); border-radius:14px; background:var(--glass); }
+  .meta-item .ml { font-size:10px; font-weight:700; color:var(--muted2); text-transform:uppercase; letter-spacing:.1em; margin-bottom:3px; }
+  .meta-item .mv { font-size:14px; color:var(--text); font-weight:600; }
+
+  .toc { padding:24px 28px; margin-bottom:56px; border:1px solid var(--border); border-radius:16px; background:rgba(0,229,160,0.03); }
+  .toc-title { font-family:var(--font-h); font-size:13px; font-weight:800; color:var(--teal); text-transform:uppercase; letter-spacing:.08em; margin-bottom:16px; }
+  .toc-list { display:flex; flex-direction:column; gap:8px; }
+  .toc-link { font-size:13.5px; color:var(--text2); text-decoration:none; display:flex; align-items:center; gap:10px; transition:color .2s; }
+  .toc-link:hover { color:var(--teal); }
+  .toc-num { font-family:var(--font-h); font-size:11px; font-weight:700; color:var(--teal); min-width:22px; }
+
+  .sec { margin-bottom:52px; scroll-margin-top:88px; }
+  .sec-head { display:flex; align-items:center; gap:14px; margin-bottom:20px; padding-bottom:14px; border-bottom:1px solid var(--border); }
+  .sec-num { font-family:var(--font-h); font-size:13px; font-weight:800; color:var(--teal); min-width:28px; }
+  .sec-title { font-family:var(--font-h); font-size:22px; font-weight:800; color:#fff; }
+  .sec p { font-size:15px; color:var(--text2); margin-bottom:14px; line-height:1.78; }
+  .sec p:last-child { margin-bottom: 0; }
+
+  ul.pl { list-style:none; display:flex; flex-direction:column; gap:10px; margin:16px 0; }
+  ul.pl li { font-size:15px; color:var(--text2); padding-left:22px; position:relative; line-height:1.65; }
+  ul.pl li::before { content:''; position:absolute; left:0; top:9px; width:6px; height:6px; border-radius:50%; background:var(--teal); opacity:.7; }
+
+  ol.nl { list-style:none; counter-reset:nl; display:flex; flex-direction:column; gap:10px; margin:16px 0; }
+  ol.nl li { font-size:15px; color:var(--text2); padding-left:28px; position:relative; line-height:1.65; counter-increment:nl; }
+  ol.nl li::before { content:counter(nl)'.'; position:absolute; left:0; top:0; font-family:var(--font-h); font-size:13px; font-weight:700; color:var(--teal); }
+
+  .hl { padding:20px 24px; margin:20px 0; border-left:3px solid var(--teal); background:rgba(0,229,160,0.04); border-radius:0 12px 12px 0; font-size:14px; color:var(--text2); line-height:1.7; }
+  .hl strong { color:var(--teal); }
+
+  .warn { padding:20px 24px; margin:20px 0; border-left:3px solid #F87171; background:rgba(248,113,113,0.04); border-radius:0 12px 12px 0; font-size:14px; color:var(--text2); line-height:1.7; }
+  .warn strong { color:#F87171; }
+
+  .plan-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin:20px 0; }
+  .plan-card { padding:20px 16px; border:1px solid var(--border); border-radius:14px; background:rgba(0,229,160,0.03); }
+  .plan-card.featured { border-color:var(--teal); background:rgba(0,229,160,0.06); }
+  .plan-badge { display:inline-block; padding:2px 10px; border-radius:100px; background:var(--teal); color:var(--ink); font-size:9px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; margin-bottom:8px; }
+  .plan-name { font-family:var(--font-h); font-size:15px; font-weight:800; color:#fff; margin-bottom:4px; }
+  .plan-price { font-family:var(--font-h); font-size:26px; font-weight:900; color:var(--teal); line-height:1; margin-bottom:8px; }
+  .plan-price span { font-size:13px; color:var(--muted2); font-weight:400; }
+  .plan-desc { font-size:11.5px; color:var(--muted2); line-height:1.55; }
+
+  .sub-title { font-family:var(--font-h); font-size:16px; font-weight:700; color:var(--text); margin:24px 0 10px; }
+
+  .cbox { margin-top:20px; padding:24px 28px; border:1px solid var(--teal); border-radius:16px; background:rgba(0,229,160,0.04); }
+  .cbox-title { font-family:var(--font-h); font-size:16px; font-weight:800; color:var(--teal); margin-bottom:14px; }
+  .crow { display:flex; gap:10px; align-items:flex-start; margin-bottom:8px; font-size:14px; }
+  .cl { color:var(--muted2); min-width:80px; font-weight:600; }
+  .cv { color:var(--text2); }
+  .cv a { color:var(--teal); text-decoration:none; }
+  .cv a:hover { text-decoration:underline; }
+
+  .agree-box { padding:24px 28px; margin:28px 0; border:1px solid var(--border); border-radius:16px; background:rgba(0,229,160,0.03); }
+  .agree-box p { font-size:14px; color:var(--text2); line-height:1.7; }
+  .agree-box strong { color:#fff; }
+
+  footer { position:relative; z-index:1; border-top:1px solid var(--border); padding:32px 40px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; font-size:13px; color:var(--muted2); }
+  .fb { font-family:var(--font-h); font-size:15px; font-weight:800; color:var(--text2); }
+  .fb span { color:var(--teal); }
+  .fl { display:flex; gap:24px; }
+  .fl a { color:var(--muted2); text-decoration:none; transition:color .2s; }
+  .fl a:hover, .fl a.active { color:var(--teal); }
+
+  @media(max-width:600px){ nav{padding:0 20px;} .wrapper{padding:40px 20px 80px;} footer{padding:24px 20px;} .nav-links{display:none;} }
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="grid"></div>
+
+<nav>
+  <a href="index.html" class="nav-brand">
+    <div class="nav-icon">⚡</div>
+    <div class="nav-name">Nexora <span>OS</span></div>
+  </a>
+  <div class="nav-links">
+    <a href="index.html" class="nav-link">Home</a>
+    <a href="privacy-policy.html" class="nav-link">Privacy Policy</a>
+    <a href="terms-and-conditions.html" class="nav-link active">Terms &amp; Conditions</a>
+  </div>
+</nav>
+
+<div class="wrapper">
+
+  <div class="page-chip"><div class="page-chip-dot"></div> Legal Document</div>
+  <h1 class="page-title">Terms &amp; <span>Conditions</span></h1>
+  <p class="page-meta">Please read these Terms and Conditions carefully before using <strong>Nexora OS</strong>. By accessing or using our platform, you agree to be bound by these terms.</p>
+
+  <div class="meta-bar">
+    <div class="meta-item"><div class="ml">Effective Date</div><div class="mv">April 12, 2026</div></div>
+    <div class="meta-item"><div class="ml">Last Updated</div><div class="mv">April 12, 2026</div></div>
+    <div class="meta-item"><div class="ml">Company</div><div class="mv">Nexora OS</div></div>
+    <div class="meta-item"><div class="ml">Governing Law</div><div class="mv">Pakistan</div></div>
+  </div>
+
+  <div class="agree-box">
+    <p>By creating an account, accessing the Nexora OS website at <strong>nexoraos.online</strong>, or using any of our services — including the web app, desktop app, or API — you confirm that you have read, understood, and agree to these Terms and Conditions in full. If you do not agree, please do not use our services.</p>
+  </div>
+
+  <div class="toc">
+    <div class="toc-title">Table of Contents</div>
+    <div class="toc-list">
+      <a href="#t1"  class="toc-link"><span class="toc-num">01</span> Acceptance of Terms</a>
+      <a href="#t2"  class="toc-link"><span class="toc-num">02</span> Description of Services</a>
+      <a href="#t3"  class="toc-link"><span class="toc-num">03</span> Account Registration &amp; Security</a>
+      <a href="#t4"  class="toc-link"><span class="toc-num">04</span> Subscription Plans &amp; Billing</a>
+      <a href="#t5"  class="toc-link"><span class="toc-num">05</span> Acceptable Use Policy</a>
+      <a href="#t6"  class="toc-link"><span class="toc-num">06</span> Your Content &amp; Intellectual Property</a>
+      <a href="#t7"  class="toc-link"><span class="toc-num">07</span> AI Features &amp; Generated Content</a>
+      <a href="#t8"  class="toc-link"><span class="toc-num">08</span> Social Media Integrations</a>
+      <a href="#t9"  class="toc-link"><span class="toc-num">09</span> Data &amp; Privacy</a>
+      <a href="#t10" class="toc-link"><span class="toc-num">10</span> Service Availability &amp; Uptime</a>
+      <a href="#t11" class="toc-link"><span class="toc-num">11</span> Disclaimers &amp; Limitation of Liability</a>
+      <a href="#t12" class="toc-link"><span class="toc-num">12</span> Termination</a>
+      <a href="#t13" class="toc-link"><span class="toc-num">13</span> Dispute Resolution</a>
+      <a href="#t14" class="toc-link"><span class="toc-num">14</span> Changes to These Terms</a>
+      <a href="#t15" class="toc-link"><span class="toc-num">15</span> Contact Us</a>
+    </div>
+  </div>
+
+  <!-- 01 -->
+  <div class="sec" id="t1">
+    <div class="sec-head"><span class="sec-num">01</span><h2 class="sec-title">Acceptance of Terms</h2></div>
+    <p>These Terms and Conditions ("Terms") constitute a legally binding agreement between you ("User," "you," or "your") and Nexora OS ("we," "us," or "our") governing your use of the Nexora OS platform, website, desktop application, and related services (collectively, the "Services").</p>
+    <p>You must be at least 13 years of age to use Nexora OS. If you are between 13 and 18 years of age, you must have the consent of a parent or legal guardian to use the Services. By using the Services, you represent and warrant that you meet these eligibility requirements.</p>
+    <p>Your use of the Services constitutes your unconditional acceptance of these Terms. If you do not agree to any part of these Terms, you must immediately stop using the Services and delete your account.</p>
+  </div>
+
+  <!-- 02 -->
+  <div class="sec" id="t2">
+    <div class="sec-head"><span class="sec-num">02</span><h2 class="sec-title">Description of Services</h2></div>
+    <p>Nexora OS is an all-in-one creator operating system that provides the following core features to content creators:</p>
+    <ul class="pl">
+      <li><strong>Content Scheduler</strong> — Plan, write, and schedule posts across YouTube, Instagram, Twitter/X, LinkedIn, and TikTok from a single dashboard.</li>
+      <li><strong>AI Repurposer</strong> — Use AI (powered by Groq LLaMA) to transform long-form content or YouTube videos into platform-optimized posts for multiple channels simultaneously.</li>
+      <li><strong>Auto Clip Generator</strong> — Automatically identify viral moments in long videos and export 9:16 vertical clips for Shorts, Reels, and TikTok using Whisper AI transcription.</li>
+      <li><strong>Brand Deals CRM</strong> — Manage your entire brand partnership pipeline from lead to paid, generate invoices, and track ROI with shareable tracking links.</li>
+      <li><strong>Media Kit Builder</strong> — Create and share a professional creator media kit with a public URL at /u/[username].</li>
+      <li><strong>Unified Inbox</strong> — View and manage DMs and comments from all connected social platforms in one inbox with AI-assisted reply suggestions.</li>
+      <li><strong>Analytics Dashboard</strong> — Track cross-platform performance metrics, follower growth, engagement rates, and sponsorship ROI in one view.</li>
+      <li><strong>Script Studio</strong> — Generate AI-written scripts for YouTube videos, podcasts, and ads.</li>
+      <li><strong>AI Power Tools</strong> — Six standalone tools including an Idea Matrix, Hashtag Optimizer, Hook Generator, Title A/B Tester, Content Calendar, and Bio Writer.</li>
+      <li><strong>Earnings Dashboard</strong> — Track revenue by source including AdSense, brand deals, affiliates, and memberships.</li>
+    </ul>
+    <p>We reserve the right to modify, add, or remove features from the Services at any time. We will make reasonable efforts to communicate significant changes in advance.</p>
+  </div>
+
+  <!-- 03 -->
+  <div class="sec" id="t3">
+    <div class="sec-head"><span class="sec-num">03</span><h2 class="sec-title">Account Registration &amp; Security</h2></div>
+
+    <div class="sub-title">3.1 Account Creation</div>
+    <p>To access the full features of Nexora OS, you must create an account by providing a valid email address and a secure password. You agree to provide accurate, current, and complete information during registration and to keep this information updated.</p>
+
+    <div class="sub-title">3.2 Account Security</div>
+    <ul class="pl">
+      <li>You are solely responsible for maintaining the confidentiality of your login credentials.</li>
+      <li>You must not share your account credentials with any other person or entity.</li>
+      <li>You are responsible for all activities that occur under your account, whether or not authorized by you.</li>
+      <li>You must notify us immediately at <a href="mailto:syedsafeer830@gmail.com" style="color:var(--teal)">syedsafeer830@gmail.com</a> if you suspect unauthorized access to your account.</li>
+      <li>We will not be liable for any loss or damage arising from your failure to maintain account security.</li>
+    </ul>
+
+    <div class="sub-title">3.3 One Account Per User</div>
+    <p>Each user may maintain only one active account on the Free Beta or individual subscription plans. Agency or team accounts may have multiple users as defined by the Pro plan. Creating multiple accounts to circumvent usage limits or subscription requirements is a violation of these Terms and may result in account termination.</p>
+
+    <div class="sub-title">3.4 Account Verification</div>
+    <p>We may require email verification before granting full access to the platform. We reserve the right to suspend or terminate accounts that cannot be verified or that appear to use fraudulent contact information.</p>
+  </div>
+
+  <!-- 04 -->
+  <div class="sec" id="t4">
+    <div class="sec-head"><span class="sec-num">04</span><h2 class="sec-title">Subscription Plans &amp; Billing</h2></div>
+
+    <div class="sub-title">4.1 Available Plans</div>
+    <div class="plan-grid">
+      <div class="plan-card">
+        <div class="plan-name">Free Beta</div>
+        <div class="plan-price">$0<span>/mo</span></div>
+        <div class="plan-desc">Limited usage. Access to core features with monthly caps on AI repurposing, scheduling, and clips.</div>
+      </div>
+      <div class="plan-card">
+        <div class="plan-name">Basic</div>
+        <div class="plan-price">$59<span>/mo</span></div>
+        <div class="plan-desc">Unlimited repurposing, scheduling, Brand Deals CRM, and Media Kit builder for solo creators.</div>
+      </div>
+      <div class="plan-card featured">
+        <div class="plan-badge">Most Popular</div>
+        <div class="plan-name">Medium</div>
+        <div class="plan-price">$79<span>/mo</span></div>
+        <div class="plan-desc">Everything in Basic plus advanced analytics, priority inbox AI, and ROI tracking links.</div>
+      </div>
+      <div class="plan-card">
+        <div class="plan-name">Pro</div>
+        <div class="plan-price">$99<span>/mo</span></div>
+        <div class="plan-desc">Everything in Medium plus up to 5 team members, full analytics export, and priority support.</div>
+      </div>
+    </div>
+
+    <div class="sub-title">4.2 Billing Terms</div>
+    <ul class="pl">
+      <li>Paid subscriptions are billed monthly in advance on the date you first subscribe.</li>
+      <li>All payments are processed securely through Stripe. By subscribing, you authorize Stripe to charge your payment method on a recurring basis.</li>
+      <li>All prices are listed in US Dollars (USD). You are responsible for any applicable taxes or foreign exchange fees charged by your bank or card provider.</li>
+      <li>Subscription fees are non-refundable except as expressly stated in our Refund Policy below.</li>
+    </ul>
+
+    <div class="sub-title">4.3 Free Beta Terms</div>
+    <p>The Free Beta plan is provided as-is to help us validate the product and gather feedback. We reserve the right to modify the Free Beta plan's features, limits, or availability at any time without prior notice. Free Beta access may be converted to a paid plan or discontinued at our discretion.</p>
+
+    <div class="sub-title">4.4 Upgrades &amp; Downgrades</div>
+    <p>You may upgrade or downgrade your subscription plan at any time from your Settings page. Upgrades take effect immediately. Downgrades take effect at the start of the next billing cycle. No partial refunds are issued for the remaining time on a higher-tier plan when downgrading.</p>
+
+    <div class="sub-title">4.5 Cancellation</div>
+    <p>You may cancel your subscription at any time from your Account Settings. Upon cancellation, your paid access will continue until the end of the current billing period, after which your account will revert to the Free Beta tier or be deactivated depending on Free Beta availability at that time. We do not provide refunds for unused portions of a billing period.</p>
+
+    <div class="sub-title">4.6 Refund Policy</div>
+    <p>We offer a <strong style="color:#fff;">7-day refund</strong> on your first subscription payment if you are not satisfied with the service and contact us within 7 days of your initial payment. After this initial period, all payments are final and non-refundable. To request a refund, email <a href="mailto:syedsafeer830@gmail.com" style="color:var(--teal)">syedsafeer830@gmail.com</a> with your account details.</p>
+
+    <div class="sub-title">4.7 Failed Payments</div>
+    <p>If a payment fails, we will attempt to retry the charge up to 3 times over 7 days. If payment cannot be collected, your account may be downgraded to Free Beta or suspended until the outstanding balance is resolved.</p>
+  </div>
+
+  <!-- 05 -->
+  <div class="sec" id="t5">
+    <div class="sec-head"><span class="sec-num">05</span><h2 class="sec-title">Acceptable Use Policy</h2></div>
+    <p>By using Nexora OS, you agree to use the Services only for lawful purposes and in a manner consistent with these Terms. The following activities are strictly prohibited:</p>
+
+    <div class="sub-title">5.1 Prohibited Conduct</div>
+    <ul class="pl">
+      <li>Using the platform to create, distribute, or schedule content that is illegal, defamatory, harassing, threatening, obscene, or violates the rights of any third party.</li>
+      <li>Using AI features to generate spam, mass unsolicited messages, misinformation, deepfakes, or content designed to deceive or defraud.</li>
+      <li>Attempting to reverse-engineer, decompile, disassemble, or otherwise derive the source code of Nexora OS.</li>
+      <li>Using automated bots, scrapers, crawlers, or scripts to access the platform outside of any officially provided API.</li>
+      <li>Attempting to gain unauthorized access to other users' accounts, our backend systems, or any connected third-party platforms.</li>
+      <li>Using the platform to infringe on the intellectual property rights of others, including posting copyrighted content without authorization.</li>
+      <li>Reselling, sublicensing, or redistributing access to Nexora OS without our written permission.</li>
+      <li>Using the Services in any way that could damage, overload, or impair the functionality of the platform or its infrastructure.</li>
+      <li>Circumventing any technical measures we use to enforce plan limits, access controls, or geographic restrictions.</li>
+      <li>Using the platform to violate the Terms of Service of any connected social media platform (YouTube, Instagram, Twitter/X, LinkedIn, TikTok).</li>
+    </ul>
+
+    <div class="sub-title">5.2 Content Standards</div>
+    <p>All content you create, schedule, or publish through Nexora OS must comply with:</p>
+    <ul class="pl">
+      <li>The community guidelines and terms of service of each social media platform you connect.</li>
+      <li>Applicable laws in your jurisdiction, including copyright, defamation, privacy, and consumer protection laws.</li>
+      <li>Our content standards, which prohibit the creation of hate speech, violent content, adult content involving minors, or content that promotes illegal activities.</li>
+    </ul>
+
+    <div class="warn"><strong>Enforcement:</strong> Violation of this Acceptable Use Policy may result in immediate suspension or permanent termination of your account without refund, at our sole discretion. We may also report illegal activity to appropriate authorities.</div>
+  </div>
+
+  <!-- 06 -->
+  <div class="sec" id="t6">
+    <div class="sec-head"><span class="sec-num">06</span><h2 class="sec-title">Your Content &amp; Intellectual Property</h2></div>
+
+    <div class="sub-title">6.1 Your Content Belongs to You</div>
+    <p>You retain full ownership of all content you create, upload, schedule, or store within Nexora OS — including scripts, posts, brand deal information, media kit content, and earnings data. We do not claim any ownership over your content.</p>
+
+    <div class="sub-title">6.2 License You Grant Us</div>
+    <p>By uploading or creating content within Nexora OS, you grant us a limited, non-exclusive, royalty-free, worldwide license to store, display, process, and transmit your content solely for the purpose of operating and providing the Services to you. This license ends when you delete the content or close your account.</p>
+    <p>We will never use your content for advertising, marketing, or selling to third parties without your explicit written consent.</p>
+
+    <div class="sub-title">6.3 Nexora OS Intellectual Property</div>
+    <p>All intellectual property rights in the Nexora OS platform — including the software, design, trademarks, logos, brand name, and documentation — are owned by Nexora OS. Nothing in these Terms transfers any ownership of our intellectual property to you. You may not use our trademarks, brand name, or logo without our prior written permission.</p>
+
+    <div class="sub-title">6.4 Feedback</div>
+    <p>If you provide us with feedback, suggestions, or ideas about the platform, you grant us the right to use this feedback freely, without any obligation to compensate you or keep it confidential.</p>
+
+    <div class="sub-title">6.5 Copyright Infringement</div>
+    <p>If you believe that content on our platform infringes your copyright, please contact us at <a href="mailto:syedsafeer830@gmail.com" style="color:var(--teal)">syedsafeer830@gmail.com</a> with the subject line "Copyright Infringement Notice" and include a description of the copyrighted work, the location of the infringing content, and your contact information. We will investigate and respond promptly.</p>
+  </div>
+
+  <!-- 07 -->
+  <div class="sec" id="t7">
+    <div class="sec-head"><span class="sec-num">07</span><h2 class="sec-title">AI Features &amp; Generated Content</h2></div>
+    <p>Nexora OS uses AI technologies including Groq LLaMA and OpenAI Whisper to power content repurposing, script generation, clip detection, and other features. By using these features, you acknowledge and agree to the following:</p>
+    <ul class="pl">
+      <li><strong>AI outputs are not guaranteed.</strong> AI-generated content is provided as a starting point and may contain errors, inaccuracies, or outputs that require human review and editing before publication.</li>
+      <li><strong>You are responsible for all published content.</strong> Regardless of whether content was AI-generated, you are solely responsible for reviewing, editing, and approving any content before it is published or shared on social media or with brands.</li>
+      <li><strong>Your inputs are not used for AI training.</strong> Content you submit for AI processing is sent to Groq's API and is not used to train or fine-tune any AI models by us or our AI providers.</li>
+      <li><strong>AI features may use third-party providers.</strong> The availability and performance of AI features depends on the uptime and policies of third-party AI providers. We are not responsible for disruptions to AI features caused by third-party outages.</li>
+      <li><strong>No intellectual property guarantee on AI outputs.</strong> We cannot guarantee that AI-generated content is free of third-party intellectual property claims. You should review AI outputs for potential copyright or trademark issues before publishing.</li>
+      <li><strong>Compliance with AI provider terms.</strong> Your use of AI features must comply with the terms of service of the underlying AI providers (Groq). Using AI features to generate content that violates their acceptable use policies is prohibited.</li>
+    </ul>
+    <div class="hl"><strong>Best Practice:</strong> Always review and edit AI-generated content before publishing. AI is a tool to accelerate your workflow, not a replacement for your creative judgment and editorial responsibility.</div>
+  </div>
+
+  <!-- 08 -->
+  <div class="sec" id="t8">
+    <div class="sec-head"><span class="sec-num">08</span><h2 class="sec-title">Social Media Integrations</h2></div>
+    <p>Nexora OS allows you to connect your social media accounts (YouTube, Instagram, Twitter/X, LinkedIn, TikTok) to enable scheduling, analytics, and inbox features.</p>
+    <ul class="pl">
+      <li><strong>Platform compliance.</strong> When using Nexora OS to schedule or publish content on social platforms, you are responsible for ensuring that all content complies with the terms of service and community guidelines of each respective platform.</li>
+      <li><strong>API limitations.</strong> The availability of social media integration features depends on the APIs provided by each platform. Social platforms regularly update, restrict, or modify their APIs. We are not responsible for integration failures caused by changes to third-party platform APIs.</li>
+      <li><strong>Account security.</strong> You must ensure that your social media accounts are in good standing. Nexora OS is not responsible for actions taken by social platforms against your accounts, including suspensions, bans, or content removals.</li>
+      <li><strong>Auto-posting responsibility.</strong> When you use the scheduling feature to auto-publish content, you confirm that you have reviewed and approved that content for publication. We are not liable for the consequences of any scheduled content being published.</li>
+      <li><strong>Token security.</strong> We encrypt and secure all OAuth access tokens. However, if you believe a connected account has been compromised, you should revoke access from both Nexora OS Settings and the respective platform's security settings immediately.</li>
+    </ul>
+  </div>
+
+  <!-- 09 -->
+  <div class="sec" id="t9">
+    <div class="sec-head"><span class="sec-num">09</span><h2 class="sec-title">Data &amp; Privacy</h2></div>
+    <p>Your use of Nexora OS is also governed by our <a href="privacy-policy.html" style="color:var(--teal)">Privacy Policy</a>, which is incorporated into these Terms by reference. By agreeing to these Terms, you also agree to the Privacy Policy.</p>
+    <ul class="pl">
+      <li>We collect and process your personal data as described in our Privacy Policy to provide and improve our Services.</li>
+      <li>We implement industry-standard security measures including AES-256 encryption, bcrypt password hashing, TLS 1.3 for data in transit, and Supabase row-level security to protect your data.</li>
+      <li>We do not sell, rent, or share your personal data with advertisers or data brokers.</li>
+      <li>You may request access to, correction of, or deletion of your personal data at any time by contacting us at <a href="mailto:syedsafeer830@gmail.com" style="color:var(--teal)">syedsafeer830@gmail.com</a>.</li>
+      <li>In the event of a data breach affecting your personal information, we will notify you within 72 hours of becoming aware of it.</li>
+    </ul>
+  </div>
+
+  <!-- 10 -->
+  <div class="sec" id="t10">
+    <div class="sec-head"><span class="sec-num">10</span><h2 class="sec-title">Service Availability &amp; Uptime</h2></div>
+    <p>We strive to provide a reliable, high-quality platform. However, we cannot guarantee uninterrupted access to Nexora OS at all times.</p>
+    <ul class="pl">
+      <li><strong>Planned maintenance</strong> — We will make reasonable efforts to schedule maintenance during off-peak hours and to notify users at least 24 hours in advance of planned downtime.</li>
+      <li><strong>Unplanned outages</strong> — Nexora OS depends on third-party infrastructure including Supabase, Netlify, Railway, Groq, and Stripe. Outages in these services may cause temporary unavailability of some or all features.</li>
+      <li><strong>No uptime guarantee</strong> — We do not guarantee any specific uptime percentage. We are not liable for losses caused by service interruptions, including scheduled maintenance, technical failures, or third-party outages.</li>
+      <li><strong>Scheduled content</strong> — While we make every effort to ensure scheduled posts are published at the correct time, we cannot guarantee publishing under all circumstances, including during platform outages or social media API disruptions.</li>
+      <li><strong>Beta features</strong> — Features marked as "Beta" or "Coming Soon" are provided as-is, may be unstable, and are subject to change or removal without prior notice.</li>
+    </ul>
+    <div class="hl"><strong>Status Updates:</strong> In the event of a significant outage, we will communicate updates via email and on our website. For time-sensitive content, we recommend having a backup publishing plan during critical periods.</div>
+  </div>
+
+  <!-- 11 -->
+  <div class="sec" id="t11">
+    <div class="sec-head"><span class="sec-num">11</span><h2 class="sec-title">Disclaimers &amp; Limitation of Liability</h2></div>
+
+    <div class="sub-title">11.1 Disclaimer of Warranties</div>
+    <p>Nexora OS is provided on an "as is" and "as available" basis without any warranties of any kind, either express or implied. We expressly disclaim all warranties including, but not limited to:</p>
+    <ul class="pl">
+      <li>Warranties of merchantability, fitness for a particular purpose, or non-infringement.</li>
+      <li>Any warranty that the Services will meet your specific requirements or expectations.</li>
+      <li>Any warranty that AI-generated content will be accurate, complete, or free of errors.</li>
+      <li>Any warranty regarding the accuracy of analytics, earnings projections, or performance data shown in the platform.</li>
+    </ul>
+
+    <div class="sub-title">11.2 Limitation of Liability</div>
+    <p>To the maximum extent permitted by applicable law, Nexora OS, its founders, employees, and service providers shall not be liable for any indirect, incidental, special, consequential, or punitive damages including but not limited to:</p>
+    <ul class="pl">
+      <li>Loss of revenue, profits, or business opportunities resulting from use or inability to use the Services.</li>
+      <li>Loss of data or content stored on the platform.</li>
+      <li>Unauthorized access to or alteration of your account or content.</li>
+      <li>Consequences of AI-generated content being published without adequate user review.</li>
+      <li>Social media platform actions (bans, suspensions, content removals) taken against your accounts.</li>
+      <li>Missed scheduled posts due to platform outages or third-party API failures.</li>
+    </ul>
+    <p>In any case, our total aggregate liability to you for any claims arising out of or relating to these Terms or the Services shall not exceed the total amount you paid to Nexora OS in the 3 months preceding the claim.</p>
+
+    <div class="warn"><strong>Important:</strong> Some jurisdictions do not allow the exclusion or limitation of certain warranties or liabilities. In such cases, our liability will be limited to the fullest extent permitted by applicable law.</div>
+  </div>
+
+  <!-- 12 -->
+  <div class="sec" id="t12">
+    <div class="sec-head"><span class="sec-num">12</span><h2 class="sec-title">Termination</h2></div>
+
+    <div class="sub-title">12.1 Termination by You</div>
+    <p>You may terminate your account at any time by going to Settings &gt; Account &gt; Delete Account. Upon termination, your access to paid features will end at the close of your current billing cycle, and your data will be deleted within 30 days as described in our Privacy Policy.</p>
+
+    <div class="sub-title">12.2 Termination by Nexora OS</div>
+    <p>We reserve the right to suspend or permanently terminate your account at our sole discretion, with or without notice, if:</p>
+    <ul class="pl">
+      <li>You violate any provision of these Terms or our Acceptable Use Policy.</li>
+      <li>You engage in fraudulent, abusive, or illegal activity through the platform.</li>
+      <li>Your payment repeatedly fails and remains unresolved after our retry attempts.</li>
+      <li>We are required to do so by applicable law or legal authority.</li>
+      <li>Continuing to provide Services to you poses a security or legal risk to us or other users.</li>
+    </ul>
+
+    <div class="sub-title">12.3 Effect of Termination</div>
+    <ul class="pl">
+      <li>Upon termination for cause (violation of Terms), you will not be entitled to any refund of prepaid fees.</li>
+      <li>All licenses granted to you under these Terms will immediately end.</li>
+      <li>Sections of these Terms that by their nature should survive termination (including intellectual property provisions, disclaimers, limitation of liability, and dispute resolution) will remain in effect.</li>
+    </ul>
+  </div>
+
+  <!-- 13 -->
+  <div class="sec" id="t13">
+    <div class="sec-head"><span class="sec-num">13</span><h2 class="sec-title">Dispute Resolution</h2></div>
+
+    <div class="sub-title">13.1 Informal Resolution First</div>
+    <p>Before initiating any formal legal action, you agree to contact us at <a href="mailto:syedsafeer830@gmail.com" style="color:var(--teal)">syedsafeer830@gmail.com</a> and give us 30 days to resolve the dispute informally. Most concerns can be resolved quickly through direct communication.</p>
+
+    <div class="sub-title">13.2 Governing Law</div>
+    <p>These Terms and any dispute arising out of or related to the Services shall be governed by the laws of the Islamic Republic of Pakistan, without regard to its conflict of law provisions. Any formal legal proceedings shall be conducted in the courts of Karachi, Sindh, Pakistan.</p>
+
+    <div class="sub-title">13.3 International Users</div>
+    <p>If you are located outside Pakistan, you access Nexora OS voluntarily and you agree to comply with local laws that apply to you. You also agree that Pakistani law governs these Terms to the fullest extent permissible.</p>
+
+    <div class="sub-title">13.4 No Class Actions</div>
+    <p>You agree to resolve disputes with Nexora OS on an individual basis and not as part of a class action, consolidated action, or representative proceeding.</p>
+  </div>
+
+  <!-- 14 -->
+  <div class="sec" id="t14">
+    <div class="sec-head"><span class="sec-num">14</span><h2 class="sec-title">Changes to These Terms</h2></div>
+    <p>We may update these Terms from time to time to reflect changes in our Services, legal requirements, or business practices.</p>
+    <ul class="pl">
+      <li>We will notify you of material changes by email at least 14 days before they take effect.</li>
+      <li>We will post a notice within the Nexora OS platform when significant changes are made.</li>
+      <li>The "Last Updated" date at the top of this page indicates when the most recent revision was made.</li>
+      <li>Continuing to use Nexora OS after the effective date of any changes constitutes your acceptance of the updated Terms.</li>
+      <li>If you disagree with any changes, you may close your account before the effective date of the changes.</li>
+    </ul>
+    <p>We encourage you to review these Terms periodically to stay informed about your rights and obligations.</p>
+  </div>
+
+  <!-- 15 -->
+  <div class="sec" id="t15">
+    <div class="sec-head"><span class="sec-num">15</span><h2 class="sec-title">Contact Us</h2></div>
+    <p>If you have any questions, concerns, or feedback about these Terms and Conditions, or if you need to report a violation, please reach out to us directly. We take all inquiries seriously and aim to respond promptly.</p>
+    <div class="cbox">
+      <div class="cbox-title">Legal &amp; Support Contact</div>
+      <div class="crow"><span class="cl">Company</span><span class="cv">Nexora OS</span></div>
+      <div class="crow"><span class="cl">Email</span><span class="cv"><a href="mailto:syedsafeer830@gmail.com">syedsafeer830@gmail.com</a></span></div>
+      <div class="crow"><span class="cl">Website</span><span class="cv"><a href="https://nexoraos.online" target="_blank">nexoraos.online</a></span></div>
+      <div class="crow"><span class="cl">Location</span><span class="cv">Karachi, Sindh, Pakistan</span></div>
+      <div class="crow"><span class="cl">Response</span><span class="cv">We aim to respond within 3 business days</span></div>
+    </div>
+
+    <div class="hl" style="margin-top:32px;"><strong>Entire Agreement:</strong> These Terms, together with our Privacy Policy, constitute the entire agreement between you and Nexora OS regarding the Services and supersede all prior agreements, understandings, and representations relating to the subject matter herein.</div>
+  </div>
+
+</div>
+
+<footer>
+  <div class="fb">Nexora <span>OS</span></div>
+  <div>© 2026 Nexora OS. All rights reserved.</div>
+  <div class="fl">
+    <a href="index.html">Home</a>
+    <a href="privacy-policy.html">Privacy Policy</a>
+    <a href="terms-and-conditions.html" class="active">Terms &amp; Conditions</a>
+  </div>
+</footer>
+</body>
+</html>"now connect privacy-policy.html and term-condition page to the index.html and add the logo.png and both page where is N before nexora so add the logo there and change the background theme and make same like index.html "

@@ -1,169 +1,298 @@
-// DASHBOARD FIX — Media Kit link
-// In your existing Dashboard.jsx, find the Media Kit link/button and change it to:
-// Instead of: window.open('https://creatoros.com/u/safeer') or any external URL
-// Use: navigate('/mediakit') — this opens the local Media Kit page
-
-// If you have a "Copy media kit link" button that copies a URL:
-// Change it to copy: `http://localhost:5173/u/${username}` (localhost)
-// NOT: `https://creatoros.com/u/${username}` (external)
-
-// ─────────────────────────────────────────────────────────
-// COMPLETE DASHBOARD with fixed Media Kit link
-// ─────────────────────────────────────────────────────────
+// Dashboard.jsx
+// SECURITY: All queries use .eq('user_id', uid) — Supabase RLS adds a second
+// layer: even if someone changes uid in JS, the DB rejects it server-side.
+// Each user sees ONLY their own profile, deals, posts, earnings, and socials.
 
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
+import {
+  CalendarDays, Sparkles, TrendingUp, DollarSign,
+  Briefcase, Settings, ArrowRight, RefreshCw,
+  Youtube, Instagram, Twitter, Linkedin
+} from 'lucide-react'
 
-const S = {
-  card: { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: 24, marginBottom: 16 },
-  btn: { cursor: 'pointer', border: 'none', fontFamily: "'DM Sans',sans-serif", transition: 'all .2s', borderRadius: 12 },
+const fmt = (n) => {
+  if (!n && n !== 0) return '—'
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
+  if (n >= 1000)    return (n / 1000).toFixed(1) + 'K'
+  return String(n)
+}
+const fmtMoney = (n) => '$' + Number(n || 0).toLocaleString()
+const greet = () => {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
+const PLATFORM_ICONS = {
+  youtube:   { icon: Youtube,   color: '#ff4444' },
+  instagram: { icon: Instagram, color: '#e1306c' },
+  twitter:   { icon: Twitter,   color: '#1da1f2' },
+  linkedin:  { icon: Linkedin,  color: '#0a66c2' },
+}
+
+const STAGE_STYLE = {
+  lead:      { bg:'rgba(59,130,246,0.12)',  color:'#60a5fa',  label:'Lead'      },
+  pitched:   { bg:'rgba(139,92,246,0.12)', color:'#a78bfa',  label:'Pitched'   },
+  active:    { bg:'rgba(245,158,11,0.12)', color:'#fbbf24',  label:'Active'    },
+  completed: { bg:'rgba(16,185,129,0.12)', color:'#34d399',  label:'Completed' },
+  paid:      { bg:'rgba(0,229,160,0.12)',  color:'#00E5A0',  label:'Paid ✓'   },
 }
 
 export default function Dashboard() {
+  const [profile,     setProfile]     = useState(null)
+  const [deals,       setDeals]       = useState([])
+  const [scheduled,   setScheduled]   = useState([])
+  const [earnings,    setEarnings]    = useState({ total: 0 })
+  const [socials,     setSocials]     = useState({})
+  const [loading,     setLoading]     = useState(true)
   const navigate = useNavigate()
-  const [user, setUser] = useState(null)
-  const [greeting, setGreeting] = useState('Good morning')
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
-    const h = new Date().getHours()
-    setGreeting(h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening')
-  }, [])
+  useEffect(() => { load() }, [])
 
-  const firstName = user?.user_metadata?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Creator'
+  const load = async () => {
+    setLoading(true)
 
-  const stats = [
-    { label: 'Total Reach', value: '48.2K', change: '+12%', color: '#6366f1', icon: '👁' },
-    { label: 'Brand Earnings', value: '$3,240', change: '+8%', color: '#f59e0b', icon: '💰' },
-    { label: 'Posts Scheduled', value: '12', change: 'Next: Tomorrow', color: '#10b981', icon: '📅' },
-    { label: 'Avg. Engagement', value: '6.4%', change: 'Above avg', color: '#8b5cf6', icon: '📊' },
-  ]
+    // Security: verify session first
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { navigate('/login', { replace: true }); return }
+    const uid = session.user.id
 
-  const recentPosts = [
-    { platform: '▶', platformColor: 'rgba(255,68,68,0.12)', title: '10 Creator Tools You Need in 2026', meta: 'YouTube · Tomorrow 10:00 AM', badge: 'Scheduled', badgeBg: 'rgba(74,174,222,0.15)', badgeColor: '#60a5fa' },
-    { platform: '📸', platformColor: 'rgba(225,48,108,0.12)', title: 'Behind the scenes — Studio setup', meta: 'Instagram · Live now', badge: 'Live', badgeBg: 'rgba(16,185,129,0.15)', badgeColor: '#6ee7b7' },
-    { platform: '𝕏', platformColor: 'rgba(255,255,255,0.06)', title: 'Thread: How I got 10K subs in 30 days', meta: 'Twitter · Draft', badge: 'Draft', badgeBg: 'rgba(255,255,255,0.06)', badgeColor: '#6b7280' },
-  ]
+    // Parallel fetch — all queries scoped to uid (+ RLS on server side)
+    const [profRes, dealsRes, postsRes, earningsRes, socialsRes] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', uid).single(),
 
-  const quickActions = [
-    { label: 'Schedule Post', icon: '📅', action: () => navigate('/schedule'), color: '#6366f1' },
-    { label: 'Repurpose Content', icon: '⚡', action: () => navigate('/repurpose'), color: '#f59e0b' },
-    { label: 'Add Brand Deal', icon: '💰', action: () => navigate('/deals'), color: '#10b981' },
-    // FIXED: Media Kit link goes to /mediakit (internal route), NOT external URL
-    { label: 'View Media Kit', icon: '🎨', action: () => navigate('/mediakit'), color: '#8b5cf6' },
-  ]
+      supabase.from('deals')
+        .select('id,brand,value,stage,due_date')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false })
+        .limit(5),
 
-  const WEEKLY = [28, 34, 26, 48, 38, 62, 55]
-  const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-  const maxVal = Math.max(...WEEKLY)
+      supabase.from('scheduled_posts')
+        .select('id,title,platform,scheduled_at,status')
+        .eq('user_id', uid)
+        .gte('scheduled_at', new Date().toISOString())
+        .order('scheduled_at', { ascending: true })
+        .limit(5),
+
+      supabase.from('earnings')
+        .select('amount,source')
+        .eq('user_id', uid),
+
+      supabase.from('social_connections')
+        .select('platform,username,followers')
+        .eq('user_id', uid),
+    ])
+
+    setProfile(profRes.data)
+    setDeals(dealsRes.data || [])
+    setScheduled(postsRes.data || [])
+
+    if (earningsRes.data) {
+      const total = earningsRes.data.reduce((s, e) => s + (e.amount || 0), 0)
+      setEarnings({ total })
+    }
+
+    if (socialsRes.data) {
+      const map = {}
+      socialsRes.data.forEach(s => { map[s.platform] = s })
+      setSocials(map)
+    }
+
+    setLoading(false)
+  }
+
+  if (loading) return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', flexDirection:'column', gap:12 }}>
+      <div style={{ width:36, height:36, border:'3px solid rgba(0,229,160,0.15)', borderTopColor:'#00E5A0', borderRadius:'50%', animation:'spin .8s linear infinite' }} />
+      <p style={{ color:'#4A6357', fontSize:13, fontFamily:'sans-serif' }}>Loading your dashboard...</p>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  )
+
+  const name        = profile?.full_name || profile?.username || 'Creator'
+  const totalReach  = Object.values(socials).reduce((s, p) => s + (p.followers || 0), 0)
+  const activeDeals = deals.filter(d => !['paid','completed'].includes(d.stage)).length
+  const pendingVal  = deals.filter(d => d.stage !== 'paid').reduce((s, d) => s + (d.value || 0), 0)
 
   return (
-    <div style={{ fontFamily: "'DM Sans',sans-serif", color: '#f0f0f5', paddingBottom: 48 }}>
+    <div style={{ fontFamily:"'Instrument Sans',system-ui,sans-serif", color:'#D8EEE5' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@700;800;900&family=Instrument+Sans:wght@400;500;600&display=swap');
+        .dc{background:rgba(15,26,20,0.6);border:1px solid rgba(0,229,160,0.1);border-radius:14px;padding:20px 22px;transition:border-color .2s;}
+        .dc:hover{border-color:rgba(0,229,160,0.18);}
+        .ds{background:rgba(0,229,160,0.05);border:1px solid rgba(0,229,160,0.1);border-radius:12px;padding:18px 20px;transition:all .2s;}
+        .ds:hover{background:rgba(0,229,160,0.08);border-color:rgba(0,229,160,0.2);}
+        .dl{color:#00E5A0;text-decoration:none;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:4px;}
+        .dl:hover{opacity:.8;}
+        .dp{display:inline-flex;align-items:center;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600;}
+        .dr{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(0,229,160,0.06);}
+        .dr:last-child{border-bottom:none;}
+        .dso{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(0,229,160,0.08);margin-bottom:7px;transition:all .15s;}
+        .dso:hover{background:rgba(0,229,160,0.04);border-color:rgba(0,229,160,0.15);}
+        .dso:last-child{margin-bottom:0;}
+        .de{color:#4A6357;font-size:13px;text-align:center;padding:20px 0;}
+        .dqa{display:flex;align-items:center;gap:10px;padding:12px 16px;background:rgba(0,229,160,0.04);border:1px solid rgba(0,229,160,0.1);border-radius:10px;color:#9DC4B0;font-size:13px;font-weight:500;text-decoration:none;transition:all .15s;}
+        .dqa:hover{background:rgba(0,229,160,0.08);color:#00E5A0;}
+        @keyframes spin{to{transform:rotate(360deg)}}
+      `}</style>
+
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 28, marginBottom: 4 }}>
-          {greeting}, {firstName}! 👋
-        </h1>
-        <p style={{ color: '#6b7280', fontSize: 14 }}>
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:12, marginBottom:28 }}>
+        <div>
+          <h1 style={{ fontFamily:"'Cabinet Grotesk',sans-serif", fontSize:26, fontWeight:800, color:'#fff', letterSpacing:'-0.02em', marginBottom:5 }}>
+            {greet()}, {name} 👋
+          </h1>
+          <p style={{ color:'#7A9E8E', fontSize:14 }}>
+            {profile?.niche && <span style={{ marginRight:10 }}>📍 {profile.niche}</span>}
+            {profile?.primary_platform && <span style={{ textTransform:'capitalize' }}>🎯 {profile.primary_platform}</span>}
+          </p>
+        </div>
+        <button onClick={load} style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', background:'rgba(0,229,160,0.08)', border:'1px solid rgba(0,229,160,0.15)', borderRadius:8, color:'#00E5A0', fontSize:13, fontWeight:600, cursor:'pointer' }}>
+          <RefreshCw size={13} /> Refresh
+        </button>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
-        {stats.map((s, i) => (
-          <div key={i} style={S.card}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</span>
-              <span style={{ fontSize: 18 }}>{s.icon}</span>
-            </div>
-            <div style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 26, color: s.color, marginBottom: 4 }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: '#10b981', fontWeight: 600 }}>↑ {s.change}</div>
+      {/* Stat cards */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(175px,1fr))', gap:12, marginBottom:24 }}>
+        {[
+          { label:'Total Reach',      value: fmt(totalReach),       sub:'Across all platforms'     },
+          { label:'Total Earnings',   value: fmtMoney(earnings.total), sub:'From all sources'     },
+          { label:'Active Deals',     value: activeDeals,            sub: fmtMoney(pendingVal) + ' pipeline' },
+          { label:'Scheduled Posts',  value: scheduled.length,       sub:'Upcoming'                },
+        ].map(s => (
+          <div key={s.label} className="ds">
+            <div style={{ fontSize:11, color:'#7A9E8E', fontWeight:600, textTransform:'uppercase', letterSpacing:'.08em', marginBottom:8 }}>{s.label}</div>
+            <div style={{ fontFamily:"'Cabinet Grotesk',sans-serif", fontSize:28, fontWeight:900, color:'#00E5A0', lineHeight:1 }}>{s.value}</div>
+            <div style={{ fontSize:12, color:'#4A6357', marginTop:5 }}>{s.sub}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16, marginBottom: 16 }}>
-        {/* Chart */}
-        <div style={S.card}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-            <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 15 }}>Weekly Reach</span>
-            <span style={{ fontSize: 12, color: '#10b981', fontWeight: 700 }}>↑ +24% vs last week</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 110 }}>
-            {WEEKLY.map((v, i) => (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-                <span style={{ fontSize: 10, color: '#6b7280' }}>{v}K</span>
-                <div style={{ width: '100%', background: 'linear-gradient(to top,#6366f1,#8b5cf6)', borderRadius: '4px 4px 0 0', height: `${(v / maxVal) * 80}px`, opacity: 0.8, transition: 'height .5s' }} />
-                <span style={{ fontSize: 10, color: '#4b5563' }}>{DAYS[i]}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Two columns */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))', gap:16, marginBottom:16 }}>
 
-        {/* Quick Actions */}
-        <div style={S.card}>
-          <div style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Quick Actions</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {quickActions.map((a, i) => (
-              <button key={i} onClick={a.action}
-                style={{ ...S.btn, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
-                  background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)',
-                  color: '#f0f0f5', fontSize: 14, fontWeight: 600,
-                }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: a.color + '22', border: `1px solid ${a.color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
-                  {a.icon}
+        {/* Connected Platforms */}
+        <div className="dc">
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+            <h3 style={{ fontFamily:"'Cabinet Grotesk',sans-serif", fontSize:15, fontWeight:700, color:'#fff' }}>Connected Platforms</h3>
+            <Link to="/settings" className="dl">Manage <ArrowRight size={12}/></Link>
+          </div>
+          {Object.entries(PLATFORM_ICONS).map(([p, cfg]) => {
+            const Icon = cfg.icon
+            const conn = socials[p]
+            return (
+              <div key={p} className="dso">
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <Icon size={16} style={{ color: cfg.color }} />
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:600, color: conn ? '#fff' : '#4A6357', textTransform:'capitalize' }}>{p}</div>
+                    {conn && <div style={{ fontSize:11, color:'#7A9E8E' }}>@{conn.username}</div>}
+                  </div>
                 </div>
-                {a.label}
-                <svg style={{ marginLeft: 'auto', color: '#374151' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
-              </button>
-            ))}
+                {conn ? (
+                  <div style={{ textAlign:'right' }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:'#00E5A0' }}>{fmt(conn.followers)}</div>
+                    <div style={{ fontSize:10, color:'#4A6357' }}>followers</div>
+                  </div>
+                ) : (
+                  <Link to="/settings" style={{ fontSize:11, color:'#7A9E8E', textDecoration:'none', padding:'4px 10px', background:'rgba(0,229,160,0.06)', borderRadius:6, border:'1px solid rgba(0,229,160,0.1)' }}>
+                    Connect
+                  </Link>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Scheduled Posts */}
+        <div className="dc">
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+            <h3 style={{ fontFamily:"'Cabinet Grotesk',sans-serif", fontSize:15, fontWeight:700, color:'#fff' }}>Upcoming Posts</h3>
+            <Link to="/schedule" className="dl">View all <ArrowRight size={12}/></Link>
           </div>
-        </div>
-      </div>
-
-      {/* Recent Posts */}
-      <div style={S.card}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 15 }}>Recent Posts</span>
-          <button onClick={() => navigate('/schedule')} style={{ ...S.btn, padding: '6px 14px', fontSize: 12, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', color: '#a5b4fc', fontWeight: 600 }}>
-            View All →
-          </button>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {recentPosts.map((post, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 14 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: post.platformColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
-                {post.platform}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#f0f0f5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{post.title}</div>
-                <div style={{ fontSize: 11, color: '#4b5563', marginTop: 2 }}>{post.meta}</div>
-              </div>
-              <div style={{ padding: '4px 10px', background: post.badgeBg, borderRadius: 100, fontSize: 11, fontWeight: 700, color: post.badgeColor, flexShrink: 0 }}>
-                {post.badge}
-              </div>
+          {scheduled.length === 0 ? (
+            <div className="de">
+              <CalendarDays size={26} style={{ display:'block', margin:'0 auto 8px', opacity:.3 }}/>
+              No upcoming posts<br/>
+              <Link to="/schedule" style={{ color:'#00E5A0', fontSize:12, textDecoration:'none' }}>+ Schedule one →</Link>
             </div>
-          ))}
+          ) : scheduled.map(p => {
+            const cfg = PLATFORM_ICONS[p.platform] || {}
+            const Icon = cfg.icon
+            return (
+              <div key={p.id} className="dr">
+                {Icon && <Icon size={14} style={{ color: cfg.color, flexShrink:0 }} />}
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, color:'#D8EEE5', fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.title || 'Untitled'}</div>
+                  <div style={{ fontSize:11, color:'#4A6357' }}>{new Date(p.scheduled_at).toLocaleString('en',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+                </div>
+                <span className="dp" style={{ background:'rgba(0,229,160,0.08)', color:'#00E5A0', fontSize:10 }}>{p.status||'scheduled'}</span>
+              </div>
+            )
+          })}
         </div>
       </div>
 
-      {/* Media Kit promo — FIXED: navigates to /mediakit, not external URL */}
-      <div style={{ ...S.card, background: 'linear-gradient(135deg,rgba(99,102,241,0.08),rgba(139,92,246,0.05))', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', gap: 20 }}>
-        <div style={{ fontSize: 40 }}>🎨</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 16, marginBottom: 4 }}>Your Media Kit is ready to share</div>
-          <div style={{ fontSize: 13, color: '#6b7280' }}>Share your creator stats and rates with brands. View and edit your media kit below.</div>
+      {/* Brand Deals */}
+      <div className="dc" style={{ marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+          <h3 style={{ fontFamily:"'Cabinet Grotesk',sans-serif", fontSize:15, fontWeight:700, color:'#fff' }}>Brand Deals Pipeline</h3>
+          <Link to="/deals" className="dl">View all <ArrowRight size={12}/></Link>
         </div>
-        <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
-          <button onClick={() => navigate('/mediakit')}
-            style={{ ...S.btn, padding: '9px 20px', fontSize: 13, fontWeight: 700, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', boxShadow: '0 4px 14px rgba(99,102,241,0.35)' }}>
-            Edit Media Kit →
-          </button>
-        </div>
+        {deals.length === 0 ? (
+          <div className="de">
+            <Briefcase size={26} style={{ display:'block', margin:'0 auto 8px', opacity:.3 }}/>
+            No brand deals yet<br/>
+            <Link to="/deals" style={{ color:'#00E5A0', fontSize:12, textDecoration:'none' }}>+ Add a deal →</Link>
+          </div>
+        ) : (
+          <div style={{ overflowX:'auto' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+              <thead>
+                <tr style={{ color:'#4A6357', fontSize:11, fontWeight:600, textTransform:'uppercase', letterSpacing:'.06em' }}>
+                  {['Brand','Value','Stage','Due'].map(h => (
+                    <th key={h} style={{ textAlign:'left', paddingBottom:10, fontWeight:600 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {deals.map(d => {
+                  const sc = STAGE_STYLE[d.stage] || STAGE_STYLE.lead
+                  return (
+                    <tr key={d.id} style={{ borderTop:'1px solid rgba(0,229,160,0.06)' }}>
+                      <td style={{ padding:'10px 0', color:'#D8EEE5', fontWeight:500 }}>{d.brand}</td>
+                      <td style={{ padding:'10px 0', color:'#00E5A0', fontWeight:700 }}>{fmtMoney(d.value)}</td>
+                      <td style={{ padding:'10px 0' }}>
+                        <span className="dp" style={{ background:sc.bg, color:sc.color }}>{sc.label}</span>
+                      </td>
+                      <td style={{ padding:'10px 0', color:'#7A9E8E', fontSize:12 }}>
+                        {d.due_date ? new Date(d.due_date).toLocaleDateString('en',{month:'short',day:'numeric'}) : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Quick Actions */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(145px,1fr))', gap:10 }}>
+        {[
+          { label:'Schedule Post',   icon:<CalendarDays size={15}/>, to:'/schedule'     },
+          { label:'Repurpose Video', icon:<Sparkles    size={15}/>, to:'/repurpose'     },
+          { label:'Add Brand Deal',  icon:<Briefcase   size={15}/>, to:'/deals'         },
+          { label:'Script Studio',   icon:<TrendingUp  size={15}/>, to:'/script-studio' },
+          { label:'Track Earnings',  icon:<DollarSign  size={15}/>, to:'/earnings'      },
+          { label:'Settings',        icon:<Settings    size={15}/>, to:'/settings'      },
+        ].map(a => (
+          <Link key={a.to} to={a.to} className="dqa">{a.icon}{a.label}</Link>
+        ))}
       </div>
     </div>
   )
 }
-

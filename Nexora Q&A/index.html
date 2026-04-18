@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Nexora OS — Security & Platform Q&A</title>
+<link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@400;500;700;800;900&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --teal:#00E5A0;--teal-d:#00B87A;--teal-dim:rgba(0,229,160,0.12);
+  --ink:#070D0A;--ink2:#0D1A12;--ink3:#152018;
+  --text:#D8EEE5;--text2:#9DC4B0;--muted:#4A6357;
+  --border:rgba(0,229,160,0.12);--border2:rgba(0,229,160,0.22);
+  --red:#F87171;--amber:#FBBF24;--blue:#60A5FA;
+  --font-h:'Cabinet Grotesk',sans-serif;
+  --font-b:'Instrument Sans',sans-serif;
+}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--ink);color:var(--text);
+  font-family:var(--font-b);font-size:15px;line-height:1.7;
+  overflow-x:hidden;
+}
+
+/* ── BG ── */
+.bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(0,229,160,0.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,229,160,0.025) 1px,transparent 1px);
+  background-size:64px 64px;}
+.bg-glow1{position:fixed;top:-200px;right:-200px;width:700px;height:700px;
+  border-radius:50%;background:radial-gradient(ellipse,rgba(0,180,120,0.08) 0%,transparent 65%);
+  pointer-events:none;z-index:0;}
+.bg-glow2{position:fixed;bottom:-200px;left:-150px;width:600px;height:600px;
+  border-radius:50%;background:radial-gradient(ellipse,rgba(0,229,160,0.05) 0%,transparent 65%);
+  pointer-events:none;z-index:0;}
+
+/* ── NAV ── */
+nav{
+  position:sticky;top:0;z-index:100;
+  background:rgba(7,13,10,0.88);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  padding:0 clamp(16px,4vw,40px);height:clamp(52px,8vw,60px);
+  display:flex;align-items:center;justify-content:space-between;
+  gap:8px;
+}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none;}
+.nav-icon{
+  width:34px;height:34px;border-radius:9px;
+  background:linear-gradient(135deg,var(--teal),var(--teal-d));
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;box-shadow:0 4px 14px rgba(0,229,160,0.3);
+}
+.nav-name{font-family:var(--font-h);font-size:17px;font-weight:900;color:#fff;}
+.nav-name span{color:var(--teal);}
+.nav-tag{
+  font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--teal);padding:4px 12px;border-radius:100px;
+  background:rgba(0,229,160,0.08);border:1px solid var(--border);
+}
+
+/* ── HERO ── */
+.hero{
+  position:relative;z-index:1;
+  text-align:center;padding:clamp(40px,8vw,80px) clamp(16px,4vw,24px) clamp(32px,6vw,60px);
+  max-width:800px;margin:0 auto;
+}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:6px 16px;border-radius:100px;
+  background:rgba(0,229,160,0.08);border:1px solid var(--border);
+  font-size:11px;font-weight:700;letter-spacing:.1em;
+  color:var(--teal);text-transform:uppercase;margin-bottom:24px;
+}
+.hero-badge-dot{
+  width:6px;height:6px;border-radius:50%;background:var(--teal);
+  animation:blink 2s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+.hero h1{
+  font-family:var(--font-h);font-size:clamp(36px,5vw,60px);
+  font-weight:900;line-height:1.0;letter-spacing:-0.03em;
+  color:#fff;margin-bottom:16px;
+}
+.hero h1 span{color:var(--teal);}
+.hero-sub{font-size:clamp(13px,2vw,16px);color:var(--text2);line-height:1.7;max-width:580px;margin:0 auto 32px;}
+.hero-stats{
+  display:flex;gap:clamp(12px,4vw,32px);justify-content:center;flex-wrap:wrap;
+  padding:20px 0;border-top:1px solid var(--border);
+}
+.hero-stat{text-align:center;}
+.hero-stat-num{
+  font-family:var(--font-h);font-size:clamp(18px,3vw,24px);font-weight:900;
+  color:var(--teal);line-height:1;margin-bottom:3px;
+}
+.hero-stat-label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;}
+
+/* ── SECTIONS ── */
+.section{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:0 clamp(16px,4vw,24px) clamp(36px,6vw,60px);}
+.section-header{margin-bottom:32px;}
+.section-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--teal);margin-bottom:10px;
+}
+.section-chip::before{content:'';width:20px;height:1px;background:var(--teal);}
+.section-title{font-family:var(--font-h);font-size:clamp(20px,3vw,28px);font-weight:800;color:#fff;letter-spacing:-0.02em;}
+
+/* ── Q&A CARDS ── */
+.qa-list{display:flex;flex-direction:column;gap:2px;}
+.qa-item{
+  border:1px solid var(--border);border-radius:14px;
+  background:rgba(13,26,18,0.6);overflow:hidden;
+  transition:border-color .2s;
+}
+.qa-item:hover{border-color:var(--border2);}
+.qa-item.open{border-color:rgba(0,229,160,0.25);}
+.qa-head{
+  display:flex;align-items:flex-start;gap:clamp(8px,2vw,14px);
+  padding:clamp(14px,2.5vw,18px) clamp(14px,3vw,22px);cursor:pointer;
+  user-select:none;min-height:44px;-webkit-tap-highlight-color:transparent;
+}
+.qa-num{
+  font-family:var(--font-h);font-size:12px;font-weight:800;
+  color:var(--teal);min-width:28px;margin-top:2px;
+  opacity:.7;
+}
+.qa-q{font-size:clamp(13.5px,2vw,15px);font-weight:600;color:#fff;flex:1;line-height:1.5;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 0;}
+.qa-arrow{
+  width:22px;height:22px;border-radius:50%;
+  background:rgba(0,229,160,0.08);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin-top:1px;
+  transition:transform .25s,background .2s;
+  font-size:11px;color:var(--teal);
+}
+.qa-item.open .qa-arrow{transform:rotate(180deg);background:rgba(0,229,160,0.15);}
+.qa-body{
+  max-height:0;overflow:hidden;
+  transition:max-height .35s cubic-bezier(.4,0,.2,1);
+}
+.qa-body-inner{
+  padding:0 clamp(14px,3vw,22px) clamp(14px,2vw,20px) clamp(20px,6vw,64px);
+  font-size:clamp(13px,1.8vw,14px);color:var(--text2);line-height:1.78;
+}
+.qa-body-inner p{margin-bottom:12px;}
+.qa-body-inner p:last-child{margin-bottom:0;}
+.qa-body-inner ul{list-style:none;display:flex;flex-direction:column;gap:7px;margin:12px 0;}
+.qa-body-inner ul li{padding-left:18px;position:relative;}
+.qa-body-inner ul li::before{
+  content:'';position:absolute;left:0;top:9px;
+  width:5px;height:5px;border-radius:50%;background:var(--teal);opacity:.7;
+}
+.qa-body-inner code{
+  font-family:monospace;font-size:12px;
+  background:rgba(0,229,160,0.08);color:var(--teal);
+  padding:2px 7px;border-radius:5px;
+}
+.qa-body-inner strong{color:var(--text);font-weight:600;}
+
+/* ── Category tags on questions ── */
+.qa-tag{
+  font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  padding:2px 8px;border-radius:100px;display:inline-block;
+  margin-left:8px;flex-shrink:0;align-self:center;
+  white-space:nowrap;
+}
+.tag-platform{background:rgba(96,165,250,0.12);color:var(--blue);}
+.tag-security{background:rgba(0,229,160,0.1);color:var(--teal);}
+.tag-attack{background:rgba(248,113,113,0.1);color:var(--red);}
+.tag-data{background:rgba(251,191,36,0.1);color:var(--amber);}
+
+/* ── Highlight box ── */
+.hl-box{
+  padding:16px 20px;border-radius:12px;margin:14px 0;
+  border-left:3px solid var(--teal);
+  background:rgba(0,229,160,0.04);
+  font-size:13px;color:var(--text2);line-height:1.7;
+}
+.hl-box.red{border-left-color:var(--red);background:rgba(248,113,113,0.04);}
+.hl-box.amber{border-left-color:var(--amber);background:rgba(251,191,36,0.04);}
+
+/* ── Security layers visual ── */
+.layers{display:flex;flex-direction:column;gap:8px;margin:14px 0;}
+.layer{
+  display:flex;align-items:center;gap:14px;
+  padding:12px 16px;border-radius:10px;
+  background:rgba(0,229,160,0.04);border:1px solid var(--border);
+}
+.layer-num{
+  font-family:var(--font-h);font-size:18px;font-weight:900;
+  color:var(--teal);min-width:28px;opacity:.5;
+}
+.layer-content{}
+.layer-title{font-size:13px;font-weight:700;color:#fff;margin-bottom:2px;}
+.layer-desc{font-size:12px;color:var(--muted);}
+
+/* ── Footer ── */
+footer{
+  position:relative;z-index:1;
+  border-top:1px solid var(--border);
+  padding:clamp(20px,3vw,28px) clamp(16px,4vw,40px);
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:12px;
+  font-size:clamp(11px,1.5vw,12px);color:var(--muted);
+}
+.footer-brand{font-family:var(--font-h);font-size:14px;font-weight:800;color:var(--text2);}
+.footer-brand span{color:var(--teal);}
+
+/* ── Print ── */
+@media print{
+  .bg-grid,.bg-glow1,.bg-glow2{display:none;}
+  nav{position:relative;}
+  .qa-body{max-height:9999px!important;}
+  .qa-arrow{display:none;}
+  body{background:#070D0A;}
+}
+
+/* ── Tablet (≤768px) ── */
+@media(max-width:768px){
+  .bg-glow1{width:420px;height:420px;top:-120px;right:-120px;}
+  .bg-glow2{width:360px;height:360px;bottom:-120px;left:-100px;}
+  .hero-stat-num{font-size:22px;}
+  .qa-tag{font-size:9px;padding:2px 7px;}
+  footer{justify-content:center;text-align:center;}
+  .layer{padding:10px 14px;gap:12px;}
+}
+
+/* ── Large mobile (≤600px) ── */
+@media(max-width:600px){
+  .hero h1{letter-spacing:-0.025em;}
+  .hero-stat-num{font-size:20px;}
+  .hero-stat-label{font-size:10px;}
+  .section-header{margin-bottom:24px;}
+  .qa-item{border-radius:11px;}
+  .qa-q{font-size:14px;}
+  .qa-arrow{width:20px;height:20px;font-size:10px;}
+  .hl-box{padding:13px 16px;font-size:12.5px;}
+  .layer-title{font-size:12.5px;}
+  .layer-desc{font-size:11.5px;}
+}
+
+/* ── Small mobile (≤480px) ── */
+@media(max-width:480px){
+  .nav-name{font-size:15px;}
+  .nav-tag{font-size:10px;padding:3px 9px;letter-spacing:.04em;}
+  .hero-badge{font-size:10px;padding:5px 13px;}
+  .hero-stats{gap:10px;padding:16px 0;}
+  .hero-stat-num{font-size:18px;}
+  .qa-num{font-size:11px;min-width:20px;}
+  .qa-q{font-size:13.5px;line-height:1.45;}
+  .qa-body-inner code{font-size:11px;}
+  .layers{gap:6px;}
+  .layer{padding:9px 12px;gap:9px;}
+  .layer-num{font-size:15px;min-width:20px;}
+  .section-chip{font-size:9px;}
+  .hl-box{padding:11px 14px;border-radius:9px;}
+}
+
+/* ── Extra small (≤380px) ── */
+@media(max-width:380px){
+  .nav-icon{width:28px;height:28px;font-size:13px;border-radius:7px;}
+  .nav-name{font-size:14px;}
+  .nav-tag{display:none;}
+  .hero-badge{font-size:9px;}
+  .hero h1{font-size:30px;}
+  .qa-tag{display:none;}
+  .qa-head{gap:8px;}
+  .bg-glow1{width:280px;height:280px;}
+  .bg-glow2{width:240px;height:240px;}
+}
+
+/* ── Tiny (≤320px) ── */
+@media(max-width:320px){
+  .hero h1{font-size:26px;}
+  .hero-stats{flex-direction:column;gap:8px;align-items:center;}
+  .nav-name{font-size:13px;}
+  .nav-icon{width:26px;height:26px;font-size:12px;}
+  .qa-q{font-size:13px;}
+  .layer{flex-direction:column;gap:4px;}
+  .layer-num{font-size:18px;min-width:unset;}
+}
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="bg-glow1"></div>
+<div class="bg-glow2"></div>
+
+<!-- Nav -->
+<nav>
+  <a href="#" class="nav-logo">
+    <div class="nav-icon">⚡</div>
+    <div class="nav-name">Nexora <span>OS</span></div>
+  </a>
+  <div class="nav-tag">Security & Platform Q&A</div>
+</nav>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="hero-badge"><div class="hero-badge-dot"></div> Investor & Technical Presentation</div>
+  <h1>Everything About <span>Nexora OS</span><br/>Security & Infrastructure</h1>
+  <p class="hero-sub">25 questions covering the platform, data security, cyber attack defense, and infrastructure — from basics to advanced.</p>
+  <div class="hero-stats">
+    <div class="hero-stat"><div class="hero-stat-num">25</div><div class="hero-stat-label">Questions</div></div>
+    <div class="hero-stat"><div class="hero-stat-num">6</div><div class="hero-stat-label">Categories</div></div>
+    <div class="hero-stat"><div class="hero-stat-num">3</div><div class="hero-stat-label">Security Layers</div></div>
+    <div class="hero-stat"><div class="hero-stat-num">0</div><div class="hero-stat-label">Data Sold</div></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 1 — ABOUT NEXORA OS
+═══════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-chip">Section 01</div>
+    <div class="section-title">About Nexora OS</div>
+  </div>
+  <div class="qa-list">
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">01</div>
+        <div class="qa-q">What is Nexora OS and what problem does it solve?<span class="qa-tag tag-platform">Platform</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p><strong>Nexora OS is an all-in-one creator operating system</strong> — a single platform that replaces the 8–12 different tools a content creator currently needs to run their business.</p>
+        <p>Today, a typical creator juggles: Buffer or Hootsuite for scheduling, Canva for design, Notion for scripts, Wave or FreshBooks for invoices, spreadsheets for brand deal tracking, TubeBuddy for YouTube analytics, and separate inboxes for each social platform. That's expensive, time-consuming, and fragmented.</p>
+        <p>Nexora OS solves this by putting everything in one secure, AI-powered dashboard:</p>
+        <ul>
+          <li>Schedule posts across YouTube, Instagram, LinkedIn, TikTok, Twitter/X</li>
+          <li>Repurpose long videos into platform-specific content using Groq AI</li>
+          <li>Auto-detect viral clips from long-form content using Whisper AI</li>
+          <li>Manage brand deals in a full CRM pipeline with invoice generation</li>
+          <li>Track earnings from AdSense, sponsorships, and affiliates</li>
+          <li>Build and share a professional media kit at a public URL</li>
+          <li>Unified inbox for DMs and comments across all platforms</li>
+        </ul>
+        <div class="hl-box">Target market: 50 million+ content creators globally, with 5 million who earn money from their content and need serious business tools.</div>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">02</div>
+        <div class="qa-q">Who built Nexora OS and what is the team?<span class="qa-tag tag-platform">Platform</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p>Nexora OS is built by <strong>DreamByte</strong>, a Karachi-based startup with three co-founders:</p>
+        <ul>
+          <li><strong>Huzaifa</strong> — Founder & CEO. Product vision, investor relations, and go-to-market strategy.</li>
+          <li><strong>Safeer</strong> — Co-Founder & Technical Lead. Full-stack development, AI integration, security architecture, and platform infrastructure.</li>
+          <li><strong>Sami</strong> — Co-Founder & COO. Growth, operations, creator partnerships, and business development.</li>
+        </ul>
+        <p>The platform is built on a modern stack: React 19 + Vite (frontend), FastAPI (backend), Supabase PostgreSQL (database), Groq AI (LLM), and deployed on Netlify with Hostinger DNS — production-grade infrastructure from day one.</p>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">03</div>
+        <div class="qa-q">What is the business model and pricing?<span class="qa-tag tag-platform">Platform</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p>Nexora OS runs on a <strong>SaaS subscription model</strong> with four tiers:</p>
+        <ul>
+          <li><strong>Free Beta — $0/mo:</strong> Core features with monthly usage caps. Used to acquire users and gather feedback during beta.</li>
+          <li><strong>Basic — $59/mo:</strong> Unlimited repurposing, scheduling, Brand Deals CRM, and Media Kit builder for solo creators.</li>
+          <li><strong>Medium — $79/mo:</strong> Everything in Basic plus advanced analytics, priority AI inbox, and ROI tracking links. (Most popular tier)</li>
+          <li><strong>Pro — $99/mo:</strong> Everything in Medium plus up to 5 team seats, full analytics export, and priority support.</li>
+        </ul>
+        <p>Revenue projections: $41,300 MRR by end of Year 1 (700 users), scaling to $852K MRR / $10.2M ARR by Year 3 (12,000 users). Seeking a $50K seed raise at current stage.</p>
+        <div class="hl-box">7-day refund policy on first payment. Payments processed through Stripe — we never store card details.</div>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">04</div>
+        <div class="qa-q">What platforms does Nexora OS integrate with?<span class="qa-tag tag-platform">Platform</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p>Nexora OS integrates with all major creator platforms via official OAuth 2.0 APIs:</p>
+        <ul>
+          <li><strong>YouTube</strong> — schedule uploads, analytics, channel data, AdSense earnings sync</li>
+          <li><strong>Instagram</strong> — post scheduling, engagement metrics, DM inbox</li>
+          <li><strong>LinkedIn</strong> — post creation, profile analytics</li>
+          <li><strong>TikTok</strong> — video publishing, account analytics</li>
+          <li><strong>Twitch</strong> — stream analytics, follower data</li>
+          <li><strong>Twitter/X</strong> — currently locked (requires $100/mo paid API tier); shown as "Coming Soon" in the UI</li>
+          <li><strong>Facebook Pages</strong> — connected via Meta Business API for Instagram integration</li>
+        </ul>
+        <p>All connections use official OAuth 2.0 — we never ask for passwords. Users authorize Nexora OS from within each platform's official authorization screen, and can revoke access at any time.</p>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">05</div>
+        <div class="qa-q">What AI features does Nexora OS use and how do they work?<span class="qa-tag tag-platform">Platform</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p>Nexora OS uses two primary AI systems:</p>
+        <ul>
+          <li><strong>Groq LLaMA 3.3 (70B)</strong> — powers content repurposing, script generation, hashtag optimization, hook writing, bio generation, and the AI inbox reply assistant. Groq's inference is 10–100x faster than standard OpenAI endpoints, enabling real-time AI responses.</li>
+          <li><strong>OpenAI Whisper (via Groq)</strong> — powers audio transcription for the Auto Clip Generator. Long-form videos are transcribed, then AI identifies viral moments based on engagement signals in the transcript.</li>
+        </ul>
+        <p><strong>Privacy guarantee:</strong> Content submitted to AI is processed via API calls and is not used to train any AI model — by Nexora OS or by Groq. This is contractually guaranteed in Groq's API terms.</p>
+        <div class="hl-box amber"><strong>Note to users:</strong> AI-generated content should always be reviewed before publishing. AI is a tool to accelerate your workflow, not a replacement for editorial judgment.</div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 2 — DATA SECURITY BASICS
+═══════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-chip">Section 02</div>
+    <div class="section-title">Data Security — Basics</div>
+  </div>
+  <div class="qa-list">
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">06</div>
+        <div class="qa-q">How is user data stored and where does it live?<span class="qa-tag tag-security">Security</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p>All user data is stored in <strong>Supabase</strong>, which runs on PostgreSQL hosted on AWS infrastructure. Supabase provides enterprise-grade security out of the box.</p>
+        <p>Data storage breakdown:</p>
+        <ul>
+          <li><strong>User profiles, settings, preferences</strong> → Supabase PostgreSQL (encrypted at rest)</li>
+          <li><strong>Brand deals, scheduled posts, earnings</strong> → Supabase PostgreSQL with Row Level Security</li>
+          <li><strong>Media uploads, avatars, images</strong> → Supabase Storage (S3-compatible, private URLs)</li>
+          <li><strong>OAuth access tokens</strong> → Supabase PostgreSQL, encrypted with AES-256 before storing</li>
+          <li><strong>Passwords</strong> → Never stored in plain text. Handled entirely by Supabase Auth using bcrypt hashing</li>
+        </ul>
+        <div class="hl-box">All data is encrypted at rest using AES-256. All data in transit uses TLS 1.3 (HTTPS). No data is ever stored unencrypted.</div>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">07</div>
+        <div class="qa-q">How do you ensure each user can only see their own data?<span class="qa-tag tag-security">Security</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p>We use a <strong>three-layer security model</strong> to ensure per-user data isolation:</p>
+        <div class="layers">
+          <div class="layer"><div class="layer-num">1</div><div class="layer-content"><div class="layer-title">Frontend Session Check</div><div class="layer-desc">ProtectedRoute component checks Supabase session before rendering any page. No session → redirect to /login immediately.</div></div></div>
+          <div class="layer"><div class="layer-num">2</div><div class="layer-content"><div class="layer-title">Query-Level Scoping</div><div class="layer-desc">Every database query includes .eq('user_id', uid) where uid comes from the authenticated session. No query ever fetches data without this filter.</div></div></div>
+          <div class="layer"><div class="layer-num">3</div><div class="layer-content"><div class="layer-title">Supabase Row Level Security (RLS)</div><div class="layer-desc">Database-level enforcement using auth.uid() = user_id policies. Even if someone bypasses the frontend completely, the database rejects any request for data that doesn't belong to the authenticated user.</div></div></div>
+        </div>
+        <p>RLS is the most critical layer — it runs inside PostgreSQL itself, meaning it is <strong>impossible to bypass</strong> regardless of what the frontend or API sends. It is the same technology used by large SaaS companies like Notion, Linear, and Vercel.</p>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">08</div>
+        <div class="qa-q">How are passwords stored? Can your team read user passwords?<span class="qa-tag tag-security">Security</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p><strong>No — it is technically impossible for anyone on our team to read user passwords.</strong></p>
+        <p>Here is exactly how it works:</p>
+        <ul>
+          <li>When a user sets a password, it is immediately hashed using <code>bcrypt</code> with a unique per-user salt before any storage occurs.</li>
+          <li>The hash is a one-way cryptographic function — it cannot be reversed to reveal the original password.</li>
+          <li>When logging in, the password the user types is hashed again and compared to the stored hash. If they match, access is granted — but the original password is never stored or transmitted.</li>
+          <li>This process is handled entirely by Supabase Auth, which is built on the same cryptography used by major banks and enterprises.</li>
+        </ul>
+        <div class="hl-box">This means that even if our entire database were leaked, passwords would be useless to attackers. The only way to crack bcrypt hashes is brute force, which takes millions of years per password with modern hardware.</div>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">09</div>
+        <div class="qa-q">How are social media OAuth tokens (like YouTube, Instagram credentials) stored safely?<span class="qa-tag tag-security">Security</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p>OAuth tokens are the keys that allow Nexora OS to post on a user's behalf. Protecting them is critical.</p>
+        <ul>
+          <li><strong>We never ask for social media passwords.</strong> OAuth means users authorize us through the platform's official screen (e.g., Google's login page), and the platform gives us a limited-access token.</li>
+          <li>Tokens are <strong>encrypted with AES-256</strong> on our backend before being stored in the database.</li>
+          <li>Tokens are stored with <code>user_id</code> and are protected by Row Level Security — one user's tokens cannot be accessed by another user's account.</li>
+          <li>Tokens have <strong>limited scope</strong> — we only request the minimum permissions needed (e.g., "post content" and "read analytics" — never "access contacts" or "read emails").</li>
+          <li>When a user disconnects a platform, the token is immediately and permanently deleted from our database.</li>
+          <li>Users can also revoke access directly from each platform's security settings (Google Account Permissions, etc.) as an additional safety layer.</li>
+        </ul>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">10</div>
+        <div class="qa-q">Do you sell user data to advertisers or third parties?<span class="qa-tag tag-data">Data</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p><strong>Never. Nexora OS does not sell, rent, or share user data with advertisers, data brokers, or any third parties.</strong></p>
+        <p>Nexora OS is a subscription-funded product. Our revenue comes entirely from user subscriptions — not from advertising or data monetization. This means we have zero financial incentive to sell data.</p>
+        <p>Data we share with third parties is limited strictly to what is required to operate the platform:</p>
+        <ul>
+          <li><strong>Supabase</strong> — stores data (infrastructure partner)</li>
+          <li><strong>Groq</strong> — processes AI requests (content processing only, not stored)</li>
+          <li><strong>Stripe</strong> — processes payments (they never share data back)</li>
+          <li><strong>Resend</strong> — sends transactional emails (email address only)</li>
+        </ul>
+        <div class="hl-box">No advertising cookies. No Facebook Pixel. No Google Ads tracking. No cross-site tracking of any kind. Nexora OS will never display ads inside the platform.</div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 3 — ADVANCED SECURITY
+═══════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-chip">Section 03</div>
+    <div class="section-title">Advanced Security Architecture</div>
+  </div>
+  <div class="qa-list">
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">11</div>
+        <div class="qa-q">What is your complete security architecture stack?<span class="qa-tag tag-security">Security</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p>Our security architecture operates at seven levels:</p>
+        <ul>
+          <li><strong>Transport Security:</strong> TLS 1.3 on all connections (HTTPS everywhere). HSTS headers enforce HTTPS and prevent protocol downgrades.</li>
+          <li><strong>Authentication:</strong> Supabase Auth with JWT tokens, bcrypt password hashing, and Google OAuth 2.0. Tokens expire after inactivity and are invalidated on logout.</li>
+          <li><strong>Authorization:</strong> Row Level Security in PostgreSQL ensures database-level access control. Every table has RLS policies tied to <code>auth.uid()</code>.</li>
+          <li><strong>API Security:</strong> Supabase anon key is public by design (safe because RLS handles authorization). Service role key is server-side only, never exposed to the client.</li>
+          <li><strong>Secret Management:</strong> All API keys (Groq, Stripe, Resend) stored as environment variables. Never committed to Git. GitHub secret scanning enabled.</li>
+          <li><strong>Encryption:</strong> AES-256 for data at rest. TLS 1.3 for data in transit. bcrypt for passwords. AES-256 for OAuth token storage.</li>
+          <li><strong>Deployment Security:</strong> Netlify HTTPS, automatic security headers, DDoS protection at the CDN level.</li>
+        </ul>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">12</div>
+        <div class="qa-q">How do you protect against SQL Injection attacks?<span class="qa-tag tag-attack">Attack Defense</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p><strong>SQL injection is one of the most common attacks on web applications.</strong> It works when an attacker puts malicious SQL code into a form field (like a login box) hoping the server will execute it and dump the database.</p>
+        <p>Nexora OS is protected at multiple levels:</p>
+        <ul>
+          <li><strong>Supabase Client (Primary Defense):</strong> The Supabase JavaScript client uses parameterized queries by default. This means user input is always treated as data, never as executable SQL code. It is structurally impossible for user input to become a SQL command.</li>
+          <li><strong>PostgREST Layer:</strong> Supabase's PostgREST API layer parses and validates all queries before they reach PostgreSQL, adding another layer of sanitization.</li>
+          <li><strong>Row Level Security:</strong> Even if an injection somehow bypassed the above two layers (theoretically impossible), RLS would still prevent the attacker from accessing any data outside their own user_id scope.</li>
+        </ul>
+        <div class="hl-box">Example: If an attacker types <code>' OR '1'='1</code> into a username field, the Supabase client treats it as a literal string search for that username, not as SQL. The database never sees it as a command.</div>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">13</div>
+        <div class="qa-q">How do you protect against Cross-Site Scripting (XSS) attacks?<span class="qa-tag tag-attack">Attack Defense</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p><strong>XSS attacks work by injecting malicious JavaScript into a web page.</strong> If a user can get their code to run in another user's browser, they can steal session tokens, read private data, or impersonate users.</p>
+        <p>Nexora OS defenses:</p>
+        <ul>
+          <li><strong>React's JSX escaping:</strong> React automatically escapes all dynamic content rendered in JSX. If a malicious user's name contains <code>&lt;script&gt;alert('hacked')&lt;/script&gt;</code>, React renders it as literal text, not executable JavaScript.</li>
+          <li><strong>No use of dangerouslySetInnerHTML:</strong> We avoid React's <code>dangerouslySetInnerHTML</code> which would bypass escaping. All content is rendered through safe JSX.</li>
+          <li><strong>Content Security Policy (CSP) headers:</strong> CSP headers tell the browser to only execute scripts from trusted sources (our domain and approved CDNs). Even if an attacker injects a script tag, the browser refuses to run it.</li>
+          <li><strong>HttpOnly cookies:</strong> Session tokens are stored in HttpOnly cookies (where applicable) which JavaScript cannot access, preventing token theft via XSS.</li>
+        </ul>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">14</div>
+        <div class="qa-q">How do you handle DDoS (Distributed Denial of Service) attacks?<span class="qa-tag tag-attack">Attack Defense</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p><strong>A DDoS attack floods a server with millions of fake requests to crash it</strong>, making the service unavailable for real users. It's one of the most common attacks on public-facing web services.</p>
+        <p>Nexora OS has multiple layers of DDoS protection:</p>
+        <ul>
+          <li><strong>Netlify CDN (Frontend):</strong> The Nexora OS web app is served from Netlify's global CDN network with 200+ edge locations worldwide. DDoS traffic hitting the frontend is absorbed by the CDN's massive distributed infrastructure — not a single origin server.</li>
+          <li><strong>Supabase Rate Limiting:</strong> Supabase automatically rate-limits database API requests per IP address and per user. Excessive requests are blocked before they reach the database.</li>
+          <li><strong>Netlify Bot Protection:</strong> Netlify's infrastructure filters known malicious bots and attack patterns at the CDN edge before requests even reach our application.</li>
+          <li><strong>API Rate Limiting (FastAPI Backend):</strong> Our Python backend implements rate limiting — if an IP sends too many requests in a short time, subsequent requests are rejected with a 429 error.</li>
+          <li><strong>Cloudflare (planned):</strong> For additional protection, we are evaluating adding Cloudflare as a reverse proxy, which provides enterprise-grade DDoS mitigation including automatic attack detection and mitigation.</li>
+        </ul>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">15</div>
+        <div class="qa-q">How do you protect against brute force login attacks?<span class="qa-tag tag-attack">Attack Defense</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p><strong>A brute force attack is when an attacker tries thousands of password combinations per second</strong> until they find the right one — like a robot trying every key on a keychain.</p>
+        <p>Nexora OS protections:</p>
+        <ul>
+          <li><strong>Supabase Auth Rate Limiting:</strong> Supabase automatically rate-limits login attempts. After a certain number of failed attempts from the same IP, further attempts are temporarily blocked.</li>
+          <li><strong>bcrypt Slow Hashing:</strong> bcrypt is intentionally slow to compute — it takes ~100ms per password check. For a legitimate user, this is imperceptible. For an attacker trying a million passwords, 100ms × 1,000,000 = over 27 hours. This makes brute force attacks computationally infeasible.</li>
+          <li><strong>Google OAuth (Recommended path):</strong> Users who sign in with Google bypass password-based attacks entirely — Google handles their authentication with 2FA, device verification, and anomaly detection.</li>
+          <li><strong>Account Lockout:</strong> Repeated failed login attempts trigger account lockout notifications sent to the registered email, alerting the real user of suspicious activity.</li>
+          <li><strong>Strong Password Requirements:</strong> Minimum 8 characters enforced at the API level, not just the frontend.</li>
+        </ul>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">16</div>
+        <div class="qa-q">How do you protect against CSRF (Cross-Site Request Forgery) attacks?<span class="qa-tag tag-attack">Attack Defense</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p><strong>CSRF attacks trick a logged-in user's browser into making unauthorized requests</strong> — for example, a malicious website silently posting on the user's Instagram while they're browsing.</p>
+        <p>Nexora OS protections:</p>
+        <ul>
+          <li><strong>JWT Bearer Tokens:</strong> All API requests require a JWT token in the Authorization header. Browser-based cross-site requests cannot automatically include custom headers, so CSRF attacks cannot include the JWT and are rejected.</li>
+          <li><strong>SameSite Cookie Attribute:</strong> Session cookies are set with <code>SameSite=Strict</code>, meaning they are never sent with cross-site requests.</li>
+          <li><strong>CORS Policy:</strong> Our FastAPI backend only accepts requests from allowed origins (nexoraos.online and localhost during development). Requests from unknown domains are rejected entirely.</li>
+          <li><strong>Supabase's built-in CSRF protection:</strong> The Supabase client library handles CSRF token generation and validation automatically.</li>
+        </ul>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">17</div>
+        <div class="qa-q">What happens if Nexora OS itself gets hacked and there is a data breach?<span class="qa-tag tag-attack">Attack Defense</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p>We take this scenario seriously and have a documented incident response plan:</p>
+        <p><strong>Immediate response (0–2 hours):</strong></p>
+        <ul>
+          <li>Isolate the affected systems to stop the breach from spreading</li>
+          <li>Revoke all active session tokens, forcing all users to re-authenticate</li>
+          <li>Rotate all API keys and secrets immediately</li>
+          <li>Engage Supabase's security team if the database is involved</li>
+        </ul>
+        <p><strong>Within 72 hours:</strong></p>
+        <ul>
+          <li>Notify all affected users via email explaining what happened, what data was accessed, and what steps to take</li>
+          <li>Publish a public incident report on our status page</li>
+          <li>Report to relevant data protection authorities if required by law</li>
+        </ul>
+        <p><strong>Why the damage is limited even in a worst case:</strong></p>
+        <ul>
+          <li>Passwords cannot be cracked from our database (bcrypt)</li>
+          <li>Payment details are never stored (Stripe holds them)</li>
+          <li>OAuth tokens are AES-256 encrypted — useless without our encryption key</li>
+          <li>Social media passwords are never stored — only limited-scope tokens</li>
+        </ul>
+        <div class="hl-box red"><strong>Worst case breach exposure:</strong> Email addresses, display names, niche preferences, and follower counts. No passwords, no payment info, no social media credentials.</div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 4 — INFRASTRUCTURE & COMPLIANCE
+═══════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-chip">Section 04</div>
+    <div class="section-title">Infrastructure & Compliance</div>
+  </div>
+  <div class="qa-list">
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">18</div>
+        <div class="qa-q">What is your uptime guarantee and how do you handle outages?<span class="qa-tag tag-data">Data</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p>Nexora OS is built on infrastructure with industry-leading uptime:</p>
+        <ul>
+          <li><strong>Netlify (Frontend):</strong> 99.99% uptime SLA. Distributed across 200+ global CDN nodes — if one goes down, traffic automatically routes to another.</li>
+          <li><strong>Supabase (Database):</strong> 99.9% uptime SLA on paid plans. Automatic failover, daily backups, and point-in-time recovery available.</li>
+          <li><strong>Groq (AI API):</strong> Enterprise-grade infrastructure with load balancing across multiple inference clusters.</li>
+        </ul>
+        <p><strong>What we do when there is an outage:</strong></p>
+        <ul>
+          <li>Automated monitoring alerts us within 60 seconds of any service degradation</li>
+          <li>Status page at nexoraos.online/status updated in real time</li>
+          <li>Scheduled posts that miss their window due to our outage are automatically queued and sent as soon as service resumes</li>
+          <li>Users are notified via email if an outage lasts longer than 30 minutes</li>
+        </ul>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">19</div>
+        <div class="qa-q">Are you GDPR compliant? What about users outside Pakistan?<span class="qa-tag tag-data">Data</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p>Nexora OS is designed with GDPR principles as a baseline for all users globally, not just EU users:</p>
+        <ul>
+          <li><strong>Right to Access:</strong> Users can view all their stored data from their account settings at any time.</li>
+          <li><strong>Right to Delete:</strong> Users can permanently delete their account and all associated data. Deletion is completed within 30 days, with encrypted backups purged within 90 days.</li>
+          <li><strong>Right to Export:</strong> Users can request a full data export — content, deals, analytics history — by contacting us.</li>
+          <li><strong>Data Minimization:</strong> We collect only what is necessary to provide the service. No unnecessary data collection.</li>
+          <li><strong>Lawful Basis:</strong> We process data under contractual necessity (to provide the service) and user consent (for optional features).</li>
+          <li><strong>Privacy Policy:</strong> Comprehensive privacy policy available at nexoraos.online/privacy-policy, updated whenever practices change with 14-day advance notice to users.</li>
+        </ul>
+        <p>Nexora OS operates under Pakistani law. International users accessing the platform acknowledge that data may be processed in Pakistan and by our infrastructure partners' data centers globally (AWS, Netlify's CDN).</p>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">20</div>
+        <div class="qa-q">How do you handle database backups and disaster recovery?<span class="qa-tag tag-data">Data</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p>Data loss is treated as seriously as a security breach. Our backup and recovery strategy:</p>
+        <ul>
+          <li><strong>Automated Daily Backups:</strong> Supabase performs automated daily backups of the entire database. Backups are stored in encrypted form in geographically separate AWS regions.</li>
+          <li><strong>Point-in-Time Recovery:</strong> On Supabase's Pro plan, we can restore the database to any point in time within the last 7 days — down to the second. If we accidentally delete a table at 3:42 PM, we can restore it to 3:41 PM.</li>
+          <li><strong>Backup Testing:</strong> Backups are tested monthly by restoring to a staging environment to verify they work correctly. An untested backup is not a real backup.</li>
+          <li><strong>Multi-region redundancy:</strong> Supabase's underlying AWS infrastructure provides redundancy across multiple availability zones — a hardware failure in one data center does not affect availability.</li>
+          <li><strong>Recovery Time Objective (RTO):</strong> In a worst-case disaster scenario, we can restore full service within 2–4 hours using our backup snapshots.</li>
+        </ul>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 5 — USER TRUST & TRANSPARENCY
+═══════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-chip">Section 05</div>
+    <div class="section-title">User Trust & Transparency</div>
+  </div>
+  <div class="qa-list">
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">21</div>
+        <div class="qa-q">Can Nexora OS employees read my private content, brand deals, or earnings?<span class="qa-tag tag-security">Security</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p><strong>Technically yes — as database administrators we have access to the database. But we have strong policies and technical controls against it:</strong></p>
+        <ul>
+          <li>Database admin access is restricted to only two people (Safeer + Supabase automated systems)</li>
+          <li>All admin database access is logged with timestamps and actions — nothing is done without a record</li>
+          <li>We have a strict internal policy against accessing user data for any reason other than technical support requested by the user themselves</li>
+          <li>We never use user content for business development, training AI models, or any commercial purpose</li>
+        </ul>
+        <p>We are honest about this. Unlike some platforms that claim "we never look at your data" but have no technical enforcement, we make our controls clear and will implement formal audit logging as we scale.</p>
+        <div class="hl-box">As the platform grows, we plan to implement customer-managed encryption keys (CMEK), which would mean even our database administrators cannot read data without the user's own encryption key.</div>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">22</div>
+        <div class="qa-q">What happens to my data if I cancel my subscription?<span class="qa-tag tag-data">Data</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p>Canceling a subscription does not immediately delete data. Here is the exact timeline:</p>
+        <ul>
+          <li><strong>Upon cancellation:</strong> Paid features are disabled at the end of the billing period. Account drops to Free Beta tier (if available) or read-only mode.</li>
+          <li><strong>After 90 days of inactivity:</strong> We send an email warning that the account will be deleted in 30 days.</li>
+          <li><strong>Account deletion:</strong> All personal data, content, brand deals, scheduled posts, earnings records, and social connections are permanently deleted within 30 days of the deletion request.</li>
+          <li><strong>Financial records:</strong> Invoice and billing records are retained for 7 years as required by accounting and tax law. This is the only data retained after account deletion.</li>
+          <li><strong>Backup purge:</strong> Encrypted backup data is purged within 90 days of account deletion.</li>
+        </ul>
+        <p>Users can also request immediate deletion at any time by emailing syedsafeer830@gmail.com — we process deletion requests within 30 days.</p>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">23</div>
+        <div class="qa-q">How do you handle government requests for user data?<span class="qa-tag tag-data">Data</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p>We are committed to protecting user privacy even in response to legal requests:</p>
+        <ul>
+          <li><strong>We require valid legal process:</strong> We will not voluntarily disclose user data to any government body without a valid court order, subpoena, or other legally binding order under Pakistani law.</li>
+          <li><strong>We notify users first:</strong> Where permitted by law, we will notify affected users before complying with any legal request, giving them the opportunity to seek legal relief.</li>
+          <li><strong>We only provide what is required:</strong> We disclose only the minimum data specifically requested by a valid legal order — not entire account contents.</li>
+          <li><strong>We resist overbroad requests:</strong> If a legal request is overbroad or legally defective, we will challenge it through appropriate legal channels.</li>
+          <li><strong>We publish transparency reports:</strong> As we scale, we will publish annual transparency reports disclosing the number of legal requests received and complied with.</li>
+        </ul>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">24</div>
+        <div class="qa-q">How do you keep Nexora OS secure as you add new features?<span class="qa-tag tag-security">Security</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p>Security is built into our development process, not bolted on afterwards:</p>
+        <ul>
+          <li><strong>Security-first code review:</strong> Every new feature goes through a security checklist before merge — does it expose new data? Does it need new RLS policies? Does it introduce any new input vectors?</li>
+          <li><strong>GitHub push protection:</strong> Our repository has secret scanning enabled. If a developer accidentally commits an API key, GitHub blocks the push and alerts the team.</li>
+          <li><strong>Dependency auditing:</strong> <code>npm audit</code> runs on every deployment. Known vulnerabilities in third-party packages are patched within 48 hours of discovery.</li>
+          <li><strong>Staging environment:</strong> All new features are tested in a staging environment (separate Supabase project, separate deployment) before being pushed to production.</li>
+          <li><strong>Penetration testing (planned):</strong> As we approach Series A, we will commission external penetration testing to identify any vulnerabilities our internal team may have missed.</li>
+          <li><strong>Security advisories:</strong> We monitor the CVE database and Supabase's security advisories and patch our infrastructure within 24 hours of any critical vulnerability being published.</li>
+        </ul>
+      </div></div>
+    </div>
+
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggle(this)">
+        <div class="qa-num">25</div>
+        <div class="qa-q">Why should a creator trust Nexora OS with their entire business data?<span class="qa-tag tag-security">Security</span></div>
+        <div class="qa-arrow">▾</div>
+      </div>
+      <div class="qa-body"><div class="qa-body-inner">
+        <p>This is the most important question we can be asked, and we take it seriously.</p>
+        <p><strong>The technical answer:</strong> We use the same infrastructure, encryption standards, and security practices as enterprise SaaS companies worth billions. Supabase powers companies at millions of users. AES-256 is used by banks and governments. bcrypt is the gold standard for password storage. TLS 1.3 is the latest internet security protocol. These are not "good enough" choices — they are the best choices available.</p>
+        <p><strong>The business answer:</strong> Our entire business model depends on creators trusting us. Unlike free social platforms that need your data to sell ads, Nexora OS earns money only when creators find the platform valuable enough to pay for. If we misuse data, we lose subscribers and our business dies. Our incentives are 100% aligned with protecting you.</p>
+        <p><strong>The human answer:</strong> We are a small team that has built this product from scratch. We put our names on it. We use it ourselves. We have friends and family who will be users. We are not a faceless corporation — we are accountable people who care deeply about doing this right.</p>
+        <div class="hl-box">
+          <strong>Our security commitments in plain language:</strong><br/>
+          ✓ We never read your content without your permission<br/>
+          ✓ We never sell your data — ever<br/>
+          ✓ We encrypt everything sensitive<br/>
+          ✓ We tell you immediately if something goes wrong<br/>
+          ✓ You own your data and can delete it completely at any time
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-brand">Nexora <span>OS</span></div>
+  <div>© 2026 Nexora OS · nexoraos.online · Built by DreamByte, Karachi</div>
+  <div>syedsafeer830@gmail.com</div>
+</footer>
+
+<script>
+function toggle(head) {
+  const item = head.closest('.qa-item')
+  const body = item.querySelector('.qa-body')
+  const isOpen = item.classList.contains('open')
+
+  // Close all
+  document.querySelectorAll('.qa-item.open').forEach(i => {
+    i.classList.remove('open')
+    i.querySelector('.qa-body').style.maxHeight = '0'
+  })
+
+  // Open clicked if it was closed
+  if (!isOpen) {
+    item.classList.add('open')
+    body.style.maxHeight = body.scrollHeight + 40 + 'px'
+  }
+}
+
+// Open first item by default
+document.addEventListener('DOMContentLoaded', () => {
+  const first = document.querySelector('.qa-head')
+  if (first) toggle(first)
+})
+</script>
+</body>
+</html>
