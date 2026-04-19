@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from app.api import posts, media_kit, ai, deals, social, captions, clipping
 from app.api.scheduler import start_scheduler
+from app.api.youtube import router as youtube_router
 from app.instagram import router as instagram_router
 load_dotenv()
 
@@ -23,6 +24,7 @@ app.include_router(deals.router, prefix="/api/deals")
 app.include_router(social.router, prefix="/api/social")
 app.include_router(captions.router, prefix="/api/captions")
 app.include_router(clipping.router, prefix="/api/clipping")
+app.include_router(youtube_router)
 
 
 @app.on_event("startup")
