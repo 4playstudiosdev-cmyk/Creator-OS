@@ -132,7 +132,7 @@ export default function App() {
         <Route path="/setup-username"         element={<UsernameSetup />} />
         <Route path="/onboarding"             element={<OnboardingPage />} />
         <Route path="/u/:username"            element={<PublicProfile />} />
-        <Route path="/r/:slug"                element={<ROIRedirect />} />
+        <Route path="/r/:code" element={<ROIRedirect />} />
         <Route path="/auth/twitter/callback"  element={<TwitterCallback />} />
         <Route path="/auth/google/callback"   element={<GoogleCallback />} />
         <Route path="/auth/linkedin/callback" element={<LinkedInCallback />} />
@@ -157,6 +157,7 @@ export default function App() {
             <Route path="/auto-clip"      element={<AutoClippingPage />} />
             <Route path="/pricing"        element={<PricingPage />} />
             <Route path="/settings"       element={<SettingsPage />} />
+            
           </Route>
 
           <Route element={<AgencyLayout />}>
