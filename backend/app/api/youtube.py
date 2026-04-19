@@ -1,17 +1,6 @@
 # backend/app/api/youtube.py
 # Complete YouTube Integration for Nexora OS
-# Works on LOCAL and RAILWAY — no client_secret.json file needed
-# Pure environment variables only
-#
-# LOCAL .env:
-#   GOOGLE_CLIENT_ID=...
-#   GOOGLE_CLIENT_SECRET=...
-#   APP_ENV=local
-#
-# RAILWAY Variables:
-#   GOOGLE_CLIENT_ID=...
-#   GOOGLE_CLIENT_SECRET=...
-#   APP_ENV=production
+# Fixes: Community post, timezone (browser local time), privacy update
 #
 # Add to main.py:
 #   from app.api.youtube import router as youtube_router
@@ -23,34 +12,31 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from supabase import create_client
 
-# Google imports
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request as GoogleRequest
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 import google_auth_oauthlib.flow
+import httpx
 
 router = APIRouter(prefix="/api/youtube", tags=["YouTube"])
 
-# ── Detect environment — local vs Railway ─────────────────────────────────────
+# ── Config ────────────────────────────────────────────────────────────────────
 APP_ENV      = os.environ.get("APP_ENV", "production")
 IS_LOCAL     = APP_ENV == "local"
+CLIENT_ID    = os.environ.get("GOOGLE_CLIENT_ID", "")
+CLIENT_SECRET= os.environ.get("GOOGLE_CLIENT_SECRET", "")
 
-CLIENT_ID     = os.environ.get("GOOGLE_CLIENT_ID", "")
-CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+LOCAL_REDIRECT   = "http://localhost:8000/api/youtube/callback"
+PROD_REDIRECT    = "https://creator-os-production-0bf8.up.railway.app/api/youtube/callback"
+REDIRECT_URI     = LOCAL_REDIRECT if IS_LOCAL else PROD_REDIRECT
 
-# Redirect URI — local vs production
-LOCAL_REDIRECT    = "http://localhost:8000/api/youtube/callback"
-PROD_REDIRECT     = "https://creator-os-production-0bf8.up.railway.app/api/youtube/callback"
-REDIRECT_URI      = LOCAL_REDIRECT if IS_LOCAL else PROD_REDIRECT
-
-# Frontend URL — local vs production
-LOCAL_FRONTEND    = "http://localhost:5173"
-PROD_FRONTEND     = "https://creator-os-ochre.vercel.app"
-FRONTEND_URL      = LOCAL_FRONTEND if IS_LOCAL else PROD_FRONTEND
+LOCAL_FRONTEND   = "http://localhost:5173"
+PROD_FRONTEND    = "https://creator-os-ochre.vercel.app"
+FRONTEND_URL     = LOCAL_FRONTEND if IS_LOCAL else PROD_FRONTEND
 
 SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
@@ -58,7 +44,9 @@ SCOPES = [
     "https://www.googleapis.com/auth/youtube.readonly",
 ]
 
-# ── Client config dict — no JSON file needed ──────────────────────────────────
+# PKCE store
+_CODE_VERIFIERS: dict = {}
+
 def get_client_config():
     return {
         "web": {
@@ -77,7 +65,7 @@ def get_sb():
         os.environ["SUPABASE_SERVICE_KEY"]
     )
 
-# ── Get credentials from Supabase ─────────────────────────────────────────────
+# ── Get credentials ───────────────────────────────────────────────────────────
 def get_credentials(user_id: str, sb) -> Credentials:
     try:
         r = sb.table("youtube_connections") \
@@ -88,10 +76,7 @@ def get_credentials(user_id: str, sb) -> Credentials:
         r = None
 
     if not r or not r.data:
-        raise HTTPException(
-            401,
-            "YouTube not connected. Please connect from Settings → Social Accounts."
-        )
+        raise HTTPException(401, "YouTube not connected. Go to Settings → Social Accounts → Connect YouTube.")
 
     data  = r.data
     creds = Credentials(
@@ -103,7 +88,6 @@ def get_credentials(user_id: str, sb) -> Credentials:
         scopes        = SCOPES,
     )
 
-    # Auto-refresh if expired
     if creds.expired and creds.refresh_token:
         try:
             creds.refresh(GoogleRequest())
@@ -112,37 +96,27 @@ def get_credentials(user_id: str, sb) -> Credentials:
                 "expires_at":   (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
             }).eq("user_id", user_id).execute()
         except Exception as e:
-            raise HTTPException(401, f"Token expired and refresh failed: {str(e)}. Please reconnect YouTube.")
+            raise HTTPException(401, f"Token expired. Please reconnect YouTube in Settings. ({str(e)[:60]})")
 
     return creds
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 1. OAUTH START
-# Frontend: window.location.href = API + '/api/youtube/auth?user_id=' + userId
+# 1. OAUTH START — with PKCE
 # ─────────────────────────────────────────────────────────────────────────────
-# Store code verifiers per user_id
-_CODE_VERIFIERS: dict = {}
-
 @router.get("/auth")
 async def youtube_auth(user_id: str):
-    """Redirect user to Google OAuth with PKCE (S256)."""
     import secrets, hashlib, base64
     from urllib.parse import urlencode
 
     if not CLIENT_ID or not CLIENT_SECRET:
         raise HTTPException(500, "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET not set.")
 
-    # Generate PKCE code_verifier (43-128 chars, URL-safe)
+    # Generate PKCE
     code_verifier  = base64.urlsafe_b64encode(secrets.token_bytes(96)).rstrip(b"=").decode()
-
-    # Generate code_challenge = BASE64URL(SHA256(code_verifier))
     digest         = hashlib.sha256(code_verifier.encode()).digest()
     code_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
-
-    # Store verifier — needed in callback
     _CODE_VERIFIERS[user_id] = code_verifier
-    print(f"[YT Auth] PKCE generated. verifier={code_verifier[:10]}... user={user_id[:8]}...")
 
     params = {
         "client_id":             CLIENT_ID,
@@ -156,18 +130,15 @@ async def youtube_auth(user_id: str):
         "code_challenge_method": "S256",
     }
     auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)
-    print(f"[YT Auth] Redirecting to Google...")
+    print(f"[YT Auth] PKCE generated for user={user_id[:8]}...")
     return RedirectResponse(auth_url)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. OAUTH CALLBACK
-# Google redirects here after user grants permission
 # ─────────────────────────────────────────────────────────────────────────────
 @router.get("/callback")
 async def youtube_callback(request: Request, sb=Depends(get_sb)):
-    """Handle Google OAuth callback — save tokens to Supabase."""
-    # MUST set before flow operations
     os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
     params  = dict(request.query_params)
@@ -180,13 +151,10 @@ async def youtube_callback(request: Request, sb=Depends(get_sb)):
     if not code or not user_id:
         return RedirectResponse(f"{FRONTEND_URL}/youtube?error=missing_params")
 
-    # Fetch token using PKCE code_verifier
+    # Exchange code for token using PKCE verifier
     try:
-        import httpx as _httpx
-
-        # Get stored PKCE verifier
         code_verifier = _CODE_VERIFIERS.pop(user_id, None)
-        print(f"[YT Callback] code_verifier found: {code_verifier is not None}")
+        print(f"[YT Callback] verifier found: {code_verifier is not None}")
 
         post_data = {
             "code":          code,
@@ -198,14 +166,14 @@ async def youtube_callback(request: Request, sb=Depends(get_sb)):
         if code_verifier:
             post_data["code_verifier"] = code_verifier
 
-        async with _httpx.AsyncClient() as client:
+        async with httpx.AsyncClient() as client:
             token_resp = await client.post(
                 "https://oauth2.googleapis.com/token",
                 data=post_data,
                 timeout=30,
             )
         token_data = token_resp.json()
-        print(f"[YT Callback] Token response keys: {list(token_data.keys())}")
+        print(f"[YT Callback] Token keys: {list(token_data.keys())}")
 
         if "error" in token_data:
             print(f"[YT Callback] Token FAILED: {token_data}")
@@ -214,7 +182,6 @@ async def youtube_callback(request: Request, sb=Depends(get_sb)):
         access_token  = token_data.get("access_token")
         refresh_token = token_data.get("refresh_token")
 
-        from google.oauth2.credentials import Credentials
         creds = Credentials(
             token         = access_token,
             refresh_token = refresh_token,
@@ -231,37 +198,36 @@ async def youtube_callback(request: Request, sb=Depends(get_sb)):
     # Get channel info
     ch_id = ch_name = ch_img = subs = ""
     try:
-        yt      = build("youtube", "v3", credentials=creds)
-        ch_r    = yt.channels().list(part="snippet,statistics", mine=True).execute()
-        ch      = ch_r["items"][0]
+        yt   = build("youtube", "v3", credentials=creds)
+        ch_r = yt.channels().list(part="snippet,statistics", mine=True).execute()
+        ch   = ch_r["items"][0]
         ch_id   = ch["id"]
         ch_name = ch["snippet"]["title"]
         ch_img  = ch["snippet"]["thumbnails"]["default"]["url"]
         subs    = ch["statistics"].get("subscriberCount", "0")
         print(f"[YT Callback] Channel: {ch_name}, subs={subs}")
     except Exception as e:
-        print(f"[YT Callback] Channel fetch failed (continuing): {e}")
+        print(f"[YT Callback] Channel fetch failed: {e}")
 
     # Save to Supabase
-    expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
     try:
         result = sb.table("youtube_connections").upsert({
             "user_id":       user_id,
             "access_token":  creds.token,
             "refresh_token": creds.refresh_token,
-            "expires_at":    expires_at,
+            "expires_at":    (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
             "channel_id":    ch_id,
             "channel_name":  ch_name,
             "channel_thumb": ch_img,
             "subscribers":   subs,
             "connected_at":  datetime.now(timezone.utc).isoformat(),
         }, on_conflict="user_id").execute()
-        print(f"[YT Callback] Supabase upsert OK: {result.data}")
+        print(f"[YT Callback] Supabase OK: {result.data}")
     except Exception as e:
-        print(f"[YT Callback] Supabase upsert FAILED: {e}")
-        return RedirectResponse(f"{FRONTEND_URL}/youtube?error=db_save_failed&detail={str(e)[:100]}")
+        print(f"[YT Callback] Supabase FAILED: {e}")
+        return RedirectResponse(f"{FRONTEND_URL}/youtube?error=db_save_failed")
 
-    print(f"[YT Callback] All done — redirecting to frontend")
+    print(f"[YT Callback] Done — redirecting to frontend")
     return RedirectResponse(f"{FRONTEND_URL}/youtube?connected=true")
 
 
@@ -270,7 +236,6 @@ async def youtube_callback(request: Request, sb=Depends(get_sb)):
 # ─────────────────────────────────────────────────────────────────────────────
 @router.get("/status/{user_id}")
 async def youtube_status(user_id: str, sb=Depends(get_sb)):
-    """Check connection status and return channel info."""
     try:
         r = sb.table("youtube_connections") \
             .select("channel_id,channel_name,channel_thumb,subscribers,expires_at") \
@@ -285,8 +250,11 @@ async def youtube_status(user_id: str, sb=Depends(get_sb)):
     data    = r.data
     expired = False
     if data.get("expires_at"):
-        exp     = datetime.fromisoformat(data["expires_at"].replace("Z", "+00:00"))
-        expired = exp < datetime.now(timezone.utc)
+        try:
+            exp     = datetime.fromisoformat(data["expires_at"].replace("Z", "+00:00"))
+            expired = exp < datetime.now(timezone.utc)
+        except Exception:
+            pass
 
     return {
         "connected":    True,
@@ -312,40 +280,21 @@ async def youtube_disconnect(user_id: str, sb=Depends(get_sb)):
 # ─────────────────────────────────────────────────────────────────────────────
 @router.get("/analytics/{user_id}")
 async def get_analytics(user_id: str, sb=Depends(get_sb)):
-    """Channel stats + recent videos performance."""
     creds = get_credentials(user_id, sb)
     yt    = build("youtube", "v3", credentials=creds)
 
-    # Channel info
-    ch_r = yt.channels().list(
-        part="snippet,statistics",
-        mine=True
-    ).execute()
-
+    ch_r = yt.channels().list(part="snippet,statistics", mine=True).execute()
     if not ch_r.get("items"):
         raise HTTPException(404, "No YouTube channel found.")
-
     ch    = ch_r["items"][0]
     stats = ch.get("statistics", {})
 
-    # Recent videos
-    search_r = yt.search().list(
-        part="snippet",
-        forMine=True,
-        type="video",
-        order="date",
-        maxResults=12
-    ).execute()
-
+    search_r  = yt.search().list(part="snippet", forMine=True, type="video", order="date", maxResults=12).execute()
     video_ids = [i["id"]["videoId"] for i in search_r.get("items", [])]
     videos    = []
 
     if video_ids:
-        vid_r = yt.videos().list(
-            part="snippet,statistics,status",
-            id=",".join(video_ids)
-        ).execute()
-
+        vid_r = yt.videos().list(part="snippet,statistics,status", id=",".join(video_ids)).execute()
         for v in vid_r.get("items", []):
             vs = v.get("statistics", {})
             videos.append({
@@ -380,38 +329,24 @@ async def get_analytics(user_id: str, sb=Depends(get_sb)):
 # ─────────────────────────────────────────────────────────────────────────────
 @router.get("/videos/{user_id}")
 async def get_videos(user_id: str, max_results: int = 20, sb=Depends(get_sb)):
-    """List all uploaded videos with stats."""
-    creds = get_credentials(user_id, sb)
-    yt    = build("youtube", "v3", credentials=creds)
-
-    # Get uploads playlist ID
+    creds    = get_credentials(user_id, sb)
+    yt       = build("youtube", "v3", credentials=creds)
     ch_r     = yt.channels().list(part="contentDetails", mine=True).execute()
     playlist = ch_r["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
-
-    # Get videos from playlist
-    pl_r = yt.playlistItems().list(
-        part="snippet",
-        playlistId=playlist,
-        maxResults=max_results
-    ).execute()
-
-    video_ids = [i["snippet"]["resourceId"]["videoId"] for i in pl_r.get("items", [])]
+    pl_r     = yt.playlistItems().list(part="snippet", playlistId=playlist, maxResults=max_results).execute()
+    video_ids= [i["snippet"]["resourceId"]["videoId"] for i in pl_r.get("items", [])]
 
     if not video_ids:
         return {"videos": [], "total": 0}
 
-    vid_r = yt.videos().list(
-        part="snippet,statistics,status,contentDetails",
-        id=",".join(video_ids)
-    ).execute()
-
+    vid_r = yt.videos().list(part="snippet,statistics,status,contentDetails", id=",".join(video_ids)).execute()
     videos = []
     for v in vid_r.get("items", []):
         vs = v.get("statistics", {})
         videos.append({
             "id":           v["id"],
             "title":        v["snippet"]["title"],
-            "description":  v["snippet"].get("description", "")[:200],
+            "description":  v["snippet"].get("description", "")[:300],
             "thumbnail":    v["snippet"]["thumbnails"].get("medium", {}).get("url", ""),
             "published_at": v["snippet"]["publishedAt"],
             "status":       v["status"]["privacyStatus"],
@@ -420,47 +355,46 @@ async def get_videos(user_id: str, max_results: int = 20, sb=Depends(get_sb)):
             "likes":        int(vs.get("likeCount", 0)),
             "comments":     int(vs.get("commentCount", 0)),
             "url":          f"https://youtube.com/watch?v={v['id']}",
+            "tags":         v["snippet"].get("tags", []),
+            "category_id":  v["snippet"].get("categoryId", ""),
         })
 
     return {"videos": videos, "total": len(videos)}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 7. VIDEO UPLOAD
+# 7. VIDEO UPLOAD — timezone fix
+# Frontend sends local datetime string → we convert to UTC ISO for YouTube
 # ─────────────────────────────────────────────────────────────────────────────
 @router.post("/upload-video")
 async def upload_video(
-    user_id:      str        = Form(...),
-    title:        str        = Form(...),
-    description:  str        = Form(""),
-    tags:         str        = Form(""),
-    privacy:      str        = Form("private"),
-    scheduled_at: str        = Form(""),
-    file:         UploadFile = File(...),
+    user_id:         str        = Form(...),
+    title:           str        = Form(...),
+    description:     str        = Form(""),
+    tags:            str        = Form(""),
+    privacy:         str        = Form("private"),
+    scheduled_at:    str        = Form(""),    # browser local ISO datetime
+    timezone_offset: int        = Form(0),     # browser UTC offset in minutes (e.g. -300 for PKT)
+    file:            UploadFile = File(...),
     sb = Depends(get_sb)
 ):
     """
     Upload video to YouTube.
-    privacy: public | private | unlisted | scheduled
-    scheduled_at: ISO datetime string (only for scheduled)
+    timezone_offset: browser's getTimezoneOffset() value in minutes.
+    PKT (UTC+5) = -300 (negative because getTimezoneOffset returns negative for ahead zones)
+    We convert local time → UTC for YouTube's publishAt field.
     """
     creds = get_credentials(user_id, sb)
     yt    = build("youtube", "v3", credentials=creds)
 
     tags_list = [t.strip() for t in tags.split(",") if t.strip()]
 
-    # Write to temp file
-    suffix = ".mp4"
-    if file.filename:
-        ext = os.path.splitext(file.filename)[1]
-        if ext: suffix = ext
-
+    suffix = os.path.splitext(file.filename or "video.mp4")[1] or ".mp4"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         content  = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
 
-    # Build request body
     actual_privacy = "private" if privacy == "scheduled" else privacy
     body = {
         "snippet": {
@@ -475,17 +409,27 @@ async def upload_video(
         }
     }
 
+    # Fix timezone: convert browser local time to UTC
     if privacy == "scheduled" and scheduled_at:
-        body["status"]["publishAt"] = scheduled_at
+        try:
+            # Parse the datetime-local input (e.g. "2026-04-20T23:52")
+            naive_dt = datetime.fromisoformat(scheduled_at)
+            # timezone_offset is browser's getTimezoneOffset() in minutes
+            # PKT = UTC+5, so offset = -300 (browser returns negative for ahead zones)
+            # To get UTC: add the offset (double negative = positive for PKT)
+            utc_dt = naive_dt + timedelta(minutes=timezone_offset)
+            # YouTube requires UTC ISO 8601
+            publish_at = utc_dt.strftime("%Y-%m-%dT%H:%M:%S") + ".000Z"
+            body["status"]["publishAt"] = publish_at
+            print(f"[YT Upload] Schedule: local={scheduled_at}, offset={timezone_offset}min, UTC={publish_at}")
+        except Exception as e:
+            print(f"[YT Upload] Timezone conversion failed: {e} — using raw value")
+            body["status"]["publishAt"] = scheduled_at
 
     media = MediaFileUpload(tmp_path, chunksize=-1, resumable=True)
 
     try:
-        request  = yt.videos().insert(
-            part="snippet,status",
-            body=body,
-            media_body=media,
-        )
+        request  = yt.videos().insert(part="snippet,status", body=body, media_body=media)
         response = None
         while response is None:
             _, response = request.next_chunk()
@@ -493,7 +437,6 @@ async def upload_video(
         video_id = response["id"]
         os.unlink(tmp_path)
 
-        # Log to Supabase
         try:
             sb.table("scheduled_posts").insert({
                 "user_id":      user_id,
@@ -515,13 +458,50 @@ async def upload_video(
         }
 
     except Exception as e:
-        try: os.unlink(tmp_path)
-        except Exception: pass
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
         raise HTTPException(500, f"Upload failed: {str(e)}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 8. COMMUNITY POST
+# 8. UPDATE VIDEO PRIVACY
+# ─────────────────────────────────────────────────────────────────────────────
+class UpdateVideoRequest(BaseModel):
+    user_id:     str
+    video_id:    str
+    title:       Optional[str] = None
+    description: Optional[str] = None
+    privacy:     Optional[str] = None  # public | private | unlisted
+
+@router.put("/update-video")
+async def update_video(body: UpdateVideoRequest, sb=Depends(get_sb)):
+    """Update video title, description, or privacy status."""
+    creds = get_credentials(body.user_id, sb)
+    yt    = build("youtube", "v3", credentials=creds)
+
+    current = yt.videos().list(part="snippet,status", id=body.video_id).execute()
+    if not current.get("items"):
+        raise HTTPException(404, "Video not found.")
+
+    snippet = current["items"][0]["snippet"]
+    status  = current["items"][0]["status"]
+
+    if body.title:       snippet["title"]        = body.title
+    if body.description: snippet["description"]  = body.description
+    if body.privacy:     status["privacyStatus"] = body.privacy
+
+    yt.videos().update(
+        part="snippet,status",
+        body={"id": body.video_id, "snippet": snippet, "status": status}
+    ).execute()
+
+    return {"success": True, "message": f"Video updated to {body.privacy or 'saved'}!"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9. COMMUNITY POST — Fixed with direct API call
 # ─────────────────────────────────────────────────────────────────────────────
 class CommunityPostRequest(BaseModel):
     user_id:   str
@@ -532,24 +512,26 @@ class CommunityPostRequest(BaseModel):
 async def community_post(body: CommunityPostRequest, sb=Depends(get_sb)):
     """
     Post to YouTube Community tab.
-    Text-only or Text + Image.
-    Note: Requires 500+ subscribers.
+    Uses YouTube Data API v3 via direct httpx call.
+    Requires 500+ subscribers.
     """
-    import httpx
     creds = get_credentials(body.user_id, sb)
 
-    headers = {
-        "Authorization": f"Bearer {creds.token}",
-        "Content-Type":  "application/json",
-    }
+    # Refresh token if needed
+    if creds.expired and creds.refresh_token:
+        creds.refresh(GoogleRequest())
 
     payload = {
         "snippet": {
             "text": body.text,
         }
     }
-    if body.image_url:
-        payload["snippet"]["backgroundImageUrl"] = body.image_url
+
+    headers = {
+        "Authorization": f"Bearer {creds.token}",
+        "Content-Type":  "application/json",
+        "Accept":        "application/json",
+    }
 
     async with httpx.AsyncClient(timeout=30) as c:
         r = await c.post(
@@ -559,63 +541,136 @@ async def community_post(body: CommunityPostRequest, sb=Depends(get_sb)):
             json=payload,
         )
         d = r.json()
+        print(f"[Community Post] Status: {r.status_code}, Response: {d}")
+
+    if r.status_code == 403:
+        raise HTTPException(403,
+            "Community posts require 500+ subscribers on your channel. "
+            f"Current subs: check your YouTube Studio. Error: {d.get('error', {}).get('message', 'Permission denied')}"
+        )
 
     if "error" in d:
-        raise HTTPException(400,
-            f"Community post error: {d['error']['message']}. "
-            "Community posts require 500+ subscribers."
-        )
+        raise HTTPException(400, f"Community post error: {d['error']['message']}")
 
     return {
         "success": True,
         "post_id": d.get("id"),
-        "message": "Community post published!"
+        "message": "Community post published! ✅"
     }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 9. COMMENTS (INBOX)
+# 10. GET COMMENTS with video analytics
 # ─────────────────────────────────────────────────────────────────────────────
 @router.get("/comments/{user_id}")
-async def get_comments(user_id: str, max_results: int = 30, sb=Depends(get_sb)):
-    """Recent comments across all channel videos."""
+async def get_comments(user_id: str, video_id: Optional[str] = None, max_results: int = 30, sb=Depends(get_sb)):
+    """
+    Returns comments. If video_id provided, returns comments for that video.
+    Otherwise returns all recent comments across channel.
+    """
     creds = get_credentials(user_id, sb)
     yt    = build("youtube", "v3", credentials=creds)
 
-    threads_r = yt.commentThreads().list(
-        part="snippet,replies",
-        allThreadsRelatedToChannelId=True,
-        maxResults=max_results,
-        order="time"
-    ).execute()
+    if video_id:
+        # Comments for specific video
+        threads_r = yt.commentThreads().list(
+            part="snippet,replies",
+            videoId=video_id,
+            maxResults=max_results,
+            order="time"
+        ).execute()
+    else:
+        # All channel comments
+        threads_r = yt.commentThreads().list(
+            part="snippet,replies",
+            allThreadsRelatedToChannelId=True,
+            maxResults=max_results,
+            order="time"
+        ).execute()
 
     comments = []
     for thread in threads_r.get("items", []):
         top = thread["snippet"]["topLevelComment"]["snippet"]
+        replies_list = []
+        for reply in thread.get("replies", {}).get("comments", []):
+            replies_list.append({
+                "id":           reply["id"],
+                "author":       reply["snippet"]["authorDisplayName"],
+                "author_pic":   reply["snippet"].get("authorProfileImageUrl", ""),
+                "text":         reply["snippet"]["textDisplay"],
+                "likes":        reply["snippet"].get("likeCount", 0),
+                "published_at": reply["snippet"]["publishedAt"],
+            })
+
         comments.append({
-            "id":          thread["id"],
-            "video_id":    thread["snippet"]["videoId"],
-            "author":      top["authorDisplayName"],
-            "author_pic":  top.get("authorProfileImageUrl", ""),
-            "text":        top["textDisplay"],
-            "likes":       top.get("likeCount", 0),
-            "published_at":top["publishedAt"],
-            "reply_count": thread["snippet"]["totalReplyCount"],
-            "replies": [
-                {
-                    "author":       r["snippet"]["authorDisplayName"],
-                    "text":         r["snippet"]["textDisplay"],
-                    "published_at": r["snippet"]["publishedAt"],
-                }
-                for r in thread.get("replies", {}).get("comments", [])
-            ]
+            "id":           thread["id"],
+            "video_id":     thread["snippet"]["videoId"],
+            "author":       top["authorDisplayName"],
+            "author_pic":   top.get("authorProfileImageUrl", ""),
+            "text":         top["textDisplay"],
+            "likes":        top.get("likeCount", 0),
+            "published_at": top["publishedAt"],
+            "reply_count":  thread["snippet"]["totalReplyCount"],
+            "replies":      replies_list,
+            "can_reply":    True,
         })
 
     return {"total": len(comments), "comments": comments}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 10. REPLY TO COMMENT
+# 11. GET SINGLE VIDEO DETAIL (for comment page analytics)
+# ─────────────────────────────────────────────────────────────────────────────
+@router.get("/video-detail/{user_id}/{video_id}")
+async def get_video_detail(user_id: str, video_id: str, sb=Depends(get_sb)):
+    """Returns full video details + stats for the comment/analytics view."""
+    creds = get_credentials(user_id, sb)
+    yt    = build("youtube", "v3", credentials=creds)
+
+    r = yt.videos().list(
+        part="snippet,statistics,status,contentDetails",
+        id=video_id
+    ).execute()
+
+    if not r.get("items"):
+        raise HTTPException(404, "Video not found.")
+
+    v  = r["items"][0]
+    vs = v.get("statistics", {})
+    sn = v["snippet"]
+
+    # Parse duration PT4M30S → 4:30
+    dur_raw = v["contentDetails"].get("duration", "PT0S")
+    try:
+        import re
+        m = re.match(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?', dur_raw)
+        h, mn, s = (int(m.group(i) or 0) for i in (1, 2, 3))
+        duration = f"{h}:{mn:02d}:{s:02d}" if h else f"{mn}:{s:02d}"
+    except Exception:
+        duration = dur_raw
+
+    return {
+        "id":           video_id,
+        "title":        sn["title"],
+        "description":  sn.get("description", ""),
+        "thumbnail":    sn["thumbnails"].get("maxres", sn["thumbnails"].get("high", {})).get("url", ""),
+        "published_at": sn["publishedAt"],
+        "status":       v["status"]["privacyStatus"],
+        "duration":     duration,
+        "url":          f"https://youtube.com/watch?v={video_id}",
+        "tags":         sn.get("tags", []),
+        "category_id":  sn.get("categoryId", ""),
+        "stats": {
+            "views":    int(vs.get("viewCount", 0)),
+            "likes":    int(vs.get("likeCount", 0)),
+            "comments": int(vs.get("commentCount", 0)),
+            "favorites":int(vs.get("favoriteCount", 0)),
+        }
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 12. REPLY TO COMMENT
 # ─────────────────────────────────────────────────────────────────────────────
 class ReplyRequest(BaseModel):
     user_id:    str
@@ -624,57 +679,10 @@ class ReplyRequest(BaseModel):
 
 @router.post("/reply-comment")
 async def reply_comment(body: ReplyRequest, sb=Depends(get_sb)):
-    """Reply to a YouTube comment."""
     creds = get_credentials(body.user_id, sb)
     yt    = build("youtube", "v3", credentials=creds)
-
     r = yt.comments().insert(
         part="snippet",
-        body={
-            "snippet": {
-                "parentId":     body.comment_id,
-                "textOriginal": body.text,
-            }
-        }
+        body={"snippet": {"parentId": body.comment_id, "textOriginal": body.text}}
     ).execute()
-
     return {"success": True, "reply_id": r["id"]}
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 11. UPDATE VIDEO
-# ─────────────────────────────────────────────────────────────────────────────
-class UpdateVideoRequest(BaseModel):
-    user_id:     str
-    video_id:    str
-    title:       Optional[str] = None
-    description: Optional[str] = None
-    privacy:     Optional[str] = None
-
-@router.put("/update-video")
-async def update_video(body: UpdateVideoRequest, sb=Depends(get_sb)):
-    """Update video title, description, or privacy status."""
-    creds = get_credentials(body.user_id, sb)
-    yt    = build("youtube", "v3", credentials=creds)
-
-    current = yt.videos().list(
-        part="snippet,status",
-        id=body.video_id
-    ).execute()
-
-    if not current.get("items"):
-        raise HTTPException(404, "Video not found.")
-
-    snippet = current["items"][0]["snippet"]
-    status  = current["items"][0]["status"]
-
-    if body.title:       snippet["title"]       = body.title
-    if body.description: snippet["description"] = body.description
-    if body.privacy:     status["privacyStatus"] = body.privacy
-
-    yt.videos().update(
-        part="snippet,status",
-        body={"id": body.video_id, "snippet": snippet, "status": status}
-    ).execute()
-
-    return {"success": True, "message": "Video updated!"}
