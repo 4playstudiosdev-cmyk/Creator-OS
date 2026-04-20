@@ -84,29 +84,58 @@ export default function SettingsPage() {
         setActiveTab('social')
         window.history.replaceState({}, '', '/settings')
       }
+
+      // LinkedIn connected via new /api/linkedin/callback
+      if (searchParams.get('linkedin_connected') === 'true') {
+        setLinkedinConnected(true)
+        setMessage({ type: 'success', text: 'LinkedIn connected successfully! ✅' })
+        setActiveTab('social')
+        window.history.replaceState({}, '', '/settings')
+      }
+      const liErr = searchParams.get('linkedin_error')
+      if (liErr) {
+        setMessage({ type: 'error', text: `LinkedIn connect failed: ${liErr}` })
+        setActiveTab('social')
+        window.history.replaceState({}, '', '/settings')
+      }
     })
   }, [])
 
   // ── Check connections ─────────────────────────────────────────────────────
   const checkConnections = async (uid) => {
     setTwitterConnected(!!localStorage.getItem('twitter_token'))
-    setLinkedinConnected(!!localStorage.getItem('linkedin_token'))
 
-    // NEW — check YouTube via /api/youtube/status/:user_id
+    // Check YouTube via new endpoint
     try {
       const r = await fetch(`${BACKEND}/api/youtube/status/${uid}`)
       const d = await r.json()
       setYtConnected(d.connected === true)
       if (d.connected && d.channel_name) {
         setYoutubeStats({
-          channel_name:  d.channel_name,
-          subscribers:   d.subscribers || '0',
-          total_views:   '—',
-          total_videos:  '—',
+          channel_name: d.channel_name,
+          subscribers:  d.subscribers || '0',
+          total_views:  '—',
+          total_videos: '—',
         })
       }
     } catch {
       setYtConnected(false)
+    }
+
+    // Check LinkedIn via new endpoint
+    try {
+      const r = await fetch(`${BACKEND}/api/linkedin/status/${uid}`)
+      const d = await r.json()
+      setLinkedinConnected(d.connected === true)
+      if (d.connected) {
+        setLinkedinStats({
+          name:    d.name,
+          email:   d.email,
+          picture: d.picture,
+        })
+      }
+    } catch {
+      setLinkedinConnected(false)
     }
   }
 
@@ -180,15 +209,22 @@ export default function SettingsPage() {
   }
 
   const handleConnectLinkedIn = async () => {
-   window.location.href = `${BACKEND}/api/linkedin/auth?user_id=${userId}`
+    const r = await fetch(`${BACKEND}/api/social/linkedin/auth`)
+    const d = await r.json()
+    if (d.url) window.location.href = d.url
   }
 
   // NEW — YouTube connect using /api/youtube/auth with user_id
   const handleConnectYouTube = () => {
     if (!userId) return
     setYtConnecting(true)
-    // Direct redirect — PKCE handled by backend
     window.location.href = `${BACKEND}/api/youtube/auth?user_id=${userId}`
+  }
+
+  // NEW — LinkedIn connect using /api/linkedin/auth with user_id
+  const handleConnectLinkedIn = () => {
+    if (!userId) return
+    window.location.href = `${BACKEND}/api/linkedin/auth?user_id=${userId}`
   }
 
   const handleDisconnectYouTube = async () => {
@@ -198,6 +234,16 @@ export default function SettingsPage() {
       setYtConnected(false)
       setYoutubeStats(null)
       setMessage({ type: 'success', text: 'YouTube disconnected.' })
+    }
+  }
+
+  const handleDisconnectLinkedIn = async () => {
+    if (!userId) return
+    if (window.confirm('Disconnect LinkedIn?')) {
+      await fetch(`${BACKEND}/api/linkedin/disconnect/${userId}`, { method: 'DELETE' })
+      setLinkedinConnected(false)
+      setLinkedinStats(null)
+      setMessage({ type: 'success', text: 'LinkedIn disconnected.' })
     }
   }
 
@@ -404,21 +450,27 @@ export default function SettingsPage() {
 
           {/* LinkedIn */}
           <PlatformCard
-            name="LinkedIn" description="Post updates and fetch profile"
+            name="LinkedIn" description="Post updates, manage comments, grow network"
             icon={<span style={{ color: '#fff', fontSize: 15, fontWeight: 900 }}>in</span>}
             iconBg="#0a66c2" accent="#0a66c2" accentRgb="10,102,194"
             connected={linkedinConnected}
-            connectedLabel={linkedinStats ? `${linkedinStats.name} · ${linkedinStats.email}` : 'Connected'}
+            connectedLabel={linkedinStats ? `${linkedinStats.name}${linkedinStats.email ? ' · ' + linkedinStats.email : ''}` : 'LinkedIn Connected ✅'}
             onConnect={handleConnectLinkedIn}
-            onDisconnect={() => handleDisconnect('linkedin')}
+            onDisconnect={handleDisconnectLinkedIn}
           >
             {linkedinConnected && linkedinStats && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(10,102,194,0.15)', borderRadius: 12 }}>
                 {linkedinStats.picture && <img src={linkedinStats.picture} alt="" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover' }} />}
                 <div>
                   <p style={{ fontWeight: 700, fontSize: 13, color: '#f0f0f5' }}>{linkedinStats.name}</p>
                   <p style={{ fontSize: 11, color: '#4b5563' }}>{linkedinStats.email}</p>
                 </div>
+              </div>
+            )}
+            {linkedinConnected && (
+              <div style={{ display: 'flex', gap: 7, marginTop: 10 }}>
+                <span style={{ fontSize: 10, padding: '3px 10px', background: 'rgba(10,102,194,0.1)', border: '1px solid rgba(10,102,194,0.25)', color: '#60A5FA', borderRadius: 100, fontWeight: 700 }}>✍️ Post Ready</span>
+                <span style={{ fontSize: 10, padding: '3px 10px', background: 'rgba(0,229,160,0.1)', border: '1px solid rgba(0,229,160,0.25)', color: '#00E5A0', borderRadius: 100, fontWeight: 700 }}>💬 Comments Ready</span>
               </div>
             )}
           </PlatformCard>

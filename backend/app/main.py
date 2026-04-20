@@ -4,14 +4,14 @@ from dotenv import load_dotenv
 from app.api import posts, media_kit, ai, deals, social, captions, clipping
 from app.api.scheduler import start_scheduler
 from app.api.youtube import router as youtube_router
-from app.instagram import router as instagram_router
 from app.api.linkedin import router as linkedin_router
+from app.instagram import router as instagram_router
 
 load_dotenv()
 
 app = FastAPI()
 
-# ── CORS — Local + Vercel + Railway ──────────────────────────────────────────
+# ── CORS ──────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -28,15 +28,15 @@ app.add_middleware(
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(instagram_router)
-app.include_router(youtube_router)                          # new YouTube — /api/youtube/...
+app.include_router(youtube_router)
+app.include_router(linkedin_router)
 app.include_router(posts.router,     prefix="/api/posts")
 app.include_router(media_kit.router, prefix="/api/media-kit")
 app.include_router(ai.router,        prefix="/api/ai")
 app.include_router(deals.router,     prefix="/api/deals")
-app.include_router(social.router,    prefix="/api/social")  # Twitter + LinkedIn only
+app.include_router(social.router,    prefix="/api/social")
 app.include_router(captions.router,  prefix="/api/captions")
 app.include_router(clipping.router,  prefix="/api/clipping")
-app.include_router(linkedin_router)
 
 
 @app.on_event("startup")
