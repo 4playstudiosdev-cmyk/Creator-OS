@@ -37,9 +37,10 @@ export default function SettingsPage() {
   const [twitterConnected,  setTwitterConnected]  = useState(false)
   const [ytConnected,       setYtConnected]       = useState(false)
   const [linkedinConnected, setLinkedinConnected] = useState(false)
-  const [twitterStats,      setTwitterStats]      = useState(null)
+  const [igConnected,       setIgConnected]       = useState(false)
   const [youtubeStats,      setYoutubeStats]      = useState(null)
   const [linkedinStats,     setLinkedinStats]     = useState(null)
+  const [igStats,           setIgStats]           = useState(null)
   const [loadingStats,      setLoadingStats]      = useState(false)
   const [ytConnecting,      setYtConnecting]      = useState(false)
   const [userId,            setUserId]            = useState(null)
@@ -52,130 +53,97 @@ export default function SettingsPage() {
       fetchProfile(uid)
       checkConnections(uid)
 
-      // Handle OAuth redirects
-      const connected = searchParams.get('connected')
-      const ytConn    = searchParams.get('yt_connected')
-      const error     = searchParams.get('error')
-      const ytErr     = searchParams.get('yt_error')
+      // Handle all OAuth redirects
+      const params = searchParams
 
-      if (connected) {
-        setMessage({ type: 'success', text: `${connected} connected successfully!` })
-        setActiveTab('social')
-      }
-      // YouTube connected via new /api/youtube/callback
-      if (searchParams.get('youtube_connected') === 'true') {
+      // YouTube
+      if (params.get('youtube_connected') === 'true' || params.get('yt_connected')) {
         setYtConnected(true)
-        setMessage({ type: 'success', text: 'YouTube connected successfully! ✅' })
+        setMessage({ type: 'success', text: 'YouTube connected! ✅' })
         setActiveTab('social')
         window.history.replaceState({}, '', '/settings')
       }
-      if (ytConn) {
-        setYtConnected(true)
-        setMessage({ type: 'success', text: 'YouTube connected! Auto Clipping uploads are now enabled.' })
-        setActiveTab('social')
-        window.history.replaceState({}, '', '/settings')
-      }
-      if (error) {
-        setMessage({ type: 'error', text: `Connection failed: ${error}` })
-        setActiveTab('social')
-      }
-      if (ytErr) {
-        setMessage({ type: 'error', text: `YouTube connect failed: ${ytErr}` })
+      if (params.get('yt_error')) {
+        setMessage({ type: 'error', text: `YouTube failed: ${params.get('yt_error')}` })
         setActiveTab('social')
         window.history.replaceState({}, '', '/settings')
       }
 
-      // LinkedIn connected via new /api/linkedin/callback
-      if (searchParams.get('linkedin_connected') === 'true') {
+      // LinkedIn
+      if (params.get('linkedin_connected') === 'true') {
         setLinkedinConnected(true)
-        setMessage({ type: 'success', text: 'LinkedIn connected successfully! ✅' })
+        setMessage({ type: 'success', text: 'LinkedIn connected! ✅' })
         setActiveTab('social')
         window.history.replaceState({}, '', '/settings')
       }
-      const liErr = searchParams.get('linkedin_error')
-      if (liErr) {
-        setMessage({ type: 'error', text: `LinkedIn connect failed: ${liErr}` })
+      if (params.get('linkedin_error')) {
+        setMessage({ type: 'error', text: `LinkedIn failed: ${params.get('linkedin_error')}` })
         setActiveTab('social')
         window.history.replaceState({}, '', '/settings')
+      }
+
+      // Instagram
+      if (params.get('connected') === 'true') {
+        setIgConnected(true)
+        setMessage({ type: 'success', text: 'Instagram connected! ✅' })
+        setActiveTab('social')
+        window.history.replaceState({}, '', '/settings')
+      }
+      if (params.get('error')) {
+        setMessage({ type: 'error', text: `Connection failed: ${params.get('error')}` })
+        setActiveTab('social')
       }
     })
   }, [])
 
-  // ── Check connections ─────────────────────────────────────────────────────
+  // ── Check all connections ──────────────────────────────────────────────────
   const checkConnections = async (uid) => {
     setTwitterConnected(!!localStorage.getItem('twitter_token'))
 
-    // Check YouTube via new endpoint
+    // YouTube
     try {
       const r = await fetch(`${BACKEND}/api/youtube/status/${uid}`)
       const d = await r.json()
       setYtConnected(d.connected === true)
       if (d.connected && d.channel_name) {
-        setYoutubeStats({
-          channel_name: d.channel_name,
-          subscribers:  d.subscribers || '0',
-          total_views:  '—',
-          total_videos: '—',
-        })
+        setYoutubeStats({ channel_name: d.channel_name, subscribers: d.subscribers || '0', total_views: '—', total_videos: '—' })
       }
-    } catch {
-      setYtConnected(false)
-    }
+    } catch { setYtConnected(false) }
 
-    // Check LinkedIn via new endpoint
+    // LinkedIn
     try {
       const r = await fetch(`${BACKEND}/api/linkedin/status/${uid}`)
       const d = await r.json()
       setLinkedinConnected(d.connected === true)
-      if (d.connected) {
-        setLinkedinStats({
-          name:    d.name,
-          email:   d.email,
-          picture: d.picture,
-        })
-      }
-    } catch {
-      setLinkedinConnected(false)
-    }
+      if (d.connected) setLinkedinStats({ name: d.name, email: d.email, picture: d.picture })
+    } catch { setLinkedinConnected(false) }
+
+    // Instagram
+    try {
+      const r = await fetch(`${BACKEND}/api/instagram/status/${uid}`)
+      const d = await r.json()
+      setIgConnected(d.connected === true)
+      if (d.connected) setIgStats({ username: d.username, name: d.name, picture: d.picture })
+    } catch { setIgConnected(false) }
   }
 
-  // ── Load detailed stats ───────────────────────────────────────────────────
+  // ── Load detailed stats ────────────────────────────────────────────────────
   const loadStats = async () => {
     if (!userId) return
     setLoadingStats(true)
-
-    const tToken = localStorage.getItem('twitter_token')
-    const lToken = localStorage.getItem('linkedin_token')
-
     try {
-      // Twitter
-      if (tToken) {
-        const r = await fetch(`${BACKEND}/api/social/twitter/stats?access_token=${tToken}`)
-        const d = await r.json()
-        if (!d.error) setTwitterStats(d)
-      }
-
-      // YouTube — use new endpoint
+      // YouTube analytics
       const ytR = await fetch(`${BACKEND}/api/youtube/analytics/${userId}`)
       const ytD = await ytR.json()
       if (ytD.channel) {
         setYoutubeStats({
-          channel_name:  ytD.channel.name,
-          subscribers:   ytD.channel.subscribers,
-          total_views:   ytD.channel.total_views,
-          total_videos:  ytD.channel.video_count,
+          channel_name: ytD.channel.name,
+          subscribers:  ytD.channel.subscribers,
+          total_views:  ytD.channel.total_views,
+          total_videos: ytD.channel.video_count,
         })
       }
-
-      // LinkedIn
-      if (lToken) {
-        const r = await fetch(`${BACKEND}/api/social/linkedin/stats?access_token=${lToken}`)
-        const d = await r.json()
-        if (!d.error) setLinkedinStats(d)
-      }
-    } catch (e) {
-      console.error('Stats load error:', e)
-    }
+    } catch {}
     setLoadingStats(false)
   }
 
@@ -191,68 +159,61 @@ export default function SettingsPage() {
     const { data: sd } = await supabase.auth.getSession()
     if (!sd.session) return
     const { error } = await supabase.from('profiles').upsert({ ...profile, id: sd.session.user.id })
-    if (error) {
-      setMessage({ type: 'error', text: 'Save failed: ' + error.message })
-    } else {
-      setSaved(true)
-      setTimeout(() => setSaved(false), 3000)
-    }
+    if (error) setMessage({ type: 'error', text: 'Save failed: ' + error.message })
+    else { setSaved(true); setTimeout(() => setSaved(false), 3000) }
     setSaving(false)
   }
 
-  // ── Connect handlers ──────────────────────────────────────────────────────
-  const handleConnectTwitter  = async () => {
+  // ── Connect handlers ───────────────────────────────────────────────────────
+  const handleConnectTwitter = async () => {
     const r = await fetch(`${BACKEND}/api/social/twitter/auth`)
     const d = await r.json()
     if (d.url) window.location.href = d.url
-    else setMessage({ type: 'error', text: 'Twitter: ' + (d.detail || 'Coming soon') })
+    else setMessage({ type: 'error', text: 'Twitter: Coming soon' })
   }
 
-  // NEW — YouTube connect using /api/youtube/auth with user_id
   const handleConnectYouTube = () => {
     if (!userId) return
     setYtConnecting(true)
     window.location.href = `${BACKEND}/api/youtube/auth?user_id=${userId}`
   }
 
-  // NEW — LinkedIn connect using /api/linkedin/auth with user_id
   const handleConnectLinkedIn = () => {
     if (!userId) return
     window.location.href = `${BACKEND}/api/linkedin/auth?user_id=${userId}`
   }
 
-  const handleDisconnectYouTube = async () => {
+  const handleConnectInstagram = () => {
     if (!userId) return
-    if (window.confirm('Disconnect YouTube?')) {
-      await fetch(`${BACKEND}/api/youtube/disconnect/${userId}`, { method: 'DELETE' })
-      setYtConnected(false)
-      setYoutubeStats(null)
-      setMessage({ type: 'success', text: 'YouTube disconnected.' })
-    }
+    window.location.href = `${BACKEND}/api/instagram/auth?user_id=${userId}`
+  }
+
+  // ── Disconnect handlers ────────────────────────────────────────────────────
+  const handleDisconnectYouTube = async () => {
+    if (!userId || !window.confirm('Disconnect YouTube?')) return
+    await fetch(`${BACKEND}/api/youtube/disconnect/${userId}`, { method: 'DELETE' })
+    setYtConnected(false); setYoutubeStats(null)
+    setMessage({ type: 'success', text: 'YouTube disconnected.' })
   }
 
   const handleDisconnectLinkedIn = async () => {
-    if (!userId) return
-    if (window.confirm('Disconnect LinkedIn?')) {
-      await fetch(`${BACKEND}/api/linkedin/disconnect/${userId}`, { method: 'DELETE' })
-      setLinkedinConnected(false)
-      setLinkedinStats(null)
-      setMessage({ type: 'success', text: 'LinkedIn disconnected.' })
-    }
+    if (!userId || !window.confirm('Disconnect LinkedIn?')) return
+    await fetch(`${BACKEND}/api/linkedin/disconnect/${userId}`, { method: 'DELETE' })
+    setLinkedinConnected(false); setLinkedinStats(null)
+    setMessage({ type: 'success', text: 'LinkedIn disconnected.' })
   }
 
-  const handleDisconnect = (platform) => {
-    localStorage.removeItem(`${platform}_token`)
-    localStorage.removeItem(`${platform}_refresh_token`)
-    if (platform === 'twitter')  { setTwitterConnected(false);  setTwitterStats(null)  }
-    if (platform === 'linkedin') { setLinkedinConnected(false); setLinkedinStats(null) }
-    setMessage({ type: 'success', text: `${platform} disconnected.` })
+  const handleDisconnectInstagram = async () => {
+    if (!userId || !window.confirm('Disconnect Instagram?')) return
+    await fetch(`${BACKEND}/api/instagram/disconnect/${userId}`, { method: 'DELETE' })
+    setIgConnected(false); setIgStats(null)
+    setMessage({ type: 'success', text: 'Instagram disconnected.' })
   }
 
   const TABS = [
     { id: 'profile', label: 'Profile',         icon: IC.user },
     { id: 'social',  label: 'Social Accounts', icon: IC.link },
-    { id: 'account', label: 'Account',          icon: IC.gear },
+    { id: 'account', label: 'Account',         icon: IC.gear },
   ]
 
   if (loading) return (
@@ -260,7 +221,7 @@ export default function SettingsPage() {
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <div style={{ textAlign: 'center' }}>
         <div style={{ width: 36, height: 36, border: '3px solid rgba(99,102,241,0.2)', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin .8s linear infinite', margin: '0 auto 10px' }} />
-        <p style={{ color: '#374151', fontSize: 13, fontFamily: "'DM Sans',sans-serif" }}>Loading settings…</p>
+        <p style={{ color: '#374151', fontSize: 13 }}>Loading settings…</p>
       </div>
     </div>
   )
@@ -294,8 +255,7 @@ export default function SettingsPage() {
         <div style={{ padding: '12px 16px', borderRadius: 12, marginBottom: 20, fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10,
           background: message.type === 'success' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
           border: `1px solid ${message.type === 'success' ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
-          color: message.type === 'success' ? '#6ee7b7' : '#f87171',
-        }}>
+          color: message.type === 'success' ? '#6ee7b7' : '#f87171' }}>
           <Ico d={message.type === 'success' ? IC.check : IC.warn} s={14} c={message.type === 'success' ? '#6ee7b7' : '#f87171'} />
           {message.text}
           <button className="st-btn" onClick={() => setMessage(null)} style={{ marginLeft: 'auto', background: 'none', color: 'inherit', fontSize: 16, padding: 0 }}>×</button>
@@ -310,15 +270,14 @@ export default function SettingsPage() {
             style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: activeTab === t.id ? 700 : 400,
               background: activeTab === t.id ? 'rgba(99,102,241,0.2)' : 'transparent',
               color: activeTab === t.id ? '#a5b4fc' : '#6b7280',
-              border: `1px solid ${activeTab === t.id ? 'rgba(99,102,241,0.35)' : 'transparent'}`,
-            }}>
+              border: `1px solid ${activeTab === t.id ? 'rgba(99,102,241,0.35)' : 'transparent'}` }}>
             <Ico d={t.icon} s={13} c={activeTab === t.id ? '#a5b4fc' : '#4b5563'} />
             {t.label}
           </button>
         ))}
       </div>
 
-      {/* ── PROFILE TAB ──────────────────────────────────────────────── */}
+      {/* ── PROFILE TAB ── */}
       {activeTab === 'profile' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ ...CARD, padding: 24 }}>
@@ -326,10 +285,7 @@ export default function SettingsPage() {
               <Ico d={IC.user} s={15} c="#6366f1" /> Basic Info
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-              {[
-                { key: 'full_name', label: 'Full Name', ph: 'Your display name' },
-                { key: 'username',  label: 'Username',  ph: '@yourhandle'       },
-              ].map(f => (
+              {[{ key: 'full_name', label: 'Full Name', ph: 'Your display name' }, { key: 'username', label: 'Username', ph: '@yourhandle' }].map(f => (
                 <div key={f.key}>
                   <label style={{ fontSize: 11, fontWeight: 700, color: '#4b5563', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>{f.label}</label>
                   <input className="st-inp" type="text" value={profile[f.key] || ''} placeholder={f.ph}
@@ -355,10 +311,10 @@ export default function SettingsPage() {
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               {[
-                { key: 'twitter',   label: 'Twitter / X', ph: '@username'              },
-                { key: 'linkedin',  label: 'LinkedIn',    ph: 'linkedin.com/in/handle' },
-                { key: 'youtube',   label: 'YouTube',     ph: 'youtube.com/@channel'   },
-                { key: 'instagram', label: 'Instagram',   ph: '@username'              },
+                { key: 'twitter', label: 'Twitter / X', ph: '@username' },
+                { key: 'linkedin', label: 'LinkedIn', ph: 'linkedin.com/in/handle' },
+                { key: 'youtube', label: 'YouTube', ph: 'youtube.com/@channel' },
+                { key: 'instagram', label: 'Instagram', ph: '@username' },
               ].map(f => (
                 <div key={f.key}>
                   <label style={{ fontSize: 11, fontWeight: 700, color: '#4b5563', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>{f.label}</label>
@@ -375,10 +331,8 @@ export default function SettingsPage() {
                 background: saved ? 'rgba(16,185,129,0.15)' : 'linear-gradient(135deg,#6366f1,#8b5cf6)',
                 border: saved ? '1px solid rgba(16,185,129,0.3)' : 'none',
                 color: saved ? '#6ee7b7' : '#fff',
-                boxShadow: saved ? 'none' : '0 4px 16px rgba(99,102,241,0.35)',
-              }}>
-              {saving
-                ? <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />Saving…</>
+                boxShadow: saved ? 'none' : '0 4px 16px rgba(99,102,241,0.35)' }}>
+              {saving ? <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />Saving…</>
                 : saved ? <><Ico d={IC.check} s={14} c="#6ee7b7" />Saved!</>
                 : <><Ico d={IC.save} s={14} c="#fff" />Save Profile</>}
             </button>
@@ -386,32 +340,30 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* ── SOCIAL ACCOUNTS TAB ──────────────────────────────────────── */}
+      {/* ── SOCIAL ACCOUNTS TAB ── */}
       {activeTab === 'social' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-          {/* Twitter */}
+          {/* Twitter — Coming Soon */}
           <PlatformCard
             name="Twitter / X" description="Post tweets and fetch analytics"
             icon={<span style={{ color: '#fff', fontSize: 16, fontWeight: 900 }}>𝕏</span>}
             iconBg="#000" accent="#1d9bf0" accentRgb="29,155,240"
             connected={twitterConnected}
-            connectedLabel={twitterStats ? `@${twitterStats.username} · ${Number(twitterStats.followers).toLocaleString()} followers` : 'Connected'}
+            connectedLabel="Connected"
             onConnect={handleConnectTwitter}
-            onDisconnect={() => handleDisconnect('twitter')}
+            onDisconnect={() => {}}
             connectLabel="Coming Soon"
             connectDisabled={true}
           />
 
-          {/* YouTube — NEW connect handler */}
+          {/* YouTube ✅ */}
           <PlatformCard
             name="YouTube" description="Upload videos, schedule, analytics & comments"
             icon={<span style={{ color: '#fff', fontSize: 18 }}>▶</span>}
             iconBg="#ef4444" accent="#ef4444" accentRgb="239,68,68"
             connected={ytConnected}
-            connectedLabel={youtubeStats
-              ? `${youtubeStats.channel_name} · ${Number(youtubeStats.subscribers || 0).toLocaleString()} subs`
-              : 'YouTube Connected ✅'}
+            connectedLabel={youtubeStats ? `${youtubeStats.channel_name} · ${Number(youtubeStats.subscribers || 0).toLocaleString()} subs` : 'YouTube Connected ✅'}
             onConnect={handleConnectYouTube}
             onDisconnect={handleDisconnectYouTube}
             connectLabel={ytConnecting ? 'Connecting…' : 'Connect YouTube'}
@@ -429,20 +381,14 @@ export default function SettingsPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginTop: 14 }}>
                 {[
                   { label: 'Subscribers', value: Number(youtubeStats.subscribers || 0).toLocaleString() },
-                  { label: 'Total Views',  value: Number(youtubeStats.total_views  || 0).toLocaleString() },
-                  { label: 'Videos',       value: Number(youtubeStats.total_videos  || 0).toLocaleString() },
+                  { label: 'Total Views', value: Number(youtubeStats.total_views || 0).toLocaleString() },
+                  { label: 'Videos', value: Number(youtubeStats.total_videos || 0).toLocaleString() },
                 ].map((s, i) => <StatBox key={i} label={s.label} value={s.value} accent="#ef4444" />)}
-              </div>
-            )}
-            {ytConnected && loadingStats && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
-                <div style={{ width: 14, height: 14, border: '2px solid rgba(239,68,68,0.2)', borderTopColor: '#ef4444', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />
-                <span style={{ fontSize: 12, color: '#374151' }}>Loading stats…</span>
               </div>
             )}
           </PlatformCard>
 
-          {/* LinkedIn */}
+          {/* LinkedIn ✅ */}
           <PlatformCard
             name="LinkedIn" description="Post updates, manage comments, grow network"
             icon={<span style={{ color: '#fff', fontSize: 15, fontWeight: 900 }}>in</span>}
@@ -456,8 +402,8 @@ export default function SettingsPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(10,102,194,0.15)', borderRadius: 12 }}>
                 {linkedinStats.picture && <img src={linkedinStats.picture} alt="" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover' }} />}
                 <div>
-                  <p style={{ fontWeight: 700, fontSize: 13, color: '#f0f0f5' }}>{linkedinStats.name}</p>
-                  <p style={{ fontSize: 11, color: '#4b5563' }}>{linkedinStats.email}</p>
+                  <p style={{ fontWeight: 700, fontSize: 13, color: '#f0f0f5', margin: 0 }}>{linkedinStats.name}</p>
+                  <p style={{ fontSize: 11, color: '#4b5563', margin: 0 }}>{linkedinStats.email}</p>
                 </div>
               </div>
             )}
@@ -469,34 +415,50 @@ export default function SettingsPage() {
             )}
           </PlatformCard>
 
-          {/* Instagram — locked */}
+          {/* Instagram ✅ */}
           <PlatformCard
-            name="Instagram" description="Posts, stories, analytics — coming soon"
+            name="Instagram" description="Post images, stories, comments, analytics"
             icon={<span style={{ color: '#fff', fontSize: 16 }}>📸</span>}
             iconBg="linear-gradient(135deg,#f09433,#dc2743,#bc1888)"
             accent="#E1306C" accentRgb="225,48,108"
-            connected={false}
-            connectedLabel=""
-            onConnect={() => {}}
-            connectLabel="Coming Soon"
-            connectDisabled={true}
-          />
+            connected={igConnected}
+            connectedLabel={igStats ? `@${igStats.username || igStats.name} · Connected ✅` : 'Instagram Connected ✅'}
+            onConnect={handleConnectInstagram}
+            onDisconnect={handleDisconnectInstagram}
+          >
+            {igConnected && igStats && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(225,48,108,0.15)', borderRadius: 12 }}>
+                {igStats.picture && <img src={igStats.picture} alt="" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', border: '2px solid #bc1888' }} />}
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: 13, color: '#f0f0f5', margin: 0 }}>@{igStats.username || igStats.name}</p>
+                  <p style={{ fontSize: 11, color: '#4b5563', margin: 0 }}>Business/Creator Account</p>
+                </div>
+              </div>
+            )}
+            {igConnected && (
+              <div style={{ display: 'flex', gap: 7, marginTop: 10 }}>
+                <span style={{ fontSize: 10, padding: '3px 10px', background: 'rgba(225,48,108,0.1)', border: '1px solid rgba(225,48,108,0.25)', color: '#F9A8D4', borderRadius: 100, fontWeight: 700 }}>📸 Post Ready</span>
+                <span style={{ fontSize: 10, padding: '3px 10px', background: 'rgba(0,229,160,0.1)', border: '1px solid rgba(0,229,160,0.25)', color: '#00E5A0', borderRadius: 100, fontWeight: 700 }}>💬 Comments Ready</span>
+                <span style={{ fontSize: 10, padding: '3px 10px', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60A5FA', borderRadius: 100, fontWeight: 700 }}>📊 Analytics Ready</span>
+              </div>
+            )}
+          </PlatformCard>
 
           <div style={{ padding: '14px 18px', background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.18)', borderRadius: 14 }}>
-            <p style={{ fontSize: 12, color: '#818cf8', lineHeight: 1.7 }}>
-              <span style={{ fontWeight: 700, color: '#a5b4fc' }}>💡 YouTube Studio:</span> After connecting YouTube here, go to <strong style={{ color: '#a5b4fc' }}>YouTube Studio</strong> in the sidebar to upload videos, post to community, view analytics and manage comments.
+            <p style={{ fontSize: 12, color: '#818cf8', lineHeight: 1.7, margin: 0 }}>
+              <span style={{ fontWeight: 700, color: '#a5b4fc' }}>💡 Tip:</span> After connecting, use the platform pages in the sidebar — YouTube Studio, LinkedIn, Instagram — to post, manage comments, and view analytics.
             </p>
           </div>
         </div>
       )}
 
-      {/* ── ACCOUNT TAB ──────────────────────────────────────────────── */}
+      {/* ── ACCOUNT TAB ── */}
       {activeTab === 'account' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ ...CARD, padding: 24 }}>
             <p style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 15, marginBottom: 18 }}>Account Info</p>
             {[
-              { label: 'Plan',         value: <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)', color: '#a5b4fc', borderRadius: 100 }}>Beta</span> },
+              { label: 'Plan', value: <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)', color: '#a5b4fc', borderRadius: 100 }}>Beta</span> },
               { label: 'Member since', value: <span style={{ fontSize: 13, fontWeight: 600, color: '#9ca3af' }}>2025</span> },
             ].map((row, i, arr) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
@@ -522,7 +484,7 @@ export default function SettingsPage() {
   )
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Sub-components ─────────────────────────────────────────────────────────────
 function PlatformCard({ name, description, icon, iconBg, accent, accentRgb, connected, connectedLabel, onConnect, onDisconnect, connectLabel = 'Connect', connectDisabled = false, connectLoading = false, children }) {
   return (
     <div className="plat-card" style={{ background: connected ? `rgba(${accentRgb},0.05)` : 'rgba(255,255,255,0.02)', border: `1px solid ${connected ? `rgba(${accentRgb},0.25)` : 'rgba(255,255,255,0.07)'}`, borderRadius: 18, padding: 22, transition: 'all .2s' }}>
@@ -547,7 +509,10 @@ function PlatformCard({ name, description, icon, iconBg, accent, accentRgb, conn
             </>
           ) : (
             <button className="st-btn" onClick={onConnect} disabled={connectDisabled}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', background: connectDisabled ? 'rgba(255,255,255,0.04)' : `rgba(${accentRgb},0.15)`, border: `1px solid ${connectDisabled ? 'rgba(255,255,255,0.08)' : `rgba(${accentRgb},0.35)`}`, color: connectDisabled ? '#4b5563' : accent, borderRadius: 12, fontSize: 13, fontWeight: 700 }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px',
+                background: connectDisabled ? 'rgba(255,255,255,0.04)' : `rgba(${accentRgb},0.15)`,
+                border: `1px solid ${connectDisabled ? 'rgba(255,255,255,0.08)' : `rgba(${accentRgb},0.35)`}`,
+                color: connectDisabled ? '#4b5563' : accent, borderRadius: 12, fontSize: 13, fontWeight: 700 }}>
               {connectLoading && <div style={{ width: 12, height: 12, border: `2px solid rgba(${accentRgb},0.3)`, borderTopColor: accent, borderRadius: '50%', animation: 'spin .8s linear infinite' }} />}
               {connectLabel}
             </button>
@@ -562,8 +527,8 @@ function PlatformCard({ name, description, icon, iconBg, accent, accentRgb, conn
 function StatBox({ label, value, accent = '#6366f1' }) {
   return (
     <div style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, textAlign: 'center' }}>
-      <p style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 18, color: '#f0f0f5' }}>{value}</p>
-      <p style={{ fontSize: 11, color: '#374151', marginTop: 3 }}>{label}</p>
+      <p style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 18, color: '#f0f0f5', margin: 0 }}>{value}</p>
+      <p style={{ fontSize: 11, color: '#374151', marginTop: 3, margin: 0 }}>{label}</p>
     </div>
   )
 }
