@@ -363,69 +363,92 @@ function UploadTab({ userId }) {
 // COMMUNITY TAB
 // ─────────────────────────────────────────────────────────────────────────────
 function CommunityTab({ userId }) {
-  const [text,     setText]     = useState('')
-  const [imageUrl, setImageUrl] = useState('')
-  const [state,    setState]    = useState('idle')
-  const [msg,      setMsg]      = useState('')
+  const [text, setText] = useState('')
+  const [copied, setCopied] = useState(false)
 
-  const handlePost = async () => {
-    if (!text.trim()) { setMsg('Write something.'); setState('error'); return }
-    setState('loading'); setMsg('')
-    try {
-      const r = await fetch(`${API}/api/youtube/community-post`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, text, image_url: imageUrl || undefined }),
-      })
-      const d = await r.json()
-      if (!r.ok) throw new Error(d.detail || 'Failed to post.')
-      setState('success')
-    } catch (e) { setState('error'); setMsg(e.message) }
+  const copyText = () => {
+    if (!text.trim()) return
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const openYouTubeStudio = () => {
+    window.open('https://studio.youtube.com', '_blank')
   }
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16, alignItems: 'start' }}>
       <div style={card}>
-        <h3 style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: '#fff', margin: '0 0 18px' }}>Community Post</h3>
+        <h3 style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: '#fff', margin: '0 0 8px' }}>
+          Community Post
+        </h3>
 
-        {state === 'success' ? (
-          <div style={{ textAlign: 'center', padding: '28px 0' }}>
-            <CheckCircle size={44} color="#00E5A0" style={{ display: 'block', margin: '0 auto 14px' }} />
-            <p style={{ color: '#00E5A0', fontWeight: 700, fontSize: 15 }}>Community Post Published! 🎉</p>
-            <button onClick={() => { setState('idle'); setMsg(''); setText(''); setImageUrl('') }}
-              style={{ display: 'block', margin: '16px auto 0', padding: '9px 20px', background: 'none', border: '1px solid rgba(0,229,160,0.2)', borderRadius: 8, color: '#9DC4B0', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
-              Post Again
-            </button>
-          </div>
-        ) : (
-          <>
-            <div style={{ marginBottom: 14 }}>
-              <label style={lbl}>Post Text <span style={{ float: 'right', fontWeight: 400, color: text.length > 2800 ? '#F87171' : '#4A6357' }}>{text.length}/3000</span></label>
-              <textarea style={{ ...ta, minHeight: 120 }} value={text} onChange={e => setText(e.target.value.slice(0, 3000))}
-                placeholder="Share an update, behind-the-scenes, ask a question..."
-                onFocus={e => e.target.style.borderColor='rgba(255,0,0,0.4)'} onBlur={e => e.target.style.borderColor='rgba(0,229,160,0.12)'} />
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <label style={lbl}><Image size={12} style={{ display: 'inline', marginRight: 4 }} /> Image URL (optional)</label>
-              <input style={inp} value={imageUrl} onChange={e => setImageUrl(e.target.value)}
-                placeholder="https://example.com/image.jpg"
-                onFocus={e => e.target.style.borderColor='rgba(255,0,0,0.4)'} onBlur={e => e.target.style.borderColor='rgba(0,229,160,0.12)'} />
-            </div>
-            {state === 'error' && (
-              <div style={{ display: 'flex', gap: 8, padding: '10px 14px', borderRadius: 10, background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.3)', marginBottom: 12 }}>
-                <AlertCircle size={15} color="#F87171" style={{ flexShrink: 0, marginTop: 1 }} />
-                <span style={{ fontSize: 13, color: '#F87171', lineHeight: 1.5 }}>{msg}</span>
-              </div>
-            )}
-            <button style={redBtn(state === 'loading')} onClick={handlePost} disabled={state === 'loading'}>
-              {state === 'loading' ? 'Posting...' : <><Send size={15} /> Post to Community</>}
-            </button>
-          </>
-        )}
+        {/* Info banner */}
+        <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', marginBottom: 18 }}>
+          <p style={{ fontSize: 12, color: '#FBBF24', lineHeight: 1.7, margin: 0 }}>
+            <strong>ℹ️ Note:</strong> YouTube does not allow third-party apps to post Community Posts via API.
+            Write your post below, copy it, then paste it in YouTube Studio.
+          </p>
+        </div>
+
+        {/* Text composer */}
+        <div style={{ marginBottom: 14 }}>
+          <label style={lbl}>
+            Write Your Post
+            <span style={{ float: 'right', fontWeight: 400, color: text.length > 2800 ? '#F87171' : '#4A6357' }}>{text.length}/3000</span>
+          </label>
+          <textarea style={{ ...ta, minHeight: 140 }} value={text}
+            onChange={e => setText(e.target.value.slice(0, 3000))}
+            placeholder="Write your community post here... Share updates, behind-the-scenes, ask questions"
+            onFocus={e => e.target.style.borderColor='rgba(255,0,0,0.4)'}
+            onBlur={e => e.target.style.borderColor='rgba(0,229,160,0.12)'} />
+        </div>
+
+        {/* Action buttons */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={copyText} disabled={!text.trim()}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px 16px',
+              background: copied ? 'rgba(0,229,160,0.15)' : 'rgba(255,255,255,0.06)',
+              border: `1px solid ${copied ? 'rgba(0,229,160,0.3)' : 'rgba(255,255,255,0.1)'}`,
+              borderRadius: 10, color: copied ? '#00E5A0' : '#9DC4B0',
+              cursor: text.trim() ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              opacity: text.trim() ? 1 : 0.5 }}>
+            {copied ? <><CheckCircle size={14} /> Copied!</> : '📋 Copy Text'}
+          </button>
+          <button onClick={openYouTubeStudio}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px 16px',
+              background: '#FF0000', border: 'none', borderRadius: 10,
+              color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}>
+            <ArrowUpRight size={14} /> Open YouTube Studio
+          </button>
+        </div>
+
+        {/* Steps */}
+        <div style={{ marginTop: 16, padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: '#7A9E8E', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>How to post:</p>
+          {[
+            '1. Write your post above',
+            '2. Click "Copy Text"',
+            '3. Click "Open YouTube Studio"',
+            '4. Go to Create → Community Post → Paste',
+          ].map(s => (
+            <p key={s} style={{ fontSize: 12, color: '#7A9E8E', margin: '0 0 6px', paddingLeft: 8, borderLeft: '2px solid rgba(255,0,0,0.2)' }}>{s}</p>
+          ))}
+        </div>
       </div>
+
       <div style={card}>
         <h4 style={{ fontSize: 13, fontWeight: 700, color: '#fff', margin: '0 0 12px' }}>📢 Community Tips</h4>
-        {['Requires 500+ subscribers to post','Text-only posts perform great','Share behind-the-scenes content','Ask questions to boost engagement','Announce new videos before publishing','Max 3000 characters per post'].map(t => (
+        {[
+          'Requires 500+ subscribers',
+          'Text-only posts perform great',
+          'Share behind-the-scenes content',
+          'Ask questions to boost comments',
+          'Announce videos before upload',
+          'Post 2-3x per week consistently',
+          'Use emojis to grab attention',
+        ].map(t => (
           <p key={t} style={{ fontSize: 12, color: '#7A9E8E', margin: '0 0 7px', paddingLeft: 12, borderLeft: '2px solid rgba(255,0,0,0.2)', lineHeight: 1.5 }}>{t}</p>
         ))}
       </div>
@@ -437,11 +460,14 @@ function CommunityTab({ userId }) {
 // MY VIDEOS TAB — with privacy edit
 // ─────────────────────────────────────────────────────────────────────────────
 function VideosTab({ userId }) {
-  const [videos,        setVideos]        = useState([])
-  const [loading,       setLoading]       = useState(true)
-  const [error,         setError]         = useState(null)
-  const [updatingId,    setUpdatingId]    = useState(null)
-  const [updateMsg,     setUpdateMsg]     = useState({})
+  const [videos,     setVideos]     = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [error,      setError]      = useState(null)
+  const [updatingId, setUpdatingId] = useState(null)
+  const [updateMsg,  setUpdateMsg]  = useState({})
+  const [selected,   setSelected]   = useState(null)  // selected video for analytics
+  const [vidDetail,  setVidDetail]  = useState(null)
+  const [vidLoading, setVidLoading] = useState(false)
 
   useEffect(() => {
     fetch(`${API}/api/youtube/videos/${userId}`)
@@ -450,7 +476,20 @@ function VideosTab({ userId }) {
       .catch(e => { setError(e.message); setLoading(false) })
   }, [userId])
 
-  const updatePrivacy = async (videoId, newPrivacy) => {
+  const selectVideo = async (v) => {
+    setSelected(v)
+    setVidDetail(null)
+    setVidLoading(true)
+    try {
+      const r = await fetch(`${API}/api/youtube/video-detail/${userId}/${v.id}`)
+      const d = await r.json()
+      setVidDetail(d)
+    } catch {}
+    setVidLoading(false)
+  }
+
+  const updatePrivacy = async (videoId, newPrivacy, e) => {
+    e.stopPropagation()
     setUpdatingId(videoId)
     try {
       const r = await fetch(`${API}/api/youtube/update-video`, {
@@ -461,14 +500,11 @@ function VideosTab({ userId }) {
       const d = await r.json()
       if (r.ok) {
         setVideos(prev => prev.map(v => v.id === videoId ? { ...v, status: newPrivacy } : v))
-        setUpdateMsg({ ...updateMsg, [videoId]: '✅ Updated!' })
-        setTimeout(() => setUpdateMsg(m => { const n = {...m}; delete n[videoId]; return n }), 2000)
-      } else {
-        setUpdateMsg({ ...updateMsg, [videoId]: `❌ ${d.detail}` })
+        if (selected?.id === videoId) setSelected(s => ({ ...s, status: newPrivacy }))
+        setUpdateMsg(m => ({ ...m, [videoId]: '✅' }))
+        setTimeout(() => setUpdateMsg(m => { const n={...m}; delete n[videoId]; return n }), 2000)
       }
-    } catch (e) {
-      setUpdateMsg({ ...updateMsg, [videoId]: `❌ ${e.message}` })
-    }
+    } catch {}
     setUpdatingId(null)
   }
 
@@ -478,52 +514,117 @@ function VideosTab({ userId }) {
   const privacyColor = (s) => s === 'public' ? '#00E5A0' : s === 'private' ? '#F87171' : '#FBBF24'
 
   return (
-    <div style={card}>
-      <h3 style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: '#fff', margin: '0 0 16px' }}>
-        My Videos ({videos.length})
-      </h3>
-      {videos.length === 0 && <div style={{ textAlign: 'center', padding: '32px 0', color: '#4A6357' }}>No videos found</div>}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {videos.map(v => (
-          <div key={v.id} style={{ display: 'flex', gap: 14, padding: 14, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(0,229,160,0.06)', transition: 'border-color .15s' }}
-            onMouseEnter={e => e.currentTarget.style.borderColor='rgba(255,0,0,0.2)'}
-            onMouseLeave={e => e.currentTarget.style.borderColor='rgba(0,229,160,0.06)'}>
-            {/* Thumbnail */}
-            {v.thumbnail && <img src={v.thumbnail} alt="" style={{ width: 128, height: 72, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />}
-
-            {/* Info */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <a href={v.url} target="_blank" rel="noopener"
-                style={{ fontSize: 14, fontWeight: 600, color: '#fff', textDecoration: 'none', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 6 }}>
-                {v.title}
-              </a>
-              <div style={{ display: 'flex', gap: 14, fontSize: 12, color: '#7A9E8E', marginBottom: 10 }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Eye size={11} />{fmt(v.views)}</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><ThumbsUp size={11} />{fmt(v.likes)}</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><MessageCircle size={11} />{fmt(v.comments)}</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Clock size={11} />{timeAgo(v.published_at)}</span>
-              </div>
-
-              {/* Privacy selector */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 11, color: '#7A9E8E' }}>Visibility:</span>
-                {['public', 'private', 'unlisted'].map(p => (
-                  <button key={p} onClick={() => updatePrivacy(v.id, p)} disabled={updatingId === v.id || v.status === p}
-                    style={{ padding: '3px 10px', borderRadius: 100, fontSize: 11, fontWeight: 700, cursor: v.status === p || updatingId === v.id ? 'default' : 'pointer', fontFamily: 'inherit', border: 'none',
-                      background: v.status === p ? (p==='public' ? 'rgba(0,229,160,0.15)' : p==='private' ? 'rgba(248,113,113,0.15)' : 'rgba(251,191,36,0.15)') : 'rgba(255,255,255,0.05)',
-                      color: v.status === p ? privacyColor(p) : '#4A6357',
-                      opacity: updatingId === v.id && v.status !== p ? 0.5 : 1,
-                    }}>
-                    {p === 'public' ? '🌐' : p === 'private' ? '🔒' : '🔗'} {p.charAt(0).toUpperCase() + p.slice(1)}
-                  </button>
-                ))}
-                {updatingId === v.id && <span style={{ fontSize: 11, color: '#7A9E8E' }}>Updating...</span>}
-                {updateMsg[v.id] && <span style={{ fontSize: 11, color: updateMsg[v.id].startsWith('✅') ? '#00E5A0' : '#F87171' }}>{updateMsg[v.id]}</span>}
+    <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 1.4fr' : '1fr', gap: 16, alignItems: 'start' }}>
+      {/* Video list */}
+      <div style={card}>
+        <h3 style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: '#fff', margin: '0 0 16px' }}>
+          My Videos ({videos.length})
+          {selected && <button onClick={() => { setSelected(null); setVidDetail(null) }} style={{ float: 'right', fontSize: 11, background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#7A9E8E', padding: '3px 8px', cursor: 'pointer', fontFamily: 'inherit' }}>✕ Close</button>}
+        </h3>
+        {videos.length === 0 && <div style={{ textAlign: 'center', padding: '32px 0', color: '#4A6357' }}>No videos found</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 600, overflowY: 'auto' }}>
+          {videos.map(v => (
+            <div key={v.id} onClick={() => selectVideo(v)}
+              style={{ display: 'flex', gap: 12, padding: 12, borderRadius: 12, background: selected?.id === v.id ? 'rgba(255,0,0,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${selected?.id === v.id ? 'rgba(255,0,0,0.3)' : 'rgba(0,229,160,0.06)'}`, cursor: 'pointer', transition: 'all .15s' }}
+              onMouseEnter={e => { if (selected?.id !== v.id) e.currentTarget.style.borderColor='rgba(255,0,0,0.2)' }}
+              onMouseLeave={e => { if (selected?.id !== v.id) e.currentTarget.style.borderColor='rgba(0,229,160,0.06)' }}>
+              {v.thumbnail && <img src={v.thumbnail} alt="" style={{ width: 112, height: 63, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 5 }}>{v.title}</div>
+                <div style={{ display: 'flex', gap: 10, fontSize: 11, color: '#7A9E8E', marginBottom: 7 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}><Eye size={10} />{fmt(v.views)}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}><ThumbsUp size={10} />{fmt(v.likes)}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}><Clock size={10} />{timeAgo(v.published_at)}</span>
+                </div>
+                {/* Privacy buttons */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                  {['public', 'private', 'unlisted'].map(p => (
+                    <button key={p} onClick={(e) => updatePrivacy(v.id, p, e)} disabled={updatingId === v.id || v.status === p}
+                      style={{ padding: '2px 8px', borderRadius: 100, fontSize: 10, fontWeight: 700, cursor: v.status === p ? 'default' : 'pointer', fontFamily: 'inherit', border: 'none',
+                        background: v.status === p ? (p==='public' ? 'rgba(0,229,160,0.15)' : p==='private' ? 'rgba(248,113,113,0.15)' : 'rgba(251,191,36,0.15)') : 'rgba(255,255,255,0.05)',
+                        color: v.status === p ? privacyColor(p) : '#4A6357' }}>
+                      {p==='public' ? '🌐' : p==='private' ? '🔒' : '🔗'} {p}
+                    </button>
+                  ))}
+                  {updateMsg[v.id] && <span style={{ fontSize: 10, color: '#00E5A0' }}>{updateMsg[v.id]}</span>}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
+
+      {/* Analytics panel */}
+      {selected && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={card}>
+            {vidLoading ? (
+              <div style={{ color: '#4A6357', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                <Loader size={14} style={{ animation: 'sp .7s linear infinite' }} /> Loading analytics...
+              </div>
+            ) : vidDetail ? (
+              <>
+                {/* Video header */}
+                <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                  {vidDetail.thumbnail && <img src={vidDetail.thumbnail} alt="" style={{ width: 140, height: 80, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', lineHeight: 1.4, marginBottom: 6 }}>{vidDetail.title}</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 100, fontWeight: 700,
+                        background: vidDetail.status==='public' ? 'rgba(0,229,160,0.12)' : vidDetail.status==='private' ? 'rgba(248,113,113,0.12)' : 'rgba(251,191,36,0.12)',
+                        color: privacyColor(vidDetail.status) }}>{vidDetail.status}</span>
+                      <span style={{ fontSize: 11, color: '#4A6357' }}>⏱ {vidDetail.duration}</span>
+                      <span style={{ fontSize: 11, color: '#4A6357' }}>{timeAgo(vidDetail.published_at)}</span>
+                    </div>
+                    {/* View on YouTube button */}
+                    <a href={vidDetail.url} target="_blank" rel="noopener"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: '#FF0000', borderRadius: 8, color: '#fff', textDecoration: 'none', fontSize: 12, fontWeight: 700 }}>
+                      <ArrowUpRight size={12} /> View on YouTube
+                    </a>
+                  </div>
+                </div>
+
+                {/* Stats */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 14 }}>
+                  {[
+                    { label: 'Views',    value: fmt(vidDetail.stats.views),    color: '#60A5FA', icon: <Eye size={14}/> },
+                    { label: 'Likes',    value: fmt(vidDetail.stats.likes),    color: '#F87171', icon: <ThumbsUp size={14}/> },
+                    { label: 'Comments', value: fmt(vidDetail.stats.comments), color: '#A78BFA', icon: <MessageCircle size={14}/> },
+                  ].map(s => (
+                    <div key={s.label} style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: 10, textAlign: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, color: s.color, marginBottom: 4 }}>{s.icon}</div>
+                      <div style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 20, fontWeight: 900, color: s.color }}>{s.value}</div>
+                      <div style={{ fontSize: 10, color: '#4A6357' }}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Description preview */}
+                {vidDetail.description && (
+                  <div style={{ marginBottom: 12 }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: '#7A9E8E', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Description</p>
+                    <p style={{ fontSize: 12, color: '#7A9E8E', lineHeight: 1.6, maxHeight: 60, overflow: 'hidden' }}>{vidDetail.description.slice(0, 200)}{vidDetail.description.length > 200 ? '...' : ''}</p>
+                  </div>
+                )}
+
+                {/* Tags */}
+                {vidDetail.tags?.length > 0 && (
+                  <div>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: '#7A9E8E', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Tags</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                      {vidDetail.tags.slice(0, 12).map(t => (
+                        <span key={t} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 100, background: 'rgba(0,229,160,0.06)', border: '1px solid rgba(0,229,160,0.1)', color: '#7A9E8E' }}>#{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{ color: '#4A6357', fontSize: 13 }}>Could not load video details.</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -606,11 +707,12 @@ function InboxTab({ userId }) {
   const [reply,      setReply]      = useState('')
   const [sending,    setSending]    = useState(false)
   const [sent,       setSent]       = useState({})
-  const [videoDetail,setVideoDetail]= useState({})  // videoId → detail
+  const [videoDetail,setVideoDetail]= useState({})
   const [loadingVid, setLoadingVid] = useState(null)
+  const [filter,     setFilter]     = useState('all') // all | responded | unresponded
 
   useEffect(() => {
-    fetch(`${API}/api/youtube/comments/${userId}`)
+    fetch(`${API}/api/youtube/comments/${userId}?max_results=50`)
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
@@ -618,7 +720,6 @@ function InboxTab({ userId }) {
 
   const selectComment = async (c) => {
     setSelected(c); setReply('')
-    // Load video detail if not already loaded
     if (!videoDetail[c.video_id]) {
       setLoadingVid(c.video_id)
       try {
@@ -646,45 +747,74 @@ function InboxTab({ userId }) {
 
   if (loading) return <div style={{ color: '#4A6357', textAlign: 'center', padding: 48 }}>Loading comments...</div>
 
-  const comments = data?.comments || []
+  const allComments = data?.comments || []
+  const responded   = allComments.filter(c => c.reply_count > 0 || sent[c.id])
+  const unresponded = allComments.filter(c => c.reply_count === 0 && !sent[c.id])
+  const displayed   = filter === 'all' ? allComments : filter === 'responded' ? responded : unresponded
+
   const vd = selected ? videoDetail[selected.video_id] : null
+
+  const filterBtn = (key, label, count, color) => (
+    <button onClick={() => setFilter(key)}
+      style={{ padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: 'none',
+        background: filter === key ? `rgba(${color},0.15)` : 'rgba(255,255,255,0.04)',
+        color: filter === key ? `rgb(${color})` : '#4A6357' }}>
+      {label} <span style={{ fontSize: 10, opacity: .7 }}>({count})</span>
+    </button>
+  )
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 16, alignItems: 'start' }}>
-
       {/* Comment list */}
       <div style={card}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <h3 style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: '#fff', margin: 0 }}>Comments</h3>
-          <span style={{ fontSize: 11, color: '#7A9E8E' }}>{comments.length} total</span>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <h3 style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: '#fff', margin: 0 }}>Comments</h3>
+            <span style={{ fontSize: 11, color: '#7A9E8E' }}>{allComments.length} total</span>
+          </div>
+          {/* Filter buttons */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {filterBtn('all',         'All',          allComments.length, '157,180,176')}
+            {filterBtn('unresponded', '🔴 Pending',   unresponded.length, '248,113,113')}
+            {filterBtn('responded',   '✅ Responded', responded.length,   '0,229,160')}
+          </div>
         </div>
+
         <div style={{ maxHeight: 560, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {comments.length === 0 && (
+          {displayed.length === 0 && (
             <div style={{ textAlign: 'center', padding: '32px 0', color: '#4A6357', fontSize: 13 }}>
               <MessageCircle size={28} style={{ display: 'block', margin: '0 auto 10px', opacity: .4 }} />
-              No comments yet
+              No {filter !== 'all' ? filter : ''} comments
             </div>
           )}
-          {comments.map(c => (
+          {displayed.map(c => (
             <div key={c.id} onClick={() => selectComment(c)}
-              style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: selected?.id === c.id ? 'rgba(255,0,0,0.08)' : 'transparent', border: selected?.id === c.id ? '1px solid rgba(255,0,0,0.25)' : '1px solid transparent', transition: 'all .15s' }}>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                {c.author_pic && <img src={c.author_pic} alt="" style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0 }} />}
+              style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                background: selected?.id === c.id ? 'rgba(255,0,0,0.08)' : 'transparent',
+                border: selected?.id === c.id ? '1px solid rgba(255,0,0,0.25)' : '1px solid transparent',
+                transition: 'all .15s' }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {c.author_pic && <img src={c.author_pic} alt="" style={{ width: 26, height: 26, borderRadius: '50%', flexShrink: 0 }} />}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
                     <span style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{c.author}</span>
-                    <span style={{ fontSize: 11, color: '#4A6357' }}>{timeAgo(c.published_at)}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {(c.reply_count > 0 || sent[c.id])
+                        ? <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 100, background: 'rgba(0,229,160,0.1)', color: '#00E5A0', fontWeight: 700 }}>✓ replied</span>
+                        : <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 100, background: 'rgba(248,113,113,0.1)', color: '#F87171', fontWeight: 700 }}>pending</span>}
+                      <span style={{ fontSize: 10, color: '#4A6357' }}>{timeAgo(c.published_at)}</span>
+                    </div>
                   </div>
-                  <div style={{ fontSize: 12, color: '#7A9E8E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>{c.text}</div>
+                  <div style={{ fontSize: 12, color: '#7A9E8E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.text}</div>
+                  {c.likes > 0 && <div style={{ fontSize: 10, color: '#4A6357', marginTop: 2 }}>👍 {c.likes} likes</div>}
                 </div>
               </div>
-              {c.reply_count > 0 && <div style={{ fontSize: 10, color: '#4A6357', marginLeft: 32 }}>{c.reply_count} replies</div>}
             </div>
           ))}
         </div>
       </div>
 
-      {/* Right panel — video detail + comment + reply */}
+      {/* Right panel */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {!selected ? (
           <div style={{ ...card, textAlign: 'center', padding: '48px 20px', color: '#4A6357' }}>
@@ -693,70 +823,64 @@ function InboxTab({ userId }) {
           </div>
         ) : (
           <>
-            {/* Video detail card */}
+            {/* Video detail */}
             <div style={card}>
               {loadingVid === selected.video_id ? (
                 <div style={{ color: '#4A6357', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Loader size={14} style={{ animation: 'sp .7s linear infinite' }} /> Loading video details...
+                  <Loader size={14} style={{ animation: 'sp .7s linear infinite' }} /> Loading video...
                 </div>
               ) : vd ? (
                 <>
                   <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
-                    {vd.thumbnail && <img src={vd.thumbnail} alt="" style={{ width: 140, height: 80, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />}
+                    {vd.thumbnail && <img src={vd.thumbnail} alt="" style={{ width: 130, height: 74, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <a href={vd.url} target="_blank" rel="noopener"
-                        style={{ fontSize: 14, fontWeight: 700, color: '#fff', textDecoration: 'none', display: 'block', marginBottom: 4, lineHeight: 1.4 }}>
-                        {vd.title} <ArrowUpRight size={12} style={{ display: 'inline', opacity: .6 }} />
-                      </a>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 100, background: vd.status==='public' ? 'rgba(0,229,160,0.1)' : vd.status==='private' ? 'rgba(248,113,113,0.1)' : 'rgba(251,191,36,0.1)', color: vd.status==='public' ? '#00E5A0' : vd.status==='private' ? '#F87171' : '#FBBF24', fontWeight: 700 }}>
-                          {vd.status}
-                        </span>
-                        <span style={{ fontSize: 11, color: '#4A6357' }}>⏱ {vd.duration}</span>
-                        <span style={{ fontSize: 11, color: '#4A6357' }}>{timeAgo(vd.published_at)}</span>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.4, marginBottom: 6 }}>{vd.title}</div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                        <span style={{ fontSize: 10, color: '#4A6357' }}>⏱ {vd.duration}</span>
+                        <span style={{ fontSize: 10, color: '#4A6357' }}>{timeAgo(vd.published_at)}</span>
                       </div>
+                      <a href={vd.url} target="_blank" rel="noopener"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: '#FF0000', borderRadius: 7, color: '#fff', textDecoration: 'none', fontSize: 11, fontWeight: 700 }}>
+                        <ArrowUpRight size={11} /> View on YouTube
+                      </a>
                     </div>
                   </div>
-
-                  {/* Stats row */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: vd.tags?.length ? 12 : 0 }}>
+                  {/* Stats */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
                     {[
                       { label: 'Views',    value: fmt(vd.stats.views),    color: '#60A5FA', icon: <Eye size={13}/> },
                       { label: 'Likes',    value: fmt(vd.stats.likes),    color: '#F87171', icon: <ThumbsUp size={13}/> },
                       { label: 'Comments', value: fmt(vd.stats.comments), color: '#A78BFA', icon: <MessageCircle size={13}/> },
                     ].map(s => (
                       <div key={s.label} style={{ padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: 10, textAlign: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, color: s.color, marginBottom: 4 }}>{s.icon}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, color: s.color, marginBottom: 3 }}>{s.icon}</div>
                         <div style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 18, fontWeight: 900, color: s.color }}>{s.value}</div>
                         <div style={{ fontSize: 10, color: '#4A6357' }}>{s.label}</div>
                       </div>
                     ))}
                   </div>
-
                   {/* Tags */}
                   {vd.tags?.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                       {vd.tags.slice(0, 8).map(t => (
-                        <span key={t} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 100, background: 'rgba(0,229,160,0.06)', border: '1px solid rgba(0,229,160,0.1)', color: '#7A9E8E' }}>#{t}</span>
+                        <span key={t} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 100, background: 'rgba(0,229,160,0.06)', border: '1px solid rgba(0,229,160,0.1)', color: '#7A9E8E' }}>#{t}</span>
                       ))}
                     </div>
                   )}
                 </>
               ) : (
                 <a href={`https://youtube.com/watch?v=${selected.video_id}`} target="_blank" rel="noopener"
-                  style={{ fontSize: 13, color: '#60A5FA', textDecoration: 'none' }}>
-                  View video on YouTube →
-                </a>
+                  style={{ fontSize: 13, color: '#60A5FA', textDecoration: 'none' }}>View video on YouTube →</a>
               )}
             </div>
 
-            {/* Comment + reply */}
+            {/* Comment + Reply */}
             <div style={card}>
               <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
                 {selected.author_pic && <img src={selected.author_pic} alt="" style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0 }} />}
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{selected.author}</div>
-                  <div style={{ fontSize: 11, color: '#4A6357' }}>{timeAgo(selected.published_at)} · {selected.likes} likes</div>
+                  <div style={{ fontSize: 11, color: '#4A6357' }}>{timeAgo(selected.published_at)} · 👍 {selected.likes}</div>
                 </div>
               </div>
               <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(0,229,160,0.08)', borderRadius: 10, padding: '12px 14px', fontSize: 14, color: '#D8EEE5', lineHeight: 1.65, marginBottom: 12 }}>
@@ -769,7 +893,7 @@ function InboxTab({ userId }) {
                   <p style={{ fontSize: 11, color: '#4A6357', marginBottom: 8, fontWeight: 700 }}>REPLIES ({selected.replies.length})</p>
                   {selected.replies.map((r, i) => (
                     <div key={i} style={{ display: 'flex', gap: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', marginBottom: 4 }}>
-                      {r.author_pic && <img src={r.author_pic} alt="" style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0 }} />}
+                      {r.author_pic && <img src={r.author_pic} alt="" style={{ width: 20, height: 20, borderRadius: '50%', flexShrink: 0 }} />}
                       <div>
                         <div style={{ fontSize: 11, fontWeight: 700, color: '#9DC4B0' }}>{r.author}</div>
                         <div style={{ fontSize: 12, color: '#7A9E8E', lineHeight: 1.5 }}>{r.text}</div>
@@ -803,4 +927,4 @@ function InboxTab({ userId }) {
       </div>
     </div>
   )
-}
+} 

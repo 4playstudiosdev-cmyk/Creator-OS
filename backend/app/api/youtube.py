@@ -643,18 +643,18 @@ async def get_comments(user_id: str, video_id: Optional[str] = None, max_results
             try:
                 ch_r     = yt.channels().list(part="contentDetails", mine=True).execute()
                 playlist = ch_r["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
-                pl_r     = yt.playlistItems().list(part="snippet", playlistId=playlist, maxResults=10).execute()
+                pl_r     = yt.playlistItems().list(part="snippet", playlistId=playlist, maxResults=20).execute()
                 video_ids = [i["snippet"]["resourceId"]["videoId"] for i in pl_r.get("items", [])]
             except Exception:
                 return {"total": 0, "comments": [], "error": "Could not fetch videos"}
 
             all_comments = []
-            for vid_id in video_ids[:5]:
+            for vid_id in video_ids[:10]:
                 try:
                     t_r = yt.commentThreads().list(
                         part="snippet,replies",
                         videoId=vid_id,
-                        maxResults=10,
+                        maxResults=20,
                         order="time"
                     ).execute()
                     for thread in t_r.get("items", []):
@@ -686,7 +686,7 @@ async def get_comments(user_id: str, video_id: Optional[str] = None, max_results
 
             # Sort by newest first
             all_comments.sort(key=lambda x: x.get("published_at", ""), reverse=True)
-            return {"total": len(all_comments), "comments": all_comments[:max_results]}
+            return {"total": len(all_comments), "comments": all_comments[:50]}
 
     except Exception as e:
         raise HTTPException(500, f"Comments error: {str(e)[:200]}")
