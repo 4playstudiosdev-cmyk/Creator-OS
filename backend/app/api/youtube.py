@@ -512,20 +512,14 @@ class CommunityPostRequest(BaseModel):
 async def community_post(body: CommunityPostRequest, sb=Depends(get_sb)):
     """
     Post to YouTube Community tab.
-    Uses YouTube Data API v3 via direct httpx call.
-    Requires 500+ subscribers.
+    Uses YouTube v3 API posts endpoint (newer endpoint).
+    Requires channel with community posts enabled (500+ subs usually).
     """
     creds = get_credentials(body.user_id, sb)
 
-    # Refresh token if needed
+    # Refresh if expired
     if creds.expired and creds.refresh_token:
         creds.refresh(GoogleRequest())
-
-    payload = {
-        "snippet": {
-            "text": body.text,
-        }
-    }
 
     headers = {
         "Authorization": f"Bearer {creds.token}",
@@ -533,28 +527,63 @@ async def community_post(body: CommunityPostRequest, sb=Depends(get_sb)):
         "Accept":        "application/json",
     }
 
+    # Try newer posts endpoint first
+    payload = {
+        "snippet": {
+            "text": body.text,
+        }
+    }
+
     async with httpx.AsyncClient(timeout=30) as c:
+        # Try v3 posts endpoint
         r = await c.post(
-            "https://www.googleapis.com/youtube/v3/communityPosts",
+            "https://www.googleapis.com/youtube/v3/posts",
             headers=headers,
             params={"part": "snippet"},
             json=payload,
         )
-        d = r.json()
-        print(f"[Community Post] Status: {r.status_code}, Response: {d}")
 
-    if r.status_code == 403:
-        raise HTTPException(403,
-            "Community posts require 500+ subscribers on your channel. "
-            f"Current subs: check your YouTube Studio. Error: {d.get('error', {}).get('message', 'Permission denied')}"
+        print(f"[Community Post] Status: {r.status_code}")
+        print(f"[Community Post] Body: {r.text[:300]}")
+
+        # Handle empty response
+        if not r.text or r.text.strip() == "":
+            raise HTTPException(503,
+                "YouTube Community Posts API is not available. "
+                "This feature requires: 1) 500+ subscribers, "
+                "2) Community tab enabled on your channel. "
+                "Please post directly from YouTube Studio for now."
+            )
+
+        try:
+            d = r.json()
+        except Exception:
+            raise HTTPException(503,
+                f"YouTube API returned unexpected response (status {r.status_code}). "
+                "Community posts may not be enabled on your channel yet. "
+                "Check: YouTube Studio → Monetization → Community tab."
+            )
+
+    if r.status_code == 404:
+        raise HTTPException(404,
+            "Community Posts endpoint not found. "
+            "Your channel may not have Community tab enabled yet. "
+            "Requirement: 500+ subscribers + channel approved for Community posts."
         )
 
-    if "error" in d:
-        raise HTTPException(400, f"Community post error: {d['error']['message']}")
+    if r.status_code == 403:
+        err_msg = d.get("error", {}).get("message", "Permission denied") if isinstance(d, dict) else "Permission denied"
+        raise HTTPException(403,
+            f"Community posts not allowed: {err_msg}. "
+            "Requires 500+ subscribers and Community tab enabled."
+        )
+
+    if isinstance(d, dict) and "error" in d:
+        raise HTTPException(400, f"YouTube error: {d['error']['message']}")
 
     return {
         "success": True,
-        "post_id": d.get("id"),
+        "post_id": d.get("id") if isinstance(d, dict) else None,
         "message": "Community post published! ✅"
     }
 
@@ -566,56 +595,103 @@ async def community_post(body: CommunityPostRequest, sb=Depends(get_sb)):
 async def get_comments(user_id: str, video_id: Optional[str] = None, max_results: int = 30, sb=Depends(get_sb)):
     """
     Returns comments. If video_id provided, returns comments for that video.
-    Otherwise returns all recent comments across channel.
+    Otherwise fetches recent videos first then gets comments from each.
     """
     creds = get_credentials(user_id, sb)
     yt    = build("youtube", "v3", credentials=creds)
 
-    if video_id:
-        # Comments for specific video
-        threads_r = yt.commentThreads().list(
-            part="snippet,replies",
-            videoId=video_id,
-            maxResults=max_results,
-            order="time"
-        ).execute()
-    else:
-        # All channel comments
-        threads_r = yt.commentThreads().list(
-            part="snippet,replies",
-            allThreadsRelatedToChannelId=True,
-            maxResults=max_results,
-            order="time"
-        ).execute()
+    try:
+        if video_id:
+            # Comments for specific video
+            threads_r = yt.commentThreads().list(
+                part="snippet,replies",
+                videoId=video_id,
+                maxResults=max_results,
+                order="time"
+            ).execute()
 
-    comments = []
-    for thread in threads_r.get("items", []):
-        top = thread["snippet"]["topLevelComment"]["snippet"]
-        replies_list = []
-        for reply in thread.get("replies", {}).get("comments", []):
-            replies_list.append({
-                "id":           reply["id"],
-                "author":       reply["snippet"]["authorDisplayName"],
-                "author_pic":   reply["snippet"].get("authorProfileImageUrl", ""),
-                "text":         reply["snippet"]["textDisplay"],
-                "likes":        reply["snippet"].get("likeCount", 0),
-                "published_at": reply["snippet"]["publishedAt"],
-            })
+            comments = []
+            for thread in threads_r.get("items", []):
+                top = thread["snippet"]["topLevelComment"]["snippet"]
+                replies_list = []
+                for reply in thread.get("replies", {}).get("comments", []):
+                    replies_list.append({
+                        "id":           reply["id"],
+                        "author":       reply["snippet"]["authorDisplayName"],
+                        "author_pic":   reply["snippet"].get("authorProfileImageUrl", ""),
+                        "text":         reply["snippet"]["textDisplay"],
+                        "likes":        reply["snippet"].get("likeCount", 0),
+                        "published_at": reply["snippet"]["publishedAt"],
+                    })
+                comments.append({
+                    "id":           thread["id"],
+                    "video_id":     thread["snippet"]["videoId"],
+                    "author":       top["authorDisplayName"],
+                    "author_pic":   top.get("authorProfileImageUrl", ""),
+                    "text":         top["textDisplay"],
+                    "likes":        top.get("likeCount", 0),
+                    "published_at": top["publishedAt"],
+                    "reply_count":  thread["snippet"]["totalReplyCount"],
+                    "replies":      replies_list,
+                    "can_reply":    True,
+                })
+            return {"total": len(comments), "comments": comments}
 
-        comments.append({
-            "id":           thread["id"],
-            "video_id":     thread["snippet"]["videoId"],
-            "author":       top["authorDisplayName"],
-            "author_pic":   top.get("authorProfileImageUrl", ""),
-            "text":         top["textDisplay"],
-            "likes":        top.get("likeCount", 0),
-            "published_at": top["publishedAt"],
-            "reply_count":  thread["snippet"]["totalReplyCount"],
-            "replies":      replies_list,
-            "can_reply":    True,
-        })
+        else:
+            # Get recent videos first, then fetch comments from each
+            # This avoids the allThreadsRelatedToChannelId issue
+            try:
+                ch_r     = yt.channels().list(part="contentDetails", mine=True).execute()
+                playlist = ch_r["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
+                pl_r     = yt.playlistItems().list(part="snippet", playlistId=playlist, maxResults=10).execute()
+                video_ids = [i["snippet"]["resourceId"]["videoId"] for i in pl_r.get("items", [])]
+            except Exception:
+                return {"total": 0, "comments": [], "error": "Could not fetch videos"}
 
-    return {"total": len(comments), "comments": comments}
+            all_comments = []
+            for vid_id in video_ids[:5]:
+                try:
+                    t_r = yt.commentThreads().list(
+                        part="snippet,replies",
+                        videoId=vid_id,
+                        maxResults=10,
+                        order="time"
+                    ).execute()
+                    for thread in t_r.get("items", []):
+                        top = thread["snippet"]["topLevelComment"]["snippet"]
+                        replies_list = []
+                        for reply in thread.get("replies", {}).get("comments", []):
+                            replies_list.append({
+                                "id":           reply["id"],
+                                "author":       reply["snippet"]["authorDisplayName"],
+                                "author_pic":   reply["snippet"].get("authorProfileImageUrl", ""),
+                                "text":         reply["snippet"]["textDisplay"],
+                                "likes":        reply["snippet"].get("likeCount", 0),
+                                "published_at": reply["snippet"]["publishedAt"],
+                            })
+                        all_comments.append({
+                            "id":           thread["id"],
+                            "video_id":     thread["snippet"]["videoId"],
+                            "author":       top["authorDisplayName"],
+                            "author_pic":   top.get("authorProfileImageUrl", ""),
+                            "text":         top["textDisplay"],
+                            "likes":        top.get("likeCount", 0),
+                            "published_at": top["publishedAt"],
+                            "reply_count":  thread["snippet"]["totalReplyCount"],
+                            "replies":      replies_list,
+                            "can_reply":    True,
+                        })
+                except Exception:
+                    continue  # Skip videos with disabled comments
+
+            # Sort by newest first
+            all_comments.sort(key=lambda x: x.get("published_at", ""), reverse=True)
+            return {"total": len(all_comments), "comments": all_comments[:max_results]}
+
+    except Exception as e:
+        raise HTTPException(500, f"Comments error: {str(e)[:200]}")
+
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
