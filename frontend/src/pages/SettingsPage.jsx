@@ -208,12 +208,6 @@ export default function SettingsPage() {
     else setMessage({ type: 'error', text: 'Twitter: ' + (d.detail || 'Coming soon') })
   }
 
-  const handleConnectLinkedIn = async () => {
-    const r = await fetch(`${BACKEND}/api/social/linkedin/auth`)
-    const d = await r.json()
-    if (d.url) window.location.href = d.url
-  }
-
   // NEW — YouTube connect using /api/youtube/auth with user_id
   const handleConnectYouTube = () => {
     if (!userId) return
