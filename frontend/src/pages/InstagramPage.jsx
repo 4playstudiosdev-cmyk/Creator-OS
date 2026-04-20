@@ -333,7 +333,7 @@ function PostTab({ userId, igStatus }) {
       {/* Tips */}
       <div style={card}>
         <h4 style={{ fontSize: 13, fontWeight: 700, color: '#fff', margin: '0 0 12px' }}>📸 Instagram Tips</h4>
-        {postType === 'story' ? [
+        {(postType === 'story' ? [
           '9:16 ratio works best (1080×1920)',
           'Stories disappear after 24 hours',
           'Add polls/questions in Instagram app',
@@ -343,10 +343,10 @@ function PostTab({ userId, igStatus }) {
           'Square (1080×1080) gets best reach',
           'First 125 chars of caption visible',
           'Add 5-10 hashtags for reach',
-          'Post Tue-Fri, 9AM-11AM for best time',
+          'Post Tue-Fri 9AM-11AM best time',
           'Reply to comments within 1 hour',
           'Carousels get 3x more engagement',
-        ]}.map(t => (
+        ]).map(t => (
           <p key={t} style={{ fontSize: 12, color: '#9CA3AF', margin: '0 0 8px', paddingLeft: 12, borderLeft: '2px solid rgba(188,24,136,0.3)', lineHeight: 1.5 }}>{t}</p>
         ))}
       </div>
