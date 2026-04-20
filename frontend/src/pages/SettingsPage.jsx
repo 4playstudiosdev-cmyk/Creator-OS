@@ -180,9 +180,7 @@ export default function SettingsPage() {
   }
 
   const handleConnectLinkedIn = async () => {
-    const r = await fetch(`${BACKEND}/api/social/linkedin/auth`)
-    const d = await r.json()
-    if (d.url) window.location.href = d.url
+   window.location.href = `${BACKEND}/api/linkedin/auth?user_id=${userId}`
   }
 
   // NEW — YouTube connect using /api/youtube/auth with user_id

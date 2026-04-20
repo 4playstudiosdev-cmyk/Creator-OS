@@ -638,55 +638,72 @@ async def get_comments(user_id: str, video_id: Optional[str] = None, max_results
             return {"total": len(comments), "comments": comments}
 
         else:
-            # Get recent videos first, then fetch comments from each
-            # This avoids the allThreadsRelatedToChannelId issue
+            # Fetch from uploads playlist then get comments per video
             try:
                 ch_r     = yt.channels().list(part="contentDetails", mine=True).execute()
                 playlist = ch_r["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
-                pl_r     = yt.playlistItems().list(part="snippet", playlistId=playlist, maxResults=20).execute()
+                pl_r     = yt.playlistItems().list(
+                    part="snippet",
+                    playlistId=playlist,
+                    maxResults=50  # fetch last 50 uploaded videos
+                ).execute()
                 video_ids = [i["snippet"]["resourceId"]["videoId"] for i in pl_r.get("items", [])]
-            except Exception:
-                return {"total": 0, "comments": [], "error": "Could not fetch videos"}
+            except Exception as e:
+                return {"total": 0, "comments": [], "error": f"Could not fetch videos: {str(e)}"}
 
             all_comments = []
-            for vid_id in video_ids[:10]:
+            for vid_id in video_ids:  # go through ALL videos
                 try:
-                    t_r = yt.commentThreads().list(
-                        part="snippet,replies",
-                        videoId=vid_id,
-                        maxResults=20,
-                        order="time"
-                    ).execute()
-                    for thread in t_r.get("items", []):
-                        top = thread["snippet"]["topLevelComment"]["snippet"]
-                        replies_list = []
-                        for reply in thread.get("replies", {}).get("comments", []):
-                            replies_list.append({
-                                "id":           reply["id"],
-                                "author":       reply["snippet"]["authorDisplayName"],
-                                "author_pic":   reply["snippet"].get("authorProfileImageUrl", ""),
-                                "text":         reply["snippet"]["textDisplay"],
-                                "likes":        reply["snippet"].get("likeCount", 0),
-                                "published_at": reply["snippet"]["publishedAt"],
-                            })
-                        all_comments.append({
-                            "id":           thread["id"],
-                            "video_id":     thread["snippet"]["videoId"],
-                            "author":       top["authorDisplayName"],
-                            "author_pic":   top.get("authorProfileImageUrl", ""),
-                            "text":         top["textDisplay"],
-                            "likes":        top.get("likeCount", 0),
-                            "published_at": top["publishedAt"],
-                            "reply_count":  thread["snippet"]["totalReplyCount"],
-                            "replies":      replies_list,
-                            "can_reply":    True,
-                        })
-                except Exception:
-                    continue  # Skip videos with disabled comments
+                    # Paginate through all comment pages
+                    next_page = None
+                    while True:
+                        kwargs = {
+                            "part":       "snippet,replies",
+                            "videoId":    vid_id,
+                            "maxResults": 100,  # max per page
+                            "order":      "time",
+                            "textFormat": "plainText",
+                        }
+                        if next_page:
+                            kwargs["pageToken"] = next_page
 
-            # Sort by newest first
+                        t_r = yt.commentThreads().list(**kwargs).execute()
+
+                        for thread in t_r.get("items", []):
+                            top = thread["snippet"]["topLevelComment"]["snippet"]
+                            replies_list = []
+                            for reply in thread.get("replies", {}).get("comments", []):
+                                replies_list.append({
+                                    "id":           reply["id"],
+                                    "author":       reply["snippet"]["authorDisplayName"],
+                                    "author_pic":   reply["snippet"].get("authorProfileImageUrl", ""),
+                                    "text":         reply["snippet"]["textDisplay"],
+                                    "likes":        reply["snippet"].get("likeCount", 0),
+                                    "published_at": reply["snippet"]["publishedAt"],
+                                })
+                            all_comments.append({
+                                "id":           thread["id"],
+                                "video_id":     thread["snippet"]["videoId"],
+                                "author":       top["authorDisplayName"],
+                                "author_pic":   top.get("authorProfileImageUrl", ""),
+                                "text":         top["textDisplay"],
+                                "likes":        top.get("likeCount", 0),
+                                "published_at": top["publishedAt"],
+                                "reply_count":  thread["snippet"]["totalReplyCount"],
+                                "replies":      replies_list,
+                                "can_reply":    True,
+                            })
+
+                        next_page = t_r.get("nextPageToken")
+                        if not next_page:
+                            break  # no more pages for this video
+
+                except Exception:
+                    continue  # skip videos with comments disabled
+
+            # Sort newest first
             all_comments.sort(key=lambda x: x.get("published_at", ""), reverse=True)
-            return {"total": len(all_comments), "comments": all_comments[:50]}
+            return {"total": len(all_comments), "comments": all_comments}
 
     except Exception as e:
         raise HTTPException(500, f"Comments error: {str(e)[:200]}")

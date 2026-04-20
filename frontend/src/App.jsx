@@ -62,6 +62,7 @@ import PricingPage      from './pages/PricingPage'
 import SettingsPage     from './pages/SettingsPage'
 import AgencyPage       from './pages/AgencyPage'
 import InstagramPage from './pages/InstagramPage'
+import LinkedInPage from './pages/LinkedInPage'
 
 import './index.css'
 
@@ -157,6 +158,7 @@ export default function App() {
             <Route path="/auto-clip"      element={<AutoClippingPage />} />
             <Route path="/pricing"        element={<PricingPage />} />
             <Route path="/settings"       element={<SettingsPage />} />
+            <Route path="/linkedin" element={<LinkedInPage />} />
             
           </Route>
 

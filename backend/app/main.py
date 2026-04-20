@@ -5,6 +5,7 @@ from app.api import posts, media_kit, ai, deals, social, captions, clipping
 from app.api.scheduler import start_scheduler
 from app.api.youtube import router as youtube_router
 from app.instagram import router as instagram_router
+from app.api.linkedin import router as linkedin_router
 
 load_dotenv()
 
@@ -35,6 +36,7 @@ app.include_router(deals.router,     prefix="/api/deals")
 app.include_router(social.router,    prefix="/api/social")  # Twitter + LinkedIn only
 app.include_router(captions.router,  prefix="/api/captions")
 app.include_router(clipping.router,  prefix="/api/clipping")
+app.include_router(linkedin_router)
 
 
 @app.on_event("startup")
