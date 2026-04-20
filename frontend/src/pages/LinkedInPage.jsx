@@ -1,8 +1,9 @@
+import React, { useState, useEffect } from 'react'
 // src/pages/LinkedInPage.jsx
 // Complete LinkedIn Studio for Nexora OS
 // Features: Connect, Post, My Posts, Comments/Inbox, Analytics
 
-import { useState, useEffect } from 'react'
+
 import { supabase } from '../lib/supabaseClient'
 import {
   CheckCircle, AlertCircle, Loader, RefreshCw,
@@ -150,21 +151,50 @@ export default function LinkedInPage() {
 // ─────────────────────────────────────────────────────────────────────────────
 function PostTab({ userId, liStatus }) {
   const [text,       setText]       = useState('')
-  const [imageUrl,   setImageUrl]   = useState('')
+  const [imageFile,  setImageFile]  = useState(null)
+  const [imagePreview, setImagePreview] = useState(null)
   const [visibility, setVisibility] = useState('PUBLIC')
   const [state,      setState]      = useState('idle')
   const [msg,        setMsg]        = useState('')
   const [result,     setResult]     = useState(null)
+  const fileRef = React.useRef()
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setImageFile(file)
+    setImagePreview(URL.createObjectURL(file))
+  }
+
+  const uploadImageToSupabase = async (file) => {
+    // Upload to Supabase storage and get public URL
+    const { createClient } = await import('@supabase/supabase-js')
+    const sb = createClient(
+      import.meta.env.VITE_SUPABASE_URL,
+      import.meta.env.VITE_SUPABASE_ANON_KEY
+    )
+    const ext      = file.name.split('.').pop()
+    const filename = `linkedin/${userId}/${Date.now()}.${ext}`
+    const { error } = await sb.storage.from('posts').upload(filename, file, { upsert: true })
+    if (error) throw new Error('Image upload failed: ' + error.message)
+    const { data } = sb.storage.from('posts').getPublicUrl(filename)
+    return data.publicUrl
+  }
 
   const handlePost = async () => {
     if (!text.trim()) { setMsg('Write something to post.'); setState('error'); return }
     setState('loading'); setMsg('')
 
     try {
+      let imageUrl = undefined
+      if (imageFile) {
+        imageUrl = await uploadImageToSupabase(imageFile)
+      }
+
       const r = await fetch(`${API}/api/linkedin/post`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, text, image_url: imageUrl || undefined, visibility }),
+        body: JSON.stringify({ user_id: userId, text, image_url: imageUrl, visibility }),
       })
       const d = await r.json()
       if (!r.ok) throw new Error(d.detail || 'Post failed.')
@@ -172,7 +202,10 @@ function PostTab({ userId, liStatus }) {
     } catch (e) { setState('error'); setMsg(e.message) }
   }
 
-  const reset = () => { setState('idle'); setMsg(''); setResult(null); setText(''); setImageUrl('') }
+  const reset = () => {
+    setState('idle'); setMsg(''); setResult(null)
+    setText(''); setImageFile(null); setImagePreview(null)
+  }
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 16, alignItems: 'start' }}>
@@ -183,6 +216,12 @@ function PostTab({ userId, liStatus }) {
           <div style={{ textAlign: 'center', padding: '28px 0' }}>
             <CheckCircle size={44} color="#00E5A0" style={{ display: 'block', margin: '0 auto 14px' }} />
             <p style={{ color: '#00E5A0', fontWeight: 700, fontSize: 15, margin: '0 0 8px' }}>Posted to LinkedIn! 🎉</p>
+            {result?.url && (
+              <a href={result.url} target="_blank" rel="noopener"
+                style={{ fontSize: 13, color: '#60A5FA', textDecoration: 'none', display: 'block', marginBottom: 16 }}>
+                View on LinkedIn →
+              </a>
+            )}
             <button onClick={reset} style={{ padding: '9px 20px', background: 'none', border: '1px solid rgba(10,102,194,0.3)', borderRadius: 8, color: '#93C5FD', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
               Post Again
             </button>
@@ -190,10 +229,12 @@ function PostTab({ userId, liStatus }) {
         ) : (
           <>
             {/* Profile preview */}
-            <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-              {liStatus?.picture && <img src={liStatus.picture} alt="" style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid #0A66C2' }} />}
+            <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+              {liStatus?.picture
+                ? <img src={liStatus.picture} alt="" style={{ width: 42, height: 42, borderRadius: '50%', border: '2px solid #0A66C2' }} />
+                : <div style={{ width: 42, height: 42, borderRadius: '50%', background: '#0A66C2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>LI</div>}
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{liStatus?.name}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{liStatus?.name || 'You'}</div>
                 <div style={{ fontSize: 11, color: '#475569' }}>Posting to LinkedIn</div>
               </div>
             </div>
@@ -206,18 +247,32 @@ function PostTab({ userId, liStatus }) {
               </label>
               <textarea style={{ ...ta, minHeight: 140 }} value={text}
                 onChange={e => setText(e.target.value.slice(0, 3000))}
-                placeholder="Share your thoughts, insights, or updates with your network..."
+                placeholder="Share your thoughts, insights, or updates...&#10;&#10;Add value, tell a story, or share what you learned.&#10;&#10;#hashtags at the end"
                 onFocus={e => e.target.style.borderColor='rgba(10,102,194,0.5)'}
                 onBlur={e => e.target.style.borderColor='rgba(10,102,194,0.2)'} />
             </div>
 
-            {/* Image URL */}
+            {/* Image upload */}
             <div style={{ marginBottom: 14 }}>
-              <label style={lbl}>Article/Link URL (optional)</label>
-              <input style={inp} value={imageUrl} onChange={e => setImageUrl(e.target.value)}
-                placeholder="https://example.com/article"
-                onFocus={e => e.target.style.borderColor='rgba(10,102,194,0.5)'}
-                onBlur={e => e.target.style.borderColor='rgba(10,102,194,0.2)'} />
+              <label style={lbl}>Image (optional)</label>
+              <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageSelect} />
+              {imagePreview ? (
+                <div style={{ position: 'relative' }}>
+                  <img src={imagePreview} alt="" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: '1px solid rgba(10,102,194,0.2)' }} />
+                  <button onClick={() => { setImageFile(null); setImagePreview(null) }}
+                    style={{ position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,0.7)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <div onClick={() => fileRef.current?.click()}
+                  style={{ border: '2px dashed rgba(10,102,194,0.25)', borderRadius: 10, padding: '20px', textAlign: 'center', cursor: 'pointer' }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor='rgba(10,102,194,0.5)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor='rgba(10,102,194,0.25)'}>
+                  <p style={{ color: '#475569', fontSize: 13, margin: 0 }}>📷 Click to add image</p>
+                  <p style={{ color: '#475569', fontSize: 11, margin: '4px 0 0' }}>JPG, PNG supported</p>
+                </div>
+              )}
             </div>
 
             {/* Visibility */}
@@ -236,11 +291,20 @@ function PostTab({ userId, liStatus }) {
               </div>
             </div>
 
-            {/* Error */}
             {state === 'error' && (
               <div style={{ display: 'flex', gap: 8, padding: '10px 14px', borderRadius: 10, background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.3)', marginBottom: 12 }}>
                 <AlertCircle size={15} color="#F87171" style={{ flexShrink: 0, marginTop: 1 }} />
                 <span style={{ fontSize: 13, color: '#F87171', lineHeight: 1.5 }}>{msg}</span>
+              </div>
+            )}
+
+            {state === 'loading' && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ height: 4, background: 'rgba(10,102,194,0.1)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: '60%', background: '#0A66C2', borderRadius: 2, animation: 'slide 1.5s ease infinite' }} />
+                </div>
+                <style>{`@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}`}</style>
+                <p style={{ fontSize: 12, color: '#475569', marginTop: 6 }}>{imageFile ? 'Uploading image...' : 'Posting...'}</p>
               </div>
             )}
 
@@ -253,7 +317,6 @@ function PostTab({ userId, liStatus }) {
         )}
       </div>
 
-      {/* Tips */}
       <div style={card}>
         <h4 style={{ fontSize: 13, fontWeight: 700, color: '#fff', margin: '0 0 12px' }}>✍️ LinkedIn Post Tips</h4>
         {[
@@ -263,6 +326,7 @@ function PostTab({ userId, liStatus }) {
           'Post Tuesday-Thursday for best reach',
           'Engage with comments in first hour',
           'Personal stories get 3x more engagement',
+          'Images get 2x more engagement',
           'Max 3000 characters per post',
         ].map(t => (
           <p key={t} style={{ fontSize: 12, color: '#64748B', margin: '0 0 8px', paddingLeft: 12, borderLeft: '2px solid rgba(10,102,194,0.3)', lineHeight: 1.5 }}>{t}</p>
@@ -279,6 +343,7 @@ function PostsTab({ userId }) {
   const [posts,   setPosts]   = useState([])
   const [loading, setLoading] = useState(true)
   const [note,    setNote]    = useState(null)
+  const [error,   setError]   = useState(null)
 
   useEffect(() => {
     fetch(`${API}/api/linkedin/posts/${userId}`)
@@ -288,7 +353,7 @@ function PostsTab({ userId }) {
         setNote(d.note)
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch(e => { setError(e.message); setLoading(false) })
   }, [userId])
 
   if (loading) return <div style={{ color: '#475569', textAlign: 'center', padding: 48 }}>Loading posts...</div>
@@ -300,25 +365,44 @@ function PostsTab({ userId }) {
       </h3>
 
       {note && (
-        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', marginBottom: 14 }}>
-          <p style={{ fontSize: 12, color: '#FBBF24', margin: 0 }}>ℹ️ {note}</p>
+        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <p style={{ fontSize: 12, color: '#FBBF24', margin: 0, flex: 1 }}>ℹ️ {note}</p>
+          <a href="https://www.linkedin.com/in/me/recent-activity/all/" target="_blank" rel="noopener"
+            style={{ fontSize: 11, color: '#60A5FA', textDecoration: 'none', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <ArrowUpRight size={11} /> View on LinkedIn
+          </a>
         </div>
       )}
 
       {posts.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '32px 0', color: '#475569' }}>
-          <FileText size={28} style={{ display: 'block', margin: '0 auto 10px', opacity: .4 }} />
-          No posts found. Create your first post!
+        <div style={{ textAlign: 'center', padding: '40px 0', color: '#475569' }}>
+          <FileText size={32} style={{ display: 'block', margin: '0 auto 12px', opacity: .3 }} />
+          <p style={{ fontSize: 14, margin: '0 0 8px', color: '#64748B' }}>No posts fetched yet</p>
+          <p style={{ fontSize: 12, margin: '0 0 16px', color: '#475569' }}>LinkedIn API has limited post reading access</p>
+          <a href="https://www.linkedin.com/in/me/recent-activity/all/" target="_blank" rel="noopener"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: '#0A66C2', borderRadius: 8, color: '#fff', textDecoration: 'none', fontSize: 13, fontWeight: 700 }}>
+            <ArrowUpRight size={13} /> View My Posts on LinkedIn
+          </a>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {posts.map(p => (
-            <div key={p.id} style={{ padding: '14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(10,102,194,0.1)' }}>
-              <p style={{ fontSize: 14, color: '#E2E8F0', lineHeight: 1.6, margin: '0 0 8px' }}>{p.text}</p>
-              <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#475569' }}>
-                <span>{p.lifecycle}</span>
-                <span>{p.visibility?.toLowerCase()}</span>
-                {p.created_at && <span>{new Date(p.created_at).toLocaleDateString()}</span>}
+            <div key={p.id} style={{ padding: '16px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(10,102,194,0.1)', transition: 'border-color .15s' }}
+              onMouseEnter={e => e.currentTarget.style.borderColor='rgba(10,102,194,0.3)'}
+              onMouseLeave={e => e.currentTarget.style.borderColor='rgba(10,102,194,0.1)'}>
+              <p style={{ fontSize: 14, color: '#E2E8F0', lineHeight: 1.7, margin: '0 0 10px', whiteSpace: 'pre-wrap' }}>{p.text}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 10, fontSize: 11, color: '#475569' }}>
+                  <span style={{ padding: '2px 8px', borderRadius: 100, background: 'rgba(0,229,160,0.08)', color: '#00E5A0', fontWeight: 700 }}>✓ {p.lifecycle || 'Published'}</span>
+                  <span style={{ padding: '2px 8px', borderRadius: 100, background: 'rgba(255,255,255,0.04)', color: '#64748B' }}>🌐 {p.visibility?.toLowerCase() || 'public'}</span>
+                  {p.created_at > 0 && <span>{new Date(p.created_at).toLocaleDateString()}</span>}
+                </div>
+                {p.url && (
+                  <a href={p.url} target="_blank" rel="noopener"
+                    style={{ fontSize: 11, color: '#60A5FA', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <ArrowUpRight size={11} /> View
+                  </a>
+                )}
               </div>
             </div>
           ))}

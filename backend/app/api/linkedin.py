@@ -225,57 +225,133 @@ class PostRequest(BaseModel):
 async def linkedin_post(body: PostRequest, sb=Depends(get_sb)):
     """Post to LinkedIn feed. Text only or text + image URL."""
     token, person_id = get_token(body.user_id, sb)
-
     author = f"urn:li:person:{person_id}"
 
-    post_body = {
-        "author":         author,
-        "lifecycleState": "PUBLISHED",
-        "specificContent": {
-            "com.linkedin.ugc.ShareContent": {
-                "shareCommentary": {"text": body.text},
-                "shareMediaCategory": "NONE" if not body.image_url else "IMAGE",
-            }
-        },
-        "visibility": {
-            "com.linkedin.ugc.MemberNetworkVisibility": body.visibility
-        },
-    }
-
-    # If image provided, add media
     if body.image_url:
-        post_body["specificContent"]["com.linkedin.ugc.ShareContent"]["media"] = [
-            {
-                "status":      "READY",
-                "description": {"text": body.text[:200]},
-                "originalUrl": body.image_url,
+        # Step 1: Register image upload
+        async with httpx.AsyncClient(timeout=30) as c:
+            reg_r = await c.post(
+                f"{LI_API}/assets?action=registerUpload",
+                json={
+                    "registerUploadRequest": {
+                        "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
+                        "owner":   author,
+                        "serviceRelationships": [{
+                            "relationshipType": "OWNER",
+                            "identifier":       "urn:li:userGeneratedContent"
+                        }]
+                    }
+                },
+                headers={
+                    "Authorization":             f"Bearer {token}",
+                    "Content-Type":              "application/json",
+                    "X-Restli-Protocol-Version": "2.0.0",
+                },
+            )
+            print(f"[LinkedIn Image Register] Status: {reg_r.status_code}")
+
+        if reg_r.status_code == 200:
+            reg_data    = reg_r.json()
+            upload_url  = reg_data["value"]["uploadMechanism"]["com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"]["uploadUrl"]
+            asset       = reg_data["value"]["asset"]
+
+            # Step 2: Upload image bytes
+            try:
+                async with httpx.AsyncClient(timeout=60) as c:
+                    img_r = await c.get(body.image_url)
+                    img_bytes = img_r.content
+
+                async with httpx.AsyncClient(timeout=60) as c:
+                    await c.put(
+                        upload_url,
+                        content=img_bytes,
+                        headers={
+                            "Authorization": f"Bearer {token}",
+                            "Content-Type":  "image/jpeg",
+                        },
+                    )
+                print(f"[LinkedIn Image Upload] Done. Asset: {asset}")
+            except Exception as e:
+                print(f"[LinkedIn Image Upload] Failed: {e}. Posting text only.")
+                asset = None
+        else:
+            asset = None
+
+        # Step 3: Post with image asset
+        if asset:
+            post_body = {
+                "author":         author,
+                "lifecycleState": "PUBLISHED",
+                "specificContent": {
+                    "com.linkedin.ugc.ShareContent": {
+                        "shareCommentary":    {"text": body.text},
+                        "shareMediaCategory": "IMAGE",
+                        "media": [{
+                            "status": "READY",
+                            "media":  asset,
+                        }]
+                    }
+                },
+                "visibility": {
+                    "com.linkedin.ugc.MemberNetworkVisibility": body.visibility
+                },
             }
-        ]
-        post_body["specificContent"]["com.linkedin.ugc.ShareContent"]["shareMediaCategory"] = "ARTICLE"
+        else:
+            # Fallback text only
+            post_body = {
+                "author":         author,
+                "lifecycleState": "PUBLISHED",
+                "specificContent": {
+                    "com.linkedin.ugc.ShareContent": {
+                        "shareCommentary":    {"text": body.text},
+                        "shareMediaCategory": "NONE",
+                    }
+                },
+                "visibility": {
+                    "com.linkedin.ugc.MemberNetworkVisibility": body.visibility
+                },
+            }
+    else:
+        # Text only post
+        post_body = {
+            "author":         author,
+            "lifecycleState": "PUBLISHED",
+            "specificContent": {
+                "com.linkedin.ugc.ShareContent": {
+                    "shareCommentary":    {"text": body.text},
+                    "shareMediaCategory": "NONE",
+                }
+            },
+            "visibility": {
+                "com.linkedin.ugc.MemberNetworkVisibility": body.visibility
+            },
+        }
 
     async with httpx.AsyncClient(timeout=30) as c:
         r = await c.post(
             f"{LI_API}/ugcPosts",
             json=post_body,
             headers={
-                "Authorization":       f"Bearer {token}",
-                "Content-Type":        "application/json",
+                "Authorization":             f"Bearer {token}",
+                "Content-Type":              "application/json",
                 "X-Restli-Protocol-Version": "2.0.0",
             },
         )
-        print(f"[LinkedIn Post] Status: {r.status_code}, Body: {r.text[:200]}")
+        print(f"[LinkedIn Post] Status: {r.status_code}, Body: {r.text[:300]}")
 
     if r.status_code not in [200, 201]:
         try:
             err = r.json()
-            msg = err.get("message", err.get("serviceErrorCode", r.text[:200]))
+            msg = err.get("message", err.get("serviceErrorCode", r.text[:300]))
         except Exception:
-            msg = r.text[:200]
+            msg = r.text[:300]
         raise HTTPException(400, f"LinkedIn post failed: {msg}")
 
-    post_id = r.headers.get("x-restli-id", "") or (r.json().get("id", "") if r.text else "")
+    post_id = r.headers.get("x-restli-id", "")
+    if not post_id and r.text:
+        try: post_id = r.json().get("id", "")
+        except Exception: pass
 
-    # Log to Supabase
     try:
         sb.table("scheduled_posts").insert({
             "user_id":      body.user_id,
@@ -291,6 +367,7 @@ async def linkedin_post(body: PostRequest, sb=Depends(get_sb)):
     return {
         "success": True,
         "post_id": post_id,
+        "url":     f"https://www.linkedin.com/feed/update/{post_id}/" if post_id else "",
         "message": "Posted to LinkedIn successfully! ✅"
     }
 
@@ -300,44 +377,73 @@ async def linkedin_post(body: PostRequest, sb=Depends(get_sb)):
 # ─────────────────────────────────────────────────────────────────────────────
 @router.get("/posts/{user_id}")
 async def get_posts(user_id: str, sb=Depends(get_sb)):
-    """Fetch recent posts by the user."""
+    """Fetch recent posts by the user using shares endpoint."""
     token, person_id = get_token(user_id, sb)
-    author = f"urn:li:person:{person_id}"
 
     async with httpx.AsyncClient(timeout=20) as c:
+        # Try shares endpoint
         r = await c.get(
-            f"{LI_API}/ugcPosts",
+            f"{LI_API}/shares",
             params={
-                "q":         "authors",
-                "authors":   f"List({author})",
-                "count":     20,
-                "sortBy":    "LAST_MODIFIED",
+                "q":           "owners",
+                "owners":      f"urn:li:person:{person_id}",
+                "sharesPerOwner": 20,
+                "count":       20,
             },
             headers={
                 "Authorization":             f"Bearer {token}",
                 "X-Restli-Protocol-Version": "2.0.0",
             },
         )
-        print(f"[LinkedIn Posts] Status: {r.status_code}")
+        print(f"[LinkedIn Posts/shares] Status: {r.status_code}, Body: {r.text[:300]}")
 
-    if r.status_code != 200:
-        # Return empty gracefully — LinkedIn posts API requires additional permissions
-        return {"posts": [], "total": 0, "note": "Posts require additional LinkedIn permissions."}
-
-    data  = r.json()
     posts = []
-    for p in data.get("elements", []):
-        content = p.get("specificContent", {}).get("com.linkedin.ugc.ShareContent", {})
-        text    = content.get("shareCommentary", {}).get("text", "")
-        posts.append({
-            "id":           p.get("id", ""),
-            "text":         text[:200],
-            "created_at":   p.get("created", {}).get("time", 0),
-            "lifecycle":    p.get("lifecycleState", ""),
-            "visibility":   p.get("visibility", {}).get("com.linkedin.ugc.MemberNetworkVisibility", ""),
-        })
+    if r.status_code == 200:
+        data = r.json()
+        for p in data.get("elements", []):
+            text = p.get("text", {}).get("text", "") or                    p.get("specificContent", {}).get("com.linkedin.ugc.ShareContent", {}).get("shareCommentary", {}).get("text", "")
+            posts.append({
+                "id":         p.get("id", ""),
+                "text":       text[:300],
+                "created_at": p.get("created", {}).get("time", 0),
+                "lifecycle":  p.get("lifecycleState", "PUBLISHED"),
+                "visibility": "PUBLIC",
+                "url":        f"https://www.linkedin.com/feed/update/{p.get('id', '')}/"
+            })
+        return {"posts": posts, "total": len(posts)}
 
-    return {"posts": posts, "total": len(posts)}
+    # Fallback: try ugcPosts
+    async with httpx.AsyncClient(timeout=20) as c:
+        r2 = await c.get(
+            f"{LI_API}/ugcPosts",
+            params={
+                "q":       "authors",
+                "authors": f"List(urn:li:person:{person_id})",
+                "count":   20,
+            },
+            headers={
+                "Authorization":             f"Bearer {token}",
+                "X-Restli-Protocol-Version": "2.0.0",
+            },
+        )
+        print(f"[LinkedIn Posts/ugc] Status: {r2.status_code}, Body: {r2.text[:300]}")
+
+    if r2.status_code == 200:
+        data = r2.json()
+        for p in data.get("elements", []):
+            sc   = p.get("specificContent", {}).get("com.linkedin.ugc.ShareContent", {})
+            text = sc.get("shareCommentary", {}).get("text", "")
+            posts.append({
+                "id":         p.get("id", ""),
+                "text":       text[:300],
+                "created_at": p.get("created", {}).get("time", 0),
+                "lifecycle":  p.get("lifecycleState", "PUBLISHED"),
+                "visibility": p.get("visibility", {}).get("com.linkedin.ugc.MemberNetworkVisibility", "PUBLIC"),
+                "url":        f"https://www.linkedin.com/feed/update/{p.get('id', '')}/"
+            })
+        return {"posts": posts, "total": len(posts)}
+
+    return {"posts": [], "total": 0, "note": "Could not fetch posts. LinkedIn API requires additional permissions for reading posts."}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
