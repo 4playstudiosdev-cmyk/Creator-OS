@@ -37,7 +37,7 @@ LOCAL_FRONTEND = "http://localhost:5173"
 PROD_FRONTEND  = "https://creator-os-ochre.vercel.app"
 FRONTEND_URL   = LOCAL_FRONTEND if IS_LOCAL else PROD_FRONTEND
 
-SCOPES = "openid profile email w_member_social r_basicprofile"
+SCOPES = "openid profile email w_member_social"
 
 # LinkedIn API base
 LI_API = "https://api.linkedin.com/v2"
