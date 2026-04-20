@@ -3,28 +3,29 @@ import {
   LayoutDashboard, CalendarDays, Sparkles, Brain,
   Inbox, BarChart2, Briefcase, FileText, TrendingUp,
   CreditCard, Settings, LogOut, DollarSign, FileVideo,
-  Youtube, Scissors, Film,
+  Youtube, Scissors, Film, Instagram, Linkedin,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
-import { Instagram } from 'lucide-react'
+
 const navItems = [
-  { name: 'Dashboard',      path: '/dashboard',     icon: LayoutDashboard },
-  { name: 'Scheduler',      path: '/schedule',      icon: CalendarDays },
-  { name: 'Repurpose',      path: '/repurpose',     icon: Sparkles },
-  { name: 'Script Studio',  path: '/script-studio', icon: FileVideo },
-  { name: 'YouTube Studio', path: '/youtube-studio',icon: Youtube },
-  { name: 'AI Tools',       path: '/ai-tools',      icon: Brain },
-  { name: 'Inbox',          path: '/inbox',         icon: Inbox },
-  { name: 'Analytics',      path: '/analytics',     icon: BarChart2 },
-  { name: 'Brand Deals',    path: '/deals',         icon: Briefcase },
-  { name: 'Video Editor',   path: '/video-editor',  icon: Film },
-  { name: 'Auto Clipping',  path: '/auto-clip',     icon: Scissors },
-  { name: 'Earnings',       path: '/earnings',      icon: DollarSign },
-  { name: 'Media Kit',      path: '/mediakit',      icon: FileText },
-  { name: 'Funding',        path: '/funding',       icon: TrendingUp },
-  { name: 'Pricing',        path: '/pricing',       icon: CreditCard },
-  { name: 'Settings',       path: '/settings',      icon: Settings },
-  { name: 'Instagram', path: '/instagram', icon: Instagram },
+  { name: 'Dashboard',      path: '/dashboard',      icon: LayoutDashboard },
+  { name: 'Scheduler',      path: '/schedule',       icon: CalendarDays    },
+  { name: 'Repurpose',      path: '/repurpose',      icon: Sparkles        },
+  { name: 'Script Studio',  path: '/script-studio',  icon: FileVideo       },
+  { name: 'YouTube Studio', path: '/youtube-studio', icon: Youtube, color: '#FF0000' },
+  { name: 'LinkedIn',       path: '/linkedin',       icon: Linkedin, color: '#0A66C2' },
+  { name: 'Instagram',      path: '/instagram',      icon: Instagram, color: '#E1306C' },
+  { name: 'AI Tools',       path: '/ai-tools',       icon: Brain           },
+  { name: 'Inbox',          path: '/inbox',          icon: Inbox           },
+  { name: 'Analytics',      path: '/analytics',      icon: BarChart2       },
+  { name: 'Brand Deals',    path: '/deals',          icon: Briefcase       },
+  { name: 'Video Editor',   path: '/video-editor',   icon: Film            },
+  { name: 'Auto Clipping',  path: '/auto-clip',      icon: Scissors        },
+  { name: 'Earnings',       path: '/earnings',       icon: DollarSign      },
+  { name: 'Media Kit',      path: '/mediakit',       icon: FileText        },
+  { name: 'Funding',        path: '/funding',        icon: TrendingUp      },
+  { name: 'Pricing',        path: '/pricing',        icon: CreditCard      },
+  { name: 'Settings',       path: '/settings',       icon: Settings        },
 ]
 
 function Sidebar() {
@@ -146,7 +147,7 @@ function Sidebar() {
                 `sidebar-nav-item${isActive ? ' active' : ''}`
               }
             >
-              <Icon size={16} />
+              <Icon size={16} color={item.color || 'currentColor'} />
               {item.name}
             </NavLink>
           )
