@@ -216,16 +216,23 @@ async def linkedin_disconnect(user_id: str, sb=Depends(get_sb)):
 # 5. CREATE POST (text + optional image URL)
 # ─────────────────────────────────────────────────────────────────────────────
 class PostRequest(BaseModel):
-    user_id:   str
-    text:      str
-    image_url: Optional[str] = None
+    user_id:    str
+    text:       str
+    image_url:  Optional[str] = None
     visibility: str = "PUBLIC"  # PUBLIC | CONNECTIONS
+    post_as:    str = "person"  # person | page
+    page_id:    Optional[str] = None  # LinkedIn Page ID e.g. "112707277"
 
 @router.post("/post")
 async def linkedin_post(body: PostRequest, sb=Depends(get_sb)):
-    """Post to LinkedIn feed. Text only or text + image URL."""
+    """Post to LinkedIn feed as Person or Page."""
     token, person_id = get_token(body.user_id, sb)
-    author = f"urn:li:person:{person_id}"
+
+    # Determine author — person or page
+    if body.post_as == "page" and body.page_id:
+        author = f"urn:li:organization:{body.page_id}"
+    else:
+        author = f"urn:li:person:{person_id}"
 
     if body.image_url:
         # Step 1: Register image upload
@@ -529,6 +536,25 @@ async def reply_to_comment(body: ReplyRequest, sb=Depends(get_sb)):
         raise HTTPException(400, f"Reply failed: {r.text[:200]}")
 
     return {"success": True, "message": "Reply posted! ✅"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8b. GET USER'S PAGES
+# ─────────────────────────────────────────────────────────────────────────────
+@router.get("/pages/{user_id}")
+async def get_pages(user_id: str, sb=Depends(get_sb)):
+    """Get LinkedIn Pages — hardcoded for now."""
+    # Page ID is known: Creator OS = 112707277
+    # LinkedIn organizationAcls API requires special permissions
+    # Hardcoded pages list for now
+    pages = [
+        {
+            "id":   "112707277",
+            "name": "Creator OS",
+            "urn":  "urn:li:organization:112707277",
+        }
+    ]
+    return {"pages": pages, "total": len(pages)}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

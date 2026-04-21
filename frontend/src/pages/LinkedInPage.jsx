@@ -150,14 +150,25 @@ export default function LinkedInPage() {
 // POST TAB
 // ─────────────────────────────────────────────────────────────────────────────
 function PostTab({ userId, liStatus }) {
-  const [text,       setText]       = useState('')
-  const [imageFile,  setImageFile]  = useState(null)
+  const [text,         setText]         = useState('')
+  const [imageFile,    setImageFile]    = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
-  const [visibility, setVisibility] = useState('PUBLIC')
-  const [state,      setState]      = useState('idle')
-  const [msg,        setMsg]        = useState('')
-  const [result,     setResult]     = useState(null)
+  const [visibility,   setVisibility]   = useState('PUBLIC')
+  const [state,        setState]        = useState('idle')
+  const [msg,          setMsg]          = useState('')
+  const [result,       setResult]       = useState(null)
+  const [postAs,       setPostAs]       = useState('person') // person | page
+  const [pages,        setPages]        = useState([{ id: '112707277', name: 'Creator OS' }])
+  const [selectedPage, setSelectedPage] = useState('112707277')
   const fileRef = React.useRef()
+
+  useEffect(() => {
+    // Fetch user's pages
+    fetch(`${API}/api/linkedin/pages/${userId}`)
+      .then(r => r.json())
+      .then(d => { if (d.pages?.length) setPages(d.pages) })
+      .catch(() => {})
+  }, [userId])
 
   const handleImageSelect = (e) => {
     const file = e.target.files[0]
@@ -173,7 +184,7 @@ function PostTab({ userId, liStatus }) {
     const filename = `linkedin/${userId}/${Date.now()}.${ext}`
 
     const { error } = await sb.storage
-      .from('posts')
+      .from('posta')
       .upload(filename, file, {
         cacheControl: '3600',
         upsert: true,
@@ -190,7 +201,7 @@ function PostTab({ userId, liStatus }) {
       return data.publicUrl
     }
 
-    const { data } = sb.storage.from('posts').getPublicUrl(filename)
+    const { data } = sb.storage.from('posta').getPublicUrl(filename)
     return data.publicUrl
   }
 
@@ -207,7 +218,14 @@ function PostTab({ userId, liStatus }) {
       const r = await fetch(`${API}/api/linkedin/post`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, text, image_url: imageUrl, visibility }),
+        body: JSON.stringify({
+          user_id:   userId,
+          text,
+          image_url: imageUrl,
+          visibility,
+          post_as:   postAs,
+          page_id:   postAs === 'page' ? selectedPage : undefined,
+        }),
       })
       const d = await r.json()
       if (!r.ok) throw new Error(d.detail || 'Post failed.')
@@ -250,6 +268,35 @@ function PostTab({ userId, liStatus }) {
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{liStatus?.name || 'You'}</div>
                 <div style={{ fontSize: 11, color: '#475569' }}>Posting to LinkedIn</div>
               </div>
+            </div>
+
+            {/* Post As selector */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={lbl}>Post As</label>
+              <div style={{ display: 'flex', gap: 8, marginBottom: postAs === 'page' ? 10 : 0 }}>
+                <div onClick={() => setPostAs('person')}
+                  style={{ flex: 1, padding: '10px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'center', fontSize: 13, fontWeight: 600,
+                    border: `1px solid ${postAs==='person' ? 'rgba(10,102,194,0.5)' : 'rgba(10,102,194,0.15)'}`,
+                    background: postAs==='person' ? 'rgba(10,102,194,0.15)' : 'transparent',
+                    color: postAs==='person' ? '#60A5FA' : '#64748B' }}>
+                  👤 Personal Account
+                </div>
+                <div onClick={() => setPostAs('page')}
+                  style={{ flex: 1, padding: '10px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'center', fontSize: 13, fontWeight: 600,
+                    border: `1px solid ${postAs==='page' ? 'rgba(10,102,194,0.5)' : 'rgba(10,102,194,0.15)'}`,
+                    background: postAs==='page' ? 'rgba(10,102,194,0.15)' : 'transparent',
+                    color: postAs==='page' ? '#60A5FA' : '#64748B' }}>
+                  🏢 LinkedIn Page
+                </div>
+              </div>
+              {postAs === 'page' && pages.length > 0 && (
+                <select value={selectedPage} onChange={e => setSelectedPage(e.target.value)}
+                  style={{ ...inp, marginTop: 8 }}>
+                  {pages.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Text */}
