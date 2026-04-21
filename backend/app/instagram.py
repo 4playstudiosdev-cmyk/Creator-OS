@@ -469,6 +469,10 @@ async def post_to_instagram(body: PostRequest, sb=Depends(get_sb)):
         else:
             raise HTTPException(400, "image_url is required.")
 
+        # Wait for Instagram to process the media
+        import asyncio
+        await asyncio.sleep(5)
+
         # Publish
         pub_r = await c.post(
             f"{IG_GRAPH}/{ig_uid}/media_publish",
