@@ -77,6 +77,35 @@ def get_token(user_id: str, sb) -> tuple[str, str]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# AUTO REFRESH — Extend token before it expires
+# ─────────────────────────────────────────────────────────────────────────────
+async def refresh_token_if_needed(token: str) -> str:
+    """
+    Refresh Instagram/Facebook long-lived token.
+    Call this before using token to keep it alive.
+    Long-lived tokens can be refreshed if they have at least 1 day left.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.get(
+                "https://graph.facebook.com/v19.0/oauth/access_token",
+                params={
+                    "grant_type":    "fb_exchange_token",
+                    "client_id":     APP_ID,
+                    "client_secret": APP_SECRET,
+                    "fb_exchange_token": token,
+                }
+            )
+            d = r.json()
+            if "access_token" in d:
+                print(f"[Instagram] Token refreshed! New expires_in: {d.get('expires_in', 'unknown')}")
+                return d["access_token"]
+    except Exception as e:
+        print(f"[Instagram] Token refresh failed: {e}")
+    return token
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 1. OAUTH START — Instagram Platform API (no Facebook needed)
 # ─────────────────────────────────────────────────────────────────────────────
 @router.get("/auth")
