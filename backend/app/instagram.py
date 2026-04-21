@@ -50,19 +50,24 @@ def get_sb():
     )
 
 def get_token(user_id: str, sb) -> tuple[str, str]:
-    """Returns (access_token, ig_user_id)"""
+    """Returns (access_token, ig_user_id) — checks both tables"""
+    # Check instagram_connections (new table)
     try:
-        r = sb.table("instagram_connections") \
-            .select("access_token, ig_user_id") \
-            .eq("user_id", user_id) \
-            .maybe_single().execute()
+        r = sb.table("instagram_connections")             .select("access_token, ig_user_id")             .eq("user_id", user_id)             .maybe_single().execute()
+        if r and r.data and r.data.get("access_token"):
+            return r.data["access_token"], r.data["ig_user_id"]
     except Exception:
-        r = None
+        pass
 
-    if r and r.data and r.data.get("access_token"):
-        return r.data["access_token"], r.data["ig_user_id"]
+    # Check social_connections (old table)
+    try:
+        r2 = sb.table("social_connections")             .select("access_token, platform_user_id")             .eq("user_id", user_id)             .eq("platform", "instagram")             .maybe_single().execute()
+        if r2 and r2.data and r2.data.get("access_token"):
+            return r2.data["access_token"], r2.data["platform_user_id"]
+    except Exception:
+        pass
 
-    # Fallback to env vars (for testing)
+    # Fallback to env vars
     tok = os.environ.get("INSTAGRAM_TEST_ACCESS_TOKEN")
     uid = os.environ.get("INSTAGRAM_TEST_USER_ID")
     if tok and uid:
@@ -202,24 +207,47 @@ async def instagram_callback(request: Request, sb=Depends(get_sb)):
 # ─────────────────────────────────────────────────────────────────────────────
 @router.get("/status/{user_id}")
 async def instagram_status(user_id: str, sb=Depends(get_sb)):
+    # Check instagram_connections table (new)
     try:
-        r = sb.table("instagram_connections") \
-            .select("ig_user_id,username,name,picture,connected_at") \
-            .eq("user_id", user_id) \
-            .maybe_single().execute()
+        r = sb.table("instagram_connections")             .select("ig_user_id,username,name,picture,connected_at")             .eq("user_id", user_id)             .maybe_single().execute()
+        if r and r.data and r.data.get("ig_user_id"):
+            return {
+                "connected":  True,
+                "ig_user_id": r.data.get("ig_user_id"),
+                "username":   r.data.get("username"),
+                "name":       r.data.get("name"),
+                "picture":    r.data.get("picture"),
+            }
     except Exception:
-        r = None
+        pass
 
-    if not r or not r.data:
-        return {"connected": False}
+    # Fallback: check social_connections table (old)
+    try:
+        r2 = sb.table("social_connections")             .select("platform_user_id,username,access_token")             .eq("user_id", user_id)             .eq("platform", "instagram")             .maybe_single().execute()
+        if r2 and r2.data and r2.data.get("access_token"):
+            return {
+                "connected":  True,
+                "ig_user_id": r2.data.get("platform_user_id"),
+                "username":   r2.data.get("username", "dreambyte"),
+                "name":       r2.data.get("username", "dreambyte"),
+                "picture":    "",
+            }
+    except Exception:
+        pass
 
-    return {
-        "connected":  True,
-        "ig_user_id": r.data.get("ig_user_id"),
-        "username":   r.data.get("username"),
-        "name":       r.data.get("name"),
-        "picture":    r.data.get("picture"),
-    }
+    # Fallback: check env vars
+    tok = os.environ.get("INSTAGRAM_TEST_ACCESS_TOKEN")
+    uid = os.environ.get("INSTAGRAM_TEST_USER_ID")
+    if tok and uid:
+        return {
+            "connected":  True,
+            "ig_user_id": uid,
+            "username":   "dreambyte",
+            "name":       "dreambyte",
+            "picture":    "",
+        }
+
+    return {"connected": False}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
