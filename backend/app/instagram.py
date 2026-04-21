@@ -22,8 +22,8 @@ router = APIRouter(prefix="/api/instagram", tags=["Instagram"])
 APP_ENV       = os.environ.get("APP_ENV", "production")
 IS_LOCAL      = APP_ENV == "local"
 
-APP_ID        = os.environ.get("INSTAGRAM_APP_ID") or os.environ.get("VITE_INSTAGRAM_APP_ID", "1667770251067275")
-APP_SECRET    = os.environ.get("INSTAGRAM_APP_SECRET", "e15388a4d64971cf04c4aa2af3e8c3c6")
+APP_ID        = os.environ.get("INSTAGRAM_APP_ID") or os.environ.get("VITE_INSTAGRAM_APP_ID", "1296497079055764")
+APP_SECRET    = os.environ.get("INSTAGRAM_APP_SECRET", "7ea157a23566f8410c96a5604945379f")
 
 LOCAL_REDIRECT = "http://localhost:8000/api/instagram/callback"
 PROD_REDIRECT  = "https://creator-os-production-0bf8.up.railway.app/api/instagram/callback"
