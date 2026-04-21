@@ -36,8 +36,8 @@ FRONTEND_URL   = LOCAL_FRONTEND if IS_LOCAL else PROD_FRONTEND
 # Instagram Platform API endpoints
 IG_AUTH    = "https://api.instagram.com/oauth/authorize"
 IG_TOKEN   = "https://api.instagram.com/oauth/access_token"
-IG_GRAPH   = "https://graph.instagram.com/v21.0"
-IG_REFRESH = "https://graph.instagram.com/refresh_access_token"
+IG_GRAPH   = "https://graph.facebook.com/v19.0"
+IG_REFRESH = "https://graph.facebook.com/v19.0/oauth/access_token"
 
 # State store
 _STATES: dict = {}
@@ -144,24 +144,9 @@ async def instagram_callback(request: Request, sb=Depends(get_sb)):
         print(f"[Instagram Callback] Token exchange failed: {e}")
         return RedirectResponse(f"{FRONTEND_URL}/instagram?error=token_failed")
 
-    # Exchange for long-lived token (60 days)
-    try:
-        async with httpx.AsyncClient(timeout=30) as c:
-            r = await c.get(
-                "https://graph.instagram.com/access_token",
-                params={
-                    "grant_type":        "ig_exchange_token",
-                    "client_secret":     APP_SECRET,
-                    "access_token":      short_token,
-                },
-            )
-            ll_data      = r.json()
-            long_token   = ll_data.get("access_token", short_token)
-            expires_in   = ll_data.get("expires_in", 5184000)
-            print(f"[Instagram Callback] Long-lived token: {long_token[:20]}...")
-    except Exception:
-        long_token = short_token
-        expires_in = 3600
+    # Use token directly (Facebook Graph API tokens are already long-lived)
+    long_token = short_token
+    expires_in = 5184000
 
     # Get profile info
     username = name = picture = ""
