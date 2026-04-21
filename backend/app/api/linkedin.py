@@ -233,93 +233,30 @@ async def linkedin_post(body: PostRequest, sb=Depends(get_sb)):
         author = f"urn:li:organization:{body.page_id}"
     else:
         author = f"urn:li:person:{person_id}"
+    
+    print(f"[LinkedIn Post] author={author}, post_as={body.post_as}")
 
+    # Build post body — text only or with article link
     if body.image_url:
-        # Step 1: Register image upload
-        async with httpx.AsyncClient(timeout=30) as c:
-            reg_r = await c.post(
-                f"{LI_API}/assets?action=registerUpload",
-                json={
-                    "registerUploadRequest": {
-                        "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
-                        "owner":   author,
-                        "serviceRelationships": [{
-                            "relationshipType": "OWNER",
-                            "identifier":       "urn:li:userGeneratedContent"
-                        }]
-                    }
-                },
-                headers={
-                    "Authorization":             f"Bearer {token}",
-                    "Content-Type":              "application/json",
-                    "X-Restli-Protocol-Version": "2.0.0",
-                },
-            )
-            print(f"[LinkedIn Image Register] Status: {reg_r.status_code}")
-
-        if reg_r.status_code == 200:
-            reg_data    = reg_r.json()
-            upload_url  = reg_data["value"]["uploadMechanism"]["com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"]["uploadUrl"]
-            asset       = reg_data["value"]["asset"]
-
-            # Step 2: Upload image bytes
-            try:
-                async with httpx.AsyncClient(timeout=60) as c:
-                    img_r = await c.get(body.image_url)
-                    img_bytes = img_r.content
-
-                async with httpx.AsyncClient(timeout=60) as c:
-                    await c.put(
-                        upload_url,
-                        content=img_bytes,
-                        headers={
-                            "Authorization": f"Bearer {token}",
-                            "Content-Type":  "image/jpeg",
-                        },
-                    )
-                print(f"[LinkedIn Image Upload] Done. Asset: {asset}")
-            except Exception as e:
-                print(f"[LinkedIn Image Upload] Failed: {e}. Posting text only.")
-                asset = None
-        else:
-            asset = None
-
-        # Step 3: Post with image asset
-        if asset:
-            post_body = {
-                "author":         author,
-                "lifecycleState": "PUBLISHED",
-                "specificContent": {
-                    "com.linkedin.ugc.ShareContent": {
-                        "shareCommentary":    {"text": body.text},
-                        "shareMediaCategory": "IMAGE",
-                        "media": [{
-                            "status": "READY",
-                            "media":  asset,
-                        }]
-                    }
-                },
-                "visibility": {
-                    "com.linkedin.ugc.MemberNetworkVisibility": body.visibility
-                },
-            }
-        else:
-            # Fallback text only
-            post_body = {
-                "author":         author,
-                "lifecycleState": "PUBLISHED",
-                "specificContent": {
-                    "com.linkedin.ugc.ShareContent": {
-                        "shareCommentary":    {"text": body.text},
-                        "shareMediaCategory": "NONE",
-                    }
-                },
-                "visibility": {
-                    "com.linkedin.ugc.MemberNetworkVisibility": body.visibility
-                },
-            }
+        post_body = {
+            "author":         author,
+            "lifecycleState": "PUBLISHED",
+            "specificContent": {
+                "com.linkedin.ugc.ShareContent": {
+                    "shareCommentary":    {"text": body.text},
+                    "shareMediaCategory": "ARTICLE",
+                    "media": [{
+                        "status":      "READY",
+                        "originalUrl": body.image_url,
+                        "description": {"text": body.text[:200]},
+                    }]
+                }
+            },
+            "visibility": {
+                "com.linkedin.ugc.MemberNetworkVisibility": body.visibility
+            },
+        }
     else:
-        # Text only post
         post_body = {
             "author":         author,
             "lifecycleState": "PUBLISHED",
