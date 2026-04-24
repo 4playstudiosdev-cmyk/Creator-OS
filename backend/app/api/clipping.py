@@ -103,12 +103,27 @@ def run_ffmpeg(args: list, timeout: int = 300):
 
 
 def get_video_duration(path: str) -> float:
-    r = subprocess.run(
-        ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", path],
-        capture_output=True, text=True
-    )
     try:
+        r = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", path],
+            capture_output=True, text=True, timeout=30
+        )
         return float(json.loads(r.stdout)["format"]["duration"])
+    except FileNotFoundError:
+        # ffprobe not found — try ffmpeg
+        try:
+            r2 = subprocess.run(
+                ["ffmpeg", "-i", path],
+                capture_output=True, text=True, timeout=30
+            )
+            import re
+            m = re.search(r"Duration: (\d+):(\d+):(\d+\.\d+)", r2.stderr)
+            if m:
+                h, mn, s = int(m.group(1)), int(m.group(2)), float(m.group(3))
+                return h*3600 + mn*60 + s
+        except Exception:
+            pass
+        return 0.0
     except Exception:
         return 0.0
 
@@ -528,12 +543,12 @@ async def editor_upload(file: UploadFile = File(...)):
     duration = get_video_duration(tmp_path)
 
     # Get video info via ffprobe
-    probe_r = subprocess.run(
-        ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams", tmp_path],
-        capture_output=True, text=True
-    )
     width = height = 0
     try:
+        probe_r = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams", tmp_path],
+            capture_output=True, text=True, timeout=30
+        )
         streams = json.loads(probe_r.stdout).get("streams", [])
         for s in streams:
             if s.get("codec_type") == "video":
