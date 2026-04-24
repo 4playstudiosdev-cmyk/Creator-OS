@@ -283,11 +283,103 @@ async def tiktok_videos(user_id: str, max_count: int = 20, sb=Depends(get_sb)):
 class UploadRequest(BaseModel):
     user_id:      str
     title:        str
-    video_url:    str        # Public URL of video to post
-    privacy:      str = "SELF_ONLY"  # PUBLIC_TO_EVERYONE | MUTUAL_FOLLOW_FRIENDS | FOLLOWER_OF_CREATOR | SELF_ONLY
+    video_url:    str
+    privacy:      str = "SELF_ONLY"
     disable_duet: bool = False
     disable_stitch: bool = False
     disable_comment: bool = False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7b. UPLOAD VIDEO — Direct file (no domain verify needed)
+# ─────────────────────────────────────────────────────────────────────────────
+@router.post("/upload-file")
+async def tiktok_upload_file(
+    user_id:         str        = Form(...),
+    title:           str        = Form(...),
+    privacy:         str        = Form("SELF_ONLY"),
+    disable_duet:    bool       = Form(False),
+    disable_stitch:  bool       = Form(False),
+    disable_comment: bool       = Form(False),
+    file:            UploadFile = File(...),
+    sb = Depends(get_sb)
+):
+    """Upload video directly to TikTok — no domain verify needed."""
+    token, _ = get_token(user_id, sb)
+
+    # Read file
+    video_bytes = await file.read()
+    video_size  = len(video_bytes)
+    print(f"[TikTok Direct Upload] File size: {video_size} bytes")
+
+    if video_size == 0:
+        raise HTTPException(400, "Empty file.")
+
+    # Chunk size — TikTok max 64MB per chunk
+    chunk_size = min(video_size, 64 * 1024 * 1024)
+    total_chunks = (video_size + chunk_size - 1) // chunk_size
+
+    # Step 1: Init
+    async with httpx.AsyncClient(timeout=30) as c:
+        init_r = await c.post(
+            f"{TT_API}/post/publish/video/init/",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={
+                "post_info": {
+                    "title":           title[:150],
+                    "privacy_level":   privacy,
+                    "disable_duet":    disable_duet,
+                    "disable_stitch":  disable_stitch,
+                    "disable_comment": disable_comment,
+                },
+                "source_info": {
+                    "source":            "FILE_UPLOAD",
+                    "video_size":        video_size,
+                    "chunk_size":        chunk_size,
+                    "total_chunk_count": total_chunks,
+                }
+            }
+        )
+        init_d = init_r.json()
+        print(f"[TikTok Init] {init_d}")
+
+    err = init_d.get("error", {})
+    if err.get("code", "ok") != "ok":
+        raise HTTPException(400, f"TikTok init failed: {err.get('message', str(init_d))}")
+
+    data       = init_d.get("data", {})
+    publish_id = data.get("publish_id", "")
+    upload_url = data.get("upload_url", "")
+
+    if not upload_url:
+        raise HTTPException(400, "No upload URL from TikTok.")
+
+    # Step 2: Upload chunks
+    for i in range(total_chunks):
+        start = i * chunk_size
+        end   = min(start + chunk_size, video_size)
+        chunk = video_bytes[start:end]
+
+        async with httpx.AsyncClient(timeout=300) as c:
+            up_r = await c.put(
+                upload_url,
+                content=chunk,
+                headers={
+                    "Content-Type":   "video/mp4",
+                    "Content-Length": str(len(chunk)),
+                    "Content-Range":  f"bytes {start}-{end-1}/{video_size}",
+                }
+            )
+            print(f"[TikTok Chunk {i+1}/{total_chunks}] Status: {up_r.status_code}")
+
+        if up_r.status_code not in [200, 201, 206]:
+            raise HTTPException(400, f"Chunk upload failed: {up_r.status_code} — {up_r.text[:200]}")
+
+    return {
+        "success":    True,
+        "publish_id": publish_id,
+        "message":    "Uploaded to TikTok! ✅ Open TikTok app to review and publish.",
+    }
 
 @router.post("/upload")
 async def tiktok_upload(body: UploadRequest, sb=Depends(get_sb)):

@@ -174,36 +174,23 @@ function UploadTab({ userId, ttStatus }) {
     setVideoFile(f); setPreview(URL.createObjectURL(f))
   }
 
-  const uploadToSupabase = async (file) => {
-    const ext  = file.name.split('.').pop() || 'mp4'
-    const name = `tiktok/${userId}/${Date.now()}.${ext}`
-    const { error } = await supabase.storage.from('posts').upload(name, file, { upsert: true, contentType: file.type })
-    if (error) throw new Error('Upload failed: ' + error.message)
-    return supabase.storage.from('posts').getPublicUrl(name).data.publicUrl
-  }
-
   const handlePost = async () => {
     if (!videoFile) { setMsg('Select a video first.'); setState('error'); return }
     if (!title.trim()) { setMsg('Add a title/caption.'); setState('error'); return }
     setState('loading'); setMsg('')
 
     try {
-      // Upload to Supabase first to get public URL
-      const videoUrl = await uploadToSupabase(videoFile)
+      // Direct upload to TikTok — no Supabase URL needed
+      const form = new FormData()
+      form.append('user_id',         userId)
+      form.append('title',           title)
+      form.append('privacy',         privacy)
+      form.append('disable_duet',    String(disableDuet))
+      form.append('disable_stitch',  String(disableStitch))
+      form.append('disable_comment', String(disableComment))
+      form.append('file',            videoFile)
 
-      const r = await fetch(`${API}/api/tiktok/upload`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id:         userId,
-          title,
-          video_url:       videoUrl,
-          privacy,
-          disable_duet:    disableDuet,
-          disable_stitch:  disableStitch,
-          disable_comment: disableComment,
-        }),
-      })
+      const r = await fetch(`${API}/api/tiktok/upload-file`, { method: 'POST', body: form })
       const d = await r.json()
       if (!r.ok) throw new Error(d.detail || 'Upload failed.')
       setState('success'); setResult(d)
