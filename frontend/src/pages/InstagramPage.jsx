@@ -119,6 +119,7 @@ export default function InstagramPage() {
     { key: 'feed',      label: 'My Posts',  icon: <Grid size={14} />          },
     { key: 'analytics', label: 'Analytics', icon: <BarChart2 size={14} />    },
     { key: 'inbox',     label: 'Comments',  icon: <MessageCircle size={14} /> },
+    { key: 'dms',       label: 'DMs',       icon: <Send size={14} />          },
   ]
 
   return (
@@ -163,6 +164,7 @@ export default function InstagramPage() {
       {tab === 'feed'      && <FeedTab      userId={userId} />}
       {tab === 'analytics' && <AnalyticsTab userId={userId} />}
       {tab === 'inbox'     && <InboxTab     userId={userId} />}
+      {tab === 'dms'       && <DMsTab       userId={userId} />}
     </div>
   )
 }
@@ -639,6 +641,127 @@ function InboxTab({ userId }) {
                   onBlur={e => e.target.style.borderColor='rgba(188,24,136,0.2)'} />
                 <button style={igBtn(sending)} onClick={() => sendReply(selected.id)} disabled={sending}>
                   {sending ? 'Sending...' : <><Send size={14} /> Reply</>}
+                </button>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DMs TAB
+// ─────────────────────────────────────────────────────────────────────────────
+function DMsTab({ userId }) {
+  const [convos,   setConvos]   = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [selected, setSelected] = useState(null)
+  const [reply,    setReply]    = useState('')
+  const [sending,  setSending]  = useState(false)
+  const [sent,     setSent]     = useState({})
+  const [note,     setNote]     = useState(null)
+
+  useEffect(() => {
+    fetch(`${API}/api/instagram/messages/${userId}`)
+      .then(r => r.json())
+      .then(d => {
+        setConvos(d.conversations || [])
+        setNote(d.note)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [userId])
+
+  const sendMsg = async (recipientId) => {
+    if (!reply.trim()) return
+    setSending(true)
+    try {
+      const r = await fetch(`${API}/api/instagram/send-message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, recipient: recipientId, message: reply }),
+      })
+      if (r.ok) { setSent({ ...sent, [recipientId]: true }); setReply('') }
+    } catch {}
+    setSending(false)
+  }
+
+  if (loading) return <div style={{ color: '#9CA3AF', textAlign: 'center', padding: 48 }}>Loading DMs...</div>
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 16 }}>
+      <div style={card}>
+        <h3 style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: '#fff', margin: '0 0 14px' }}>
+          Direct Messages
+        </h3>
+
+        {note && (
+          <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', marginBottom: 14 }}>
+            <p style={{ fontSize: 12, color: '#FBBF24', margin: 0 }}>ℹ️ {note}</p>
+          </div>
+        )}
+
+        {convos.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '32px 0', color: '#6B7280' }}>
+            <Send size={28} style={{ display: 'block', margin: '0 auto 10px', opacity: .3 }} />
+            <p style={{ fontSize: 13, margin: 0 }}>No DMs found</p>
+            <p style={{ fontSize: 11, color: '#4B5563', marginTop: 6 }}>
+              DMs require Business account connected to Facebook Page
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {convos.map(c => (
+              <div key={c.id} onClick={() => setSelected(c)}
+                style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                  background: selected?.id === c.id ? 'rgba(188,24,136,0.1)' : 'transparent',
+                  border: selected?.id === c.id ? '1px solid rgba(188,24,136,0.3)' : '1px solid transparent' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#F9A8D4', marginBottom: 3 }}>@{c.from}</div>
+                <div style={{ fontSize: 12, color: '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.last_message}</div>
+                <div style={{ fontSize: 10, color: '#6B7280', marginTop: 2 }}>{timeAgo(c.timestamp)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={card}>
+        {!selected ? (
+          <div style={{ textAlign: 'center', padding: '48px 20px', color: '#6B7280' }}>
+            <Send size={34} style={{ display: 'block', margin: '0 auto 14px', opacity: .3 }} />
+            Select a conversation to reply
+          </div>
+        ) : (
+          <>
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#F9A8D4', marginBottom: 12 }}>@{selected.from}</div>
+              {selected.messages?.map((m, i) => (
+                <div key={i} style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', marginBottom: 6, fontSize: 13, color: '#F3E8FF', lineHeight: 1.5 }}>
+                  <span style={{ fontSize: 10, color: '#6B7280', display: 'block', marginBottom: 3 }}>
+                    {m.from?.username || 'You'} · {timeAgo(m.created_time)}
+                  </span>
+                  {m.message}
+                </div>
+              ))}
+            </div>
+
+            {sent[selected.id] ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#00E5A0', fontSize: 13 }}>
+                <CheckCircle size={15} /> Message sent!
+              </div>
+            ) : (
+              <>
+                <label style={lbl}>Reply</label>
+                <textarea style={{ ...ta, minHeight: 72, marginBottom: 10 }}
+                  value={reply} onChange={e => setReply(e.target.value)}
+                  placeholder="Write your reply..."
+                  onFocus={e => e.target.style.borderColor='rgba(188,24,136,0.5)'}
+                  onBlur={e => e.target.style.borderColor='rgba(188,24,136,0.2)'} />
+                <button style={igBtn(sending)} onClick={() => sendMsg(selected.id)} disabled={sending}>
+                  {sending ? 'Sending...' : <><Send size={14} /> Send Message</>}
                 </button>
               </>
             )}

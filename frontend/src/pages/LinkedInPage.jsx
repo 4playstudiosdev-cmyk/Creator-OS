@@ -178,30 +178,13 @@ function PostTab({ userId, liStatus }) {
   }
 
   const uploadImageToSupabase = async (file) => {
-    // Use the already imported supabase client from lib
-    const { supabase: sb } = await import('../lib/supabaseClient')
     const ext      = file.name.split('.').pop() || 'jpg'
     const filename = `linkedin/${userId}/${Date.now()}.${ext}`
-
-    const { error } = await sb.storage
-      .from('posta')
-      .upload(filename, file, {
-        cacheControl: '3600',
-        upsert: true,
-        contentType: file.type,
-      })
-
-    if (error) {
-      // If bucket doesnt exist, try media bucket
-      const { error: err2, data: d2 } = await sb.storage
-        .from('media')
-        .upload(filename, file, { upsert: true, contentType: file.type })
-      if (err2) throw new Error(`Image upload failed: ${error.message}. Try creating a "posts" or "media" bucket in Supabase Storage.`)
-      const { data } = sb.storage.from('media').getPublicUrl(filename)
-      return data.publicUrl
-    }
-
-    const { data } = sb.storage.from('posta').getPublicUrl(filename)
+    const { error } = await supabase.storage
+      .from('posts')
+      .upload(filename, file, { cacheControl: '3600', upsert: true, contentType: file.type })
+    if (error) throw new Error('Image upload failed: ' + error.message)
+    const { data } = supabase.storage.from('posts').getPublicUrl(filename)
     return data.publicUrl
   }
 

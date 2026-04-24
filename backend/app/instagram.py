@@ -632,3 +632,81 @@ async def reply_to_comment(body: ReplyRequest, sb=Depends(get_sb)):
     if "error" in d:
         raise HTTPException(400, d["error"]["message"])
     return {"success": True, "reply_id": d.get("id")}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 13. DMs / MESSAGES INBOX
+# ─────────────────────────────────────────────────────────────────────────────
+@router.get("/messages/{user_id}")
+async def get_messages(user_id: str, sb=Depends(get_sb)):
+    """
+    Get Instagram DMs/conversations.
+    Requires instagram_manage_messages permission.
+    Works with Business accounts connected to Facebook Page.
+    """
+    tok, ig_uid = get_token(user_id, sb)
+
+    async with httpx.AsyncClient(timeout=20) as c:
+        r = await c.get(
+            f"{IG_GRAPH}/{ig_uid}/conversations",
+            params={
+                "platform":     "instagram",
+                "fields":       "id,messages{message,from,to,created_time}",
+                "access_token": tok,
+            }
+        )
+        print(f"[Instagram DMs] Status: {r.status_code}")
+        d = r.json()
+
+    if "error" in d:
+        # DMs require Business account + Facebook Page connection
+        return {
+            "conversations": [],
+            "total": 0,
+            "note": f"DMs require Business account with Facebook Page. Error: {d['error']['message']}"
+        }
+
+    conversations = []
+    for conv in d.get("data", []):
+        msgs = conv.get("messages", {}).get("data", [])
+        if not msgs:
+            continue
+        latest = msgs[0]
+        conversations.append({
+            "id":           conv["id"],
+            "last_message": latest.get("message", ""),
+            "from":         latest.get("from", {}).get("username", "Unknown"),
+            "timestamp":    latest.get("created_time", ""),
+            "messages":     msgs[:10],
+        })
+
+    return {
+        "conversations": conversations,
+        "total":         len(conversations),
+    }
+
+
+class SendMessageRequest(BaseModel):
+    user_id:    str
+    recipient:  str  # Instagram user ID
+    message:    str
+
+@router.post("/send-message")
+async def send_message(body: SendMessageRequest, sb=Depends(get_sb)):
+    """Send DM to Instagram user."""
+    tok, ig_uid = get_token(body.user_id, sb)
+
+    async with httpx.AsyncClient(timeout=20) as c:
+        r = await c.post(
+            f"{IG_GRAPH}/{ig_uid}/messages",
+            params={"access_token": tok},
+            json={
+                "recipient": {"id": body.recipient},
+                "message":   {"text": body.message},
+            }
+        )
+        d = r.json()
+
+    if "error" in d:
+        raise HTTPException(400, f"Message failed: {d['error']['message']}")
+
+    return {"success": True, "message_id": d.get("message_id")}
