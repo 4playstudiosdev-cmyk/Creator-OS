@@ -112,7 +112,7 @@ export default function InstagramPage() {
     { key: 'feed',      label: 'My Posts',  icon: <Grid size={14} />           },
     { key: 'analytics', label: 'Analytics', icon: <BarChart2 size={14} />     },
     { key: 'comments',  label: 'Comments',  icon: <MessageCircle size={14} /> },
-    { key: 'dms',       label: 'DMs',       icon: <Send size={14} />           },
+    { key: 'dms',       label: 'DMs 🔒',    icon: <Send size={14} />           },
   ]
 
   return (

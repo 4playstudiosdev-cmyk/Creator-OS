@@ -38,6 +38,8 @@ export default function SettingsPage() {
   const [ytConnected,       setYtConnected]       = useState(false)
   const [linkedinConnected, setLinkedinConnected] = useState(false)
   const [igConnected,       setIgConnected]       = useState(false)
+  const [ttConnected,       setTtConnected]       = useState(false)
+  const [ttStats,           setTtStats]           = useState(null)
   const [youtubeStats,      setYoutubeStats]      = useState(null)
   const [linkedinStats,     setLinkedinStats]     = useState(null)
   const [igStats,           setIgStats]           = useState(null)
@@ -80,6 +82,18 @@ export default function SettingsPage() {
         setMessage({ type: 'error', text: `LinkedIn failed: ${params.get('linkedin_error')}` })
         setActiveTab('social')
         window.history.replaceState({}, '', '/settings')
+      }
+
+      // TikTok
+      if (params.get('tiktok_connected') === 'true') {
+        setTtConnected(true)
+        setMessage({ type: 'success', text: 'TikTok connected! ✅' })
+        setActiveTab('social')
+        window.history.replaceState({}, '', '/settings')
+      }
+      if (params.get('tiktok_error')) {
+        setMessage({ type: 'error', text: `TikTok failed: ${params.get('tiktok_error')}` })
+        setActiveTab('social')
       }
 
       // Instagram
@@ -125,6 +139,14 @@ export default function SettingsPage() {
       setIgConnected(d.connected === true)
       if (d.connected) setIgStats({ username: d.username, name: d.name, picture: d.picture })
     } catch { setIgConnected(false) }
+
+    // TikTok
+    try {
+      const r = await fetch(`${BACKEND}/api/tiktok/status/${uid}`)
+      const d = await r.json()
+      setTtConnected(d.connected === true)
+      if (d.connected) setTtStats({ username: d.username, display_name: d.display_name, avatar: d.avatar })
+    } catch { setTtConnected(false) }
   }
 
   // ── Load detailed stats ────────────────────────────────────────────────────
@@ -208,6 +230,18 @@ export default function SettingsPage() {
     await fetch(`${BACKEND}/api/instagram/disconnect/${userId}`, { method: 'DELETE' })
     setIgConnected(false); setIgStats(null)
     setMessage({ type: 'success', text: 'Instagram disconnected.' })
+  }
+
+  const handleConnectTikTok = () => {
+    if (!userId) return
+    window.location.href = `${BACKEND}/api/tiktok/auth?user_id=${userId}`
+  }
+
+  const handleDisconnectTikTok = async () => {
+    if (!userId || !window.confirm('Disconnect TikTok?')) return
+    await fetch(`${BACKEND}/api/tiktok/disconnect/${userId}`, { method: 'DELETE' })
+    setTtConnected(false); setTtStats(null)
+    setMessage({ type: 'success', text: 'TikTok disconnected.' })
   }
 
   const TABS = [
@@ -440,6 +474,33 @@ export default function SettingsPage() {
                 <span style={{ fontSize: 10, padding: '3px 10px', background: 'rgba(225,48,108,0.1)', border: '1px solid rgba(225,48,108,0.25)', color: '#F9A8D4', borderRadius: 100, fontWeight: 700 }}>📸 Post Ready</span>
                 <span style={{ fontSize: 10, padding: '3px 10px', background: 'rgba(0,229,160,0.1)', border: '1px solid rgba(0,229,160,0.25)', color: '#00E5A0', borderRadius: 100, fontWeight: 700 }}>💬 Comments Ready</span>
                 <span style={{ fontSize: 10, padding: '3px 10px', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60A5FA', borderRadius: 100, fontWeight: 700 }}>📊 Analytics Ready</span>
+              </div>
+            )}
+          </PlatformCard>
+
+          {/* TikTok */}
+          <PlatformCard
+            name="TikTok" description="Upload videos, view stats, manage content"
+            icon={<span style={{ color: '#fff', fontSize: 16, fontWeight: 900 }}>♪</span>}
+            iconBg="#010101" accent="#FE2C55" accentRgb="254,44,85"
+            connected={ttConnected}
+            connectedLabel={ttStats ? `@${ttStats.username || ttStats.display_name} · Connected ✅` : 'TikTok Connected ✅'}
+            onConnect={handleConnectTikTok}
+            onDisconnect={handleDisconnectTikTok}
+          >
+            {ttConnected && ttStats && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(254,44,85,0.15)', borderRadius: 12 }}>
+                {ttStats.avatar && <img src={ttStats.avatar} alt="" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover' }} />}
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: 13, color: '#f0f0f5', margin: 0 }}>{ttStats.display_name}</p>
+                  <p style={{ fontSize: 11, color: '#4b5563', margin: 0 }}>@{ttStats.username}</p>
+                </div>
+              </div>
+            )}
+            {ttConnected && (
+              <div style={{ display: 'flex', gap: 7, marginTop: 10 }}>
+                <span style={{ fontSize: 10, padding: '3px 10px', background: 'rgba(254,44,85,0.1)', border: '1px solid rgba(254,44,85,0.25)', color: '#FE2C55', borderRadius: 100, fontWeight: 700 }}>🎵 Upload Ready</span>
+                <span style={{ fontSize: 10, padding: '3px 10px', background: 'rgba(0,229,160,0.1)', border: '1px solid rgba(0,229,160,0.25)', color: '#00E5A0', borderRadius: 100, fontWeight: 700 }}>📊 Stats Ready</span>
               </div>
             )}
           </PlatformCard>

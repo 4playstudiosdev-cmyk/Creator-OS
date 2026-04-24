@@ -5,6 +5,7 @@ from app.api import posts, media_kit, ai, deals, social, captions, clipping
 from app.api.scheduler import start_scheduler
 from app.api.youtube import router as youtube_router
 from app.api.linkedin import router as linkedin_router
+from app.api.tiktok   import router as tiktok_router
 from app.instagram import router as instagram_router
 
 load_dotenv()
@@ -30,6 +31,7 @@ app.add_middleware(
 app.include_router(instagram_router)
 app.include_router(youtube_router)
 app.include_router(linkedin_router)
+app.include_router(tiktok_router)
 app.include_router(posts.router,     prefix="/api/posts")
 app.include_router(media_kit.router, prefix="/api/media-kit")
 app.include_router(ai.router,        prefix="/api/ai")
