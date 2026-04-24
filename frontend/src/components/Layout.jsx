@@ -15,6 +15,7 @@ const navItems = [
   { name: 'YouTube Studio', path: '/youtube-studio', icon: Youtube, color: '#FF0000' },
   { name: 'LinkedIn',       path: '/linkedin',       icon: Linkedin, color: '#0A66C2' },
   { name: 'Instagram',      path: '/instagram',      icon: Instagram, color: '#E1306C' },
+  { name: 'TikTok',         path: '/tiktok',         icon: Music,     color: '#FE2C55' },
   { name: 'AI Tools',       path: '/ai-tools',       icon: Brain           },
   { name: 'Inbox',          path: '/inbox',          icon: Inbox           },
   { name: 'Analytics',      path: '/analytics',      icon: BarChart2       },

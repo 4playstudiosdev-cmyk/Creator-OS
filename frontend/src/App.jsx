@@ -39,6 +39,7 @@ import SettingsPage     from './pages/SettingsPage'
 import AgencyPage       from './pages/AgencyPage'
 import InstagramPage    from './pages/InstagramPage'
 import LinkedInPage     from './pages/LinkedInPage'
+import TikTokPage       from './pages/TikTokPage'
 
 import './index.css'
 
@@ -120,6 +121,7 @@ export default function App() {
             <Route path="/settings"       element={<SettingsPage />} />
             <Route path="/linkedin"       element={<LinkedInPage />} />
             <Route path="/instagram"      element={<InstagramPage />} />
+            <Route path="/tiktok"         element={<TikTokPage />} />
           </Route>
 
           {/* Agency layout */}
