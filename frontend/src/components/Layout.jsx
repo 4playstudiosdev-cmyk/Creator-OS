@@ -3,7 +3,7 @@ import {
   LayoutDashboard, CalendarDays, Sparkles, Brain,
   Inbox, BarChart2, Briefcase, FileText, TrendingUp,
   CreditCard, Settings, LogOut, DollarSign, FileVideo,
-  Youtube, Scissors, Film, Instagram, Linkedin,
+  Youtube, Scissors, Film, Instagram, Linkedin, Music2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 
@@ -15,7 +15,7 @@ const navItems = [
   { name: 'YouTube Studio', path: '/youtube-studio', icon: Youtube, color: '#FF0000' },
   { name: 'LinkedIn',       path: '/linkedin',       icon: Linkedin, color: '#0A66C2' },
   { name: 'Instagram',      path: '/instagram',      icon: Instagram, color: '#E1306C' },
-  { name: 'TikTok',         path: '/tiktok',         icon: Music,     color: '#FE2C55' },
+  { name: 'TikTok',         path: '/tiktok',         icon: Music2,     color: '#FE2C55' },
   { name: 'AI Tools',       path: '/ai-tools',       icon: Brain           },
   { name: 'Inbox',          path: '/inbox',          icon: Inbox           },
   { name: 'Analytics',      path: '/analytics',      icon: BarChart2       },
