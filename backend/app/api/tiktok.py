@@ -291,11 +291,22 @@ class UploadRequest(BaseModel):
 
 @router.post("/upload")
 async def tiktok_upload(body: UploadRequest, sb=Depends(get_sb)):
-    """Upload video to TikTok via URL."""
+    """Upload video to TikTok via file chunks (push_by_file)."""
     token, _ = get_token(body.user_id, sb)
 
-    async with httpx.AsyncClient(timeout=60) as c:
-        r = await c.post(
+    # Download video from Supabase URL
+    try:
+        async with httpx.AsyncClient(timeout=120) as c:
+            video_r = await c.get(body.video_url)
+            video_bytes = video_r.content
+            video_size  = len(video_bytes)
+        print(f"[TikTok Upload] Downloaded {video_size} bytes")
+    except Exception as e:
+        raise HTTPException(400, f"Could not download video: {str(e)}")
+
+    # Step 1: Init upload
+    async with httpx.AsyncClient(timeout=30) as c:
+        init_r = await c.post(
             f"{TT_API}/post/publish/video/init/",
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             json={
@@ -307,22 +318,46 @@ async def tiktok_upload(body: UploadRequest, sb=Depends(get_sb)):
                     "disable_comment": body.disable_comment,
                 },
                 "source_info": {
-                    "source":    "PULL_FROM_URL",
-                    "video_url": body.video_url,
+                    "source":     "FILE_UPLOAD",
+                    "video_size": video_size,
+                    "chunk_size": video_size,  # single chunk
+                    "total_chunk_count": 1,
                 }
             }
         )
-        d = r.json()
-        print(f"[TikTok Upload] Status: {r.status_code}, Body: {d}")
+        init_d = init_r.json()
+        print(f"[TikTok Init] {init_d}")
 
-    if d.get("error", {}).get("code", "ok") != "ok":
-        raise HTTPException(400, f"TikTok upload failed: {d.get('error', {}).get('message', 'Unknown error')}")
+    if init_d.get("error", {}).get("code", "ok") != "ok":
+        raise HTTPException(400, f"TikTok init failed: {init_d.get('error', {}).get('message', 'Unknown')}")
 
-    publish_id = d.get("data", {}).get("publish_id", "")
+    data        = init_d.get("data", {})
+    publish_id  = data.get("publish_id", "")
+    upload_url  = data.get("upload_url", "")
+
+    if not upload_url:
+        raise HTTPException(400, "No upload URL returned from TikTok.")
+
+    # Step 2: Upload video chunk
+    async with httpx.AsyncClient(timeout=300) as c:
+        up_r = await c.put(
+            upload_url,
+            content=video_bytes,
+            headers={
+                "Content-Type":         "video/mp4",
+                "Content-Length":       str(video_size),
+                "Content-Range":        f"bytes 0-{video_size-1}/{video_size}",
+            }
+        )
+        print(f"[TikTok Chunk Upload] Status: {up_r.status_code}")
+
+    if up_r.status_code not in [200, 201, 206]:
+        raise HTTPException(400, f"TikTok chunk upload failed: {up_r.status_code}")
+
     return {
         "success":    True,
         "publish_id": publish_id,
-        "message":    "Video uploaded to TikTok! ✅ Check TikTok app to review and post.",
+        "message":    "Video uploaded to TikTok! ✅ Open TikTok app to review and publish.",
     }
 
 
