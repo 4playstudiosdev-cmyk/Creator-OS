@@ -75,7 +75,7 @@ async def tiktok_auth(user_id: str):
     params = {
         "client_key":             CLIENT_KEY,
         "response_type":          "code",
-        "scope":                  "user.info.basic,video.upload,user.info.profile,user.info.stats,video.list",
+        "scope":                  "user.info.basic,video.upload,video.publish,user.info.profile,user.info.stats,video.list",
         "redirect_uri":           REDIRECT_URI,
         "state":                  state,
         "code_challenge":         code_challenge,
