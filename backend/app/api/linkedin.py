@@ -236,26 +236,80 @@ async def linkedin_post(body: PostRequest, sb=Depends(get_sb)):
     
     print(f"[LinkedIn Post] author={author}, post_as={body.post_as}")
 
-    # Build post body — text only or with article link
+    # Build post body
     if body.image_url:
-        post_body = {
-            "author":         author,
-            "lifecycleState": "PUBLISHED",
-            "specificContent": {
-                "com.linkedin.ugc.ShareContent": {
-                    "shareCommentary":    {"text": body.text},
-                    "shareMediaCategory": "ARTICLE",
-                    "media": [{
-                        "status":      "READY",
-                        "originalUrl": body.image_url,
-                        "description": {"text": body.text[:200]},
-                    }]
-                }
-            },
-            "visibility": {
-                "com.linkedin.ugc.MemberNetworkVisibility": body.visibility
-            },
-        }
+        # Step 1: Register image upload with LinkedIn
+        async with httpx.AsyncClient(timeout=30) as c:
+            reg_r = await c.post(
+                f"{LI_API}/assets?action=registerUpload",
+                json={
+                    "registerUploadRequest": {
+                        "recipes":              ["urn:li:digitalmediaRecipe:feedshare-image"],
+                        "owner":                author,
+                        "serviceRelationships": [{
+                            "relationshipType": "OWNER",
+                            "identifier":       "urn:li:userGeneratedContent"
+                        }]
+                    }
+                },
+                headers={
+                    "Authorization":             f"Bearer {token}",
+                    "Content-Type":              "application/json",
+                    "X-Restli-Protocol-Version": "2.0.0",
+                },
+            )
+        print(f"[LinkedIn Image] Register status: {reg_r.status_code}, body: {reg_r.text[:200]}")
+
+        asset = None
+        if reg_r.status_code == 200:
+            reg_data   = reg_r.json()
+            upload_url = reg_data["value"]["uploadMechanism"]["com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"]["uploadUrl"]
+            asset      = reg_data["value"]["asset"]
+
+            # Step 2: Download image and upload to LinkedIn
+            try:
+                async with httpx.AsyncClient(timeout=60) as c:
+                    img_r     = await c.get(body.image_url)
+                    img_bytes = img_r.content
+                    ct        = img_r.headers.get("content-type", "image/jpeg")
+
+                async with httpx.AsyncClient(timeout=60) as c:
+                    up_r = await c.put(
+                        upload_url,
+                        content=img_bytes,
+                        headers={"Authorization": f"Bearer {token}", "Content-Type": ct},
+                    )
+                print(f"[LinkedIn Image] Upload status: {up_r.status_code}")
+            except Exception as e:
+                print(f"[LinkedIn Image] Upload failed: {e}")
+                asset = None
+
+        if asset:
+            post_body = {
+                "author":         author,
+                "lifecycleState": "PUBLISHED",
+                "specificContent": {
+                    "com.linkedin.ugc.ShareContent": {
+                        "shareCommentary":    {"text": body.text},
+                        "shareMediaCategory": "IMAGE",
+                        "media": [{"status": "READY", "media": asset}]
+                    }
+                },
+                "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": body.visibility},
+            }
+        else:
+            # Fallback: text only
+            post_body = {
+                "author":         author,
+                "lifecycleState": "PUBLISHED",
+                "specificContent": {
+                    "com.linkedin.ugc.ShareContent": {
+                        "shareCommentary":    {"text": body.text},
+                        "shareMediaCategory": "NONE",
+                    }
+                },
+                "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": body.visibility},
+            }
     else:
         post_body = {
             "author":         author,
@@ -266,9 +320,7 @@ async def linkedin_post(body: PostRequest, sb=Depends(get_sb)):
                     "shareMediaCategory": "NONE",
                 }
             },
-            "visibility": {
-                "com.linkedin.ugc.MemberNetworkVisibility": body.visibility
-            },
+            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": body.visibility},
         }
 
     async with httpx.AsyncClient(timeout=30) as c:
