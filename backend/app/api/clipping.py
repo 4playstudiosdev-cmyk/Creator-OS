@@ -506,3 +506,189 @@ async def upload_to_youtube(
         }
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VIDEO EDITOR ENDPOINTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+import asyncio
+
+@router.post("/editor/upload")
+async def editor_upload(file: UploadFile = File(...)):
+    """Upload video to server for editing. Returns file_id + duration + metadata."""
+    suffix   = os.path.splitext(file.filename or "video.mp4")[1] or ".mp4"
+    file_id  = str(uuid.uuid4())
+    tmp_path = os.path.join(CLIPS_DIR, f"editor_{file_id}{suffix}")
+
+    content  = await file.read()
+    with open(tmp_path, "wb") as f:
+        f.write(content)
+
+    duration = get_video_duration(tmp_path)
+
+    # Get video info via ffprobe
+    probe_r = subprocess.run(
+        ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams", tmp_path],
+        capture_output=True, text=True
+    )
+    width = height = 0
+    try:
+        streams = json.loads(probe_r.stdout).get("streams", [])
+        for s in streams:
+            if s.get("codec_type") == "video":
+                width  = s.get("width", 0)
+                height = s.get("height", 0)
+                break
+    except Exception:
+        pass
+
+    return {
+        "file_id":  file_id,
+        "filename": os.path.basename(tmp_path),
+        "duration": round(duration, 2),
+        "width":    width,
+        "height":   height,
+        "size_mb":  round(len(content) / 1024 / 1024, 2),
+        "path":     tmp_path,
+    }
+
+
+@router.post("/editor/trim")
+async def editor_trim(
+    file_id:    str   = Form(...),
+    start_time: float = Form(...),   # seconds
+    end_time:   float = Form(...),   # seconds
+    output_format: str = Form("mp4"),
+):
+    """Trim video from start_time to end_time."""
+    # Find the uploaded file
+    pattern = os.path.join(CLIPS_DIR, f"editor_{file_id}*")
+    import glob
+    matches = glob.glob(pattern)
+    if not matches:
+        raise HTTPException(404, "File not found. Please upload again.")
+
+    input_path  = matches[0]
+    output_id   = str(uuid.uuid4())
+    output_path = os.path.join(CLIPS_DIR, f"trimmed_{output_id}.{output_format}")
+
+    duration = end_time - start_time
+    if duration <= 0:
+        raise HTTPException(400, "End time must be after start time.")
+
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(None, lambda: subprocess.run(
+            [
+                "ffmpeg", "-y",
+                "-ss", str(start_time),
+                "-i", input_path,
+                "-t", str(duration),
+                "-c:v", "libx264", "-crf", "23",
+                "-c:a", "aac",
+                "-movflags", "+faststart",
+                output_path
+            ],
+            capture_output=True, text=True, timeout=300
+        ))
+        if not os.path.exists(output_path):
+            raise HTTPException(500, f"FFmpeg failed: {result.stderr[-300:]}")
+    except Exception as e:
+        raise HTTPException(500, f"Trim failed: {str(e)}")
+
+    size_mb = round(os.path.getsize(output_path) / 1024 / 1024, 2)
+    return {
+        "success":      True,
+        "output_id":    output_id,
+        "download_url": f"/api/clipping/editor/download/{output_id}",
+        "duration":     duration,
+        "size_mb":      size_mb,
+    }
+
+
+@router.post("/editor/cut")
+async def editor_cut(
+    file_id:    str   = Form(...),
+    cuts:       str   = Form(...),   # JSON: [{"start": 0, "end": 10}, {"start": 20, "end": 35}]
+    output_format: str = Form("mp4"),
+):
+    """
+    Cut and join multiple segments from a video.
+    cuts: JSON array of {start, end} objects in seconds.
+    """
+    import glob
+    pattern = os.path.join(CLIPS_DIR, f"editor_{file_id}*")
+    matches = glob.glob(pattern)
+    if not matches:
+        raise HTTPException(404, "File not found. Please upload again.")
+
+    input_path = matches[0]
+    try:
+        segments = json.loads(cuts)
+    except Exception:
+        raise HTTPException(400, "Invalid cuts format. Expected JSON array.")
+
+    if not segments:
+        raise HTTPException(400, "No segments provided.")
+
+    output_id    = str(uuid.uuid4())
+    output_path  = os.path.join(CLIPS_DIR, f"cut_{output_id}.{output_format}")
+
+    # Build ffmpeg filter_complex for joining segments
+    filter_parts = []
+    for i, seg in enumerate(segments):
+        s, e = seg["start"], seg["end"]
+        filter_parts.append(f"[0:v]trim=start={s}:end={e},setpts=PTS-STARTPTS[v{i}];")
+        filter_parts.append(f"[0:a]atrim=start={s}:end={e},asetpts=PTS-STARTPTS[a{i}];")
+
+    n = len(segments)
+    concat_v = "".join(f"[v{i}]" for i in range(n))
+    concat_a = "".join(f"[a{i}]" for i in range(n))
+    filter_complex = "".join(filter_parts) + f"{concat_v}concat=n={n}:v=1:a=0[vout];{concat_a}concat=n={n}:v=0:a=1[aout]"
+
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(None, lambda: subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", input_path,
+                "-filter_complex", filter_complex,
+                "-map", "[vout]", "-map", "[aout]",
+                "-c:v", "libx264", "-crf", "23",
+                "-c:a", "aac",
+                "-movflags", "+faststart",
+                output_path
+            ],
+            capture_output=True, text=True, timeout=600
+        ))
+        if not os.path.exists(output_path):
+            raise HTTPException(500, f"FFmpeg cut failed: {result.stderr[-300:]}")
+    except Exception as e:
+        raise HTTPException(500, f"Cut failed: {str(e)}")
+
+    size_mb  = round(os.path.getsize(output_path) / 1024 / 1024, 2)
+    duration = get_video_duration(output_path)
+    return {
+        "success":      True,
+        "output_id":    output_id,
+        "download_url": f"/api/clipping/editor/download/{output_id}",
+        "duration":     round(duration, 2),
+        "size_mb":      size_mb,
+        "segments":     len(segments),
+    }
+
+
+@router.get("/editor/download/{output_id}")
+async def editor_download(output_id: str):
+    """Download edited/trimmed video."""
+    import glob
+    for pattern in [f"trimmed_{output_id}.*", f"cut_{output_id}.*"]:
+        matches = glob.glob(os.path.join(CLIPS_DIR, pattern))
+        if matches:
+            path = matches[0]
+            filename = os.path.basename(path)
+            return FileResponse(
+                path,
+                media_type="video/mp4",
+                filename=f"nexora_edit_{output_id[:8]}.mp4",
+                headers={"Content-Disposition": f"attachment; filename=nexora_edit_{output_id[:8]}.mp4"}
+            )
+    raise HTTPException(404, "File not found or expired.")
