@@ -238,41 +238,55 @@ async def linkedin_post(body: PostRequest, sb=Depends(get_sb)):
 
     # Build post body
     if body.image_url:
-        # Step 1: Register image upload with LinkedIn
-        async with httpx.AsyncClient(timeout=30) as c:
-            reg_r = await c.post(
-                f"{LI_API}/assets?action=registerUpload",
-                json={
-                    "registerUploadRequest": {
-                        "recipes":              ["urn:li:digitalmediaRecipe:feedshare-image"],
-                        "owner":                author,
-                        "serviceRelationships": [{
-                            "relationshipType": "OWNER",
-                            "identifier":       "urn:li:userGeneratedContent"
-                        }]
-                    }
-                },
-                headers={
-                    "Authorization":             f"Bearer {token}",
-                    "Content-Type":              "application/json",
-                    "X-Restli-Protocol-Version": "2.0.0",
-                },
-            )
-        print(f"[LinkedIn Image] Register status: {reg_r.status_code}, body: {reg_r.text[:200]}")
-
+        # Step 1: Download image and convert to JPEG (any format supported)
         asset = None
-        if reg_r.status_code == 200:
-            reg_data   = reg_r.json()
-            upload_url = reg_data["value"]["uploadMechanism"]["com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"]["uploadUrl"]
-            asset      = reg_data["value"]["asset"]
+        try:
+            async with httpx.AsyncClient(timeout=60) as c:
+                img_r     = await c.get(body.image_url)
+                img_bytes = img_r.content
+                ct        = img_r.headers.get("content-type", "image/jpeg")
 
-            # Step 2: Download image and upload to LinkedIn
+            # Convert any image format to JPEG using Pillow
             try:
-                async with httpx.AsyncClient(timeout=60) as c:
-                    img_r     = await c.get(body.image_url)
-                    img_bytes = img_r.content
-                    ct        = img_r.headers.get("content-type", "image/jpeg")
+                from PIL import Image
+                import io
+                img_pil   = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+                buf       = io.BytesIO()
+                img_pil.save(buf, format="JPEG", quality=90)
+                img_bytes = buf.getvalue()
+                ct        = "image/jpeg"
+                print(f"[LinkedIn Image] Converted to JPEG, size: {len(img_bytes)} bytes")
+            except Exception as e:
+                print(f"[LinkedIn Image] PIL conversion failed: {e} — using original")
 
+            # Step 2: Register upload with LinkedIn
+            async with httpx.AsyncClient(timeout=30) as c:
+                reg_r = await c.post(
+                    f"{LI_API}/assets?action=registerUpload",
+                    json={
+                        "registerUploadRequest": {
+                            "recipes":              ["urn:li:digitalmediaRecipe:feedshare-image"],
+                            "owner":                author,
+                            "serviceRelationships": [{
+                                "relationshipType": "OWNER",
+                                "identifier":       "urn:li:userGeneratedContent"
+                            }]
+                        }
+                    },
+                    headers={
+                        "Authorization":             f"Bearer {token}",
+                        "Content-Type":              "application/json",
+                        "X-Restli-Protocol-Version": "2.0.0",
+                    },
+                )
+            print(f"[LinkedIn Image] Register status: {reg_r.status_code}, body: {reg_r.text[:200]}")
+
+            if reg_r.status_code == 200:
+                reg_data   = reg_r.json()
+                upload_url = reg_data["value"]["uploadMechanism"]["com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"]["uploadUrl"]
+                asset      = reg_data["value"]["asset"]
+
+                # Step 3: Upload image bytes
                 async with httpx.AsyncClient(timeout=60) as c:
                     up_r = await c.put(
                         upload_url,
@@ -280,9 +294,11 @@ async def linkedin_post(body: PostRequest, sb=Depends(get_sb)):
                         headers={"Authorization": f"Bearer {token}", "Content-Type": ct},
                     )
                 print(f"[LinkedIn Image] Upload status: {up_r.status_code}")
-            except Exception as e:
-                print(f"[LinkedIn Image] Upload failed: {e}")
-                asset = None
+                if up_r.status_code not in [200, 201]:
+                    asset = None
+        except Exception as e:
+            print(f"[LinkedIn Image] Failed: {e}")
+            asset = None
 
         if asset:
             post_body = {
@@ -298,7 +314,6 @@ async def linkedin_post(body: PostRequest, sb=Depends(get_sb)):
                 "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": body.visibility},
             }
         else:
-            # Fallback: text only
             post_body = {
                 "author":         author,
                 "lifecycleState": "PUBLISHED",
@@ -575,3 +590,142 @@ async def get_analytics(user_id: str, sb=Depends(get_sb)):
         },
         "note": "Follower count and post analytics require LinkedIn Partner Program access."
     }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VIDEO POST — Upload any video format to LinkedIn
+# ─────────────────────────────────────────────────────────────────────────────
+class VideoPostRequest(BaseModel):
+    user_id:    str
+    text:       str
+    video_url:  str        # Public URL of video (any format)
+    visibility: str = "PUBLIC"
+    post_as:    str = "person"
+    page_id:    Optional[str] = None
+
+@router.post("/post-video")
+async def linkedin_post_video(body: VideoPostRequest, sb=Depends(get_sb)):
+    """Post video to LinkedIn feed."""
+    token, person_id = get_token(body.user_id, sb)
+    author = f"urn:li:organization:{body.page_id}" if body.post_as == "page" and body.page_id else f"urn:li:person:{person_id}"
+
+    # Step 1: Download video
+    try:
+        async with httpx.AsyncClient(timeout=120) as c:
+            vid_r     = await c.get(body.video_url)
+            vid_bytes = vid_r.content
+            vid_size  = len(vid_bytes)
+        print(f"[LinkedIn Video] Downloaded {vid_size} bytes")
+    except Exception as e:
+        raise HTTPException(400, f"Could not download video: {e}")
+
+    # Step 2: Register video upload
+    async with httpx.AsyncClient(timeout=30) as c:
+        reg_r = await c.post(
+            f"{LI_API}/assets?action=registerUpload",
+            json={
+                "registerUploadRequest": {
+                    "recipes":              ["urn:li:digitalmediaRecipe:feedshare-video"],
+                    "owner":                author,
+                    "serviceRelationships": [{
+                        "relationshipType": "OWNER",
+                        "identifier":       "urn:li:userGeneratedContent"
+                    }]
+                }
+            },
+            headers={
+                "Authorization":             f"Bearer {token}",
+                "Content-Type":              "application/json",
+                "X-Restli-Protocol-Version": "2.0.0",
+            },
+        )
+    print(f"[LinkedIn Video] Register: {reg_r.status_code}, {reg_r.text[:200]}")
+
+    if reg_r.status_code != 200:
+        raise HTTPException(400, f"LinkedIn video register failed: {reg_r.text[:200]}")
+
+    reg_data   = reg_r.json()
+    upload_url = reg_data["value"]["uploadMechanism"]["com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"]["uploadUrl"]
+    asset      = reg_data["value"]["asset"]
+
+    # Step 3: Upload video
+    async with httpx.AsyncClient(timeout=300) as c:
+        up_r = await c.put(
+            upload_url,
+            content=vid_bytes,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type":  "video/mp4",
+            },
+        )
+    print(f"[LinkedIn Video] Upload: {up_r.status_code}")
+
+    if up_r.status_code not in [200, 201]:
+        raise HTTPException(400, f"Video upload failed: {up_r.status_code}")
+
+    # Step 4: Post with video
+    post_body = {
+        "author":         author,
+        "lifecycleState": "PUBLISHED",
+        "specificContent": {
+            "com.linkedin.ugc.ShareContent": {
+                "shareCommentary":    {"text": body.text},
+                "shareMediaCategory": "VIDEO",
+                "media": [{"status": "READY", "media": asset}]
+            }
+        },
+        "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": body.visibility},
+    }
+
+    async with httpx.AsyncClient(timeout=30) as c:
+        r = await c.post(
+            f"{LI_API}/ugcPosts",
+            json=post_body,
+            headers={
+                "Authorization":             f"Bearer {token}",
+                "Content-Type":              "application/json",
+                "X-Restli-Protocol-Version": "2.0.0",
+            },
+        )
+    print(f"[LinkedIn Video Post] {r.status_code}: {r.text[:200]}")
+
+    if r.status_code not in [200, 201]:
+        try:
+            err = r.json().get("message", r.text[:200])
+        except Exception:
+            err = r.text[:200]
+        raise HTTPException(400, f"LinkedIn video post failed: {err}")
+
+    return {"success": True, "message": "Video posted to LinkedIn! ✅"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# WEBHOOK — LinkedIn personal inbox via ngrok/webhook
+# ─────────────────────────────────────────────────────────────────────────────
+@router.post("/webhook")
+async def linkedin_webhook(request: Request):
+    """
+    LinkedIn webhook for receiving messages/notifications.
+    Note: LinkedIn personal messaging webhook requires Community Management API.
+    This endpoint receives and logs webhook events.
+    """
+    body = await request.json()
+    print(f"[LinkedIn Webhook] Received: {body}")
+
+    # Store in Supabase if needed
+    event_type = body.get("type", "unknown")
+    print(f"[LinkedIn Webhook] Event type: {event_type}")
+
+    return {"message": "ok"}
+
+
+@router.get("/webhook/verify")
+async def linkedin_webhook_verify(
+    hub_mode:      str = None,
+    hub_challenge: str = None,
+    hub_verify_token: str = None,
+):
+    """LinkedIn webhook verification endpoint."""
+    VERIFY_TOKEN = os.environ.get("LINKEDIN_WEBHOOK_VERIFY_TOKEN", "nexora_linkedin_webhook")
+    if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
+        return int(hub_challenge)
+    raise HTTPException(403, "Webhook verification failed.")

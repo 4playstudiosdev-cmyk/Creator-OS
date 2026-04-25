@@ -1,14 +1,10 @@
-import React, { useState, useEffect } from 'react'
-// src/pages/LinkedInPage.jsx
-// Complete LinkedIn Studio for Nexora OS
-// Features: Connect, Post, My Posts, Comments/Inbox, Analytics
-
-
+import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import {
   CheckCircle, AlertCircle, Loader, RefreshCw,
   Send, Eye, ThumbsUp, MessageCircle, Globe,
-  Lock, ArrowUpRight, Users, BarChart2, FileText
+  Lock, ArrowUpRight, Users, BarChart2, FileText,
+  Film, Image
 } from 'lucide-react'
 
 const API = 'https://creator-os-production-0bf8.up.railway.app'
@@ -153,14 +149,17 @@ function PostTab({ userId, liStatus }) {
   const [text,         setText]         = useState('')
   const [imageFile,    setImageFile]    = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
+  const [videoFile,    setVideoFile]    = useState(null)
+  const [mediaType,    setMediaType]    = useState('none') // none | image | video
   const [visibility,   setVisibility]   = useState('PUBLIC')
   const [state,        setState]        = useState('idle')
   const [msg,          setMsg]          = useState('')
   const [result,       setResult]       = useState(null)
-  const [postAs,       setPostAs]       = useState('person') // person | page
+  const [postAs,       setPostAs]       = useState('person')
   const [pages,        setPages]        = useState([{ id: '112707277', name: 'Creator OS' }])
   const [selectedPage, setSelectedPage] = useState('112707277')
-  const fileRef = React.useRef()
+  const fileRef  = React.useRef()
+  const videoRef = React.useRef()
 
   useEffect(() => {
     // Fetch user's pages
@@ -173,8 +172,16 @@ function PostTab({ userId, liStatus }) {
   const handleImageSelect = (e) => {
     const file = e.target.files[0]
     if (!file) return
-    setImageFile(file)
+    setImageFile(file); setVideoFile(null)
+    setMediaType('image')
     setImagePreview(URL.createObjectURL(file))
+  }
+
+  const handleVideoSelect = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setVideoFile(file); setImageFile(null); setImagePreview(null)
+    setMediaType('video')
   }
 
   const uploadImageToSupabase = async (file) => {
@@ -193,26 +200,36 @@ function PostTab({ userId, liStatus }) {
     setState('loading'); setMsg('')
 
     try {
-      let imageUrl = undefined
-      if (imageFile) {
-        imageUrl = await uploadImageToSupabase(imageFile)
-      }
+      if (mediaType === 'video' && videoFile) {
+        // Video post — upload to Supabase first then LinkedIn
+        const ext  = videoFile.name.split('.').pop() || 'mp4'
+        const name = `linkedin/${userId}/${Date.now()}.${ext}`
+        const { error } = await supabase.storage.from('posts').upload(name, videoFile, { upsert: true, contentType: videoFile.type })
+        if (error) throw new Error('Video upload failed: ' + error.message)
+        const videoUrl = supabase.storage.from('posts').getPublicUrl(name).data.publicUrl
 
-      const r = await fetch(`${API}/api/linkedin/post`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id:   userId,
-          text,
-          image_url: imageUrl,
-          visibility,
-          post_as:   postAs,
-          page_id:   postAs === 'page' ? selectedPage : undefined,
-        }),
-      })
-      const d = await r.json()
-      if (!r.ok) throw new Error(d.detail || 'Post failed.')
-      setState('success'); setResult(d)
+        const r = await fetch(`${API}/api/linkedin/post-video`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, text, video_url: videoUrl, visibility, post_as: postAs, page_id: postAs === 'page' ? selectedPage : undefined }),
+        })
+        const d = await r.json()
+        if (!r.ok) throw new Error(d.detail || 'Video post failed.')
+        setState('success'); setResult(d)
+      } else {
+        // Image or text post
+        let imageUrl = undefined
+        if (imageFile) imageUrl = await uploadImageToSupabase(imageFile)
+
+        const r = await fetch(`${API}/api/linkedin/post`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId, text, image_url: imageUrl, visibility, post_as: postAs, page_id: postAs === 'page' ? selectedPage : undefined }),
+        })
+        const d = await r.json()
+        if (!r.ok) throw new Error(d.detail || 'Post failed.')
+        setState('success'); setResult(d)
+      }
     } catch (e) { setState('error'); setMsg(e.message) }
   }
 
@@ -295,25 +312,53 @@ function PostTab({ userId, liStatus }) {
                 onBlur={e => e.target.style.borderColor='rgba(10,102,194,0.2)'} />
             </div>
 
-            {/* Image upload */}
+            {/* Media upload — image or video */}
             <div style={{ marginBottom: 14 }}>
-              <label style={lbl}>Image (optional)</label>
-              <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageSelect} />
-              {imagePreview ? (
+              <label style={lbl}>Media (optional)</label>
+              <input ref={fileRef}  type="file" accept="image/*"  style={{ display: 'none' }} onChange={handleImageSelect} />
+              <input ref={videoRef} type="file" accept="video/*"  style={{ display: 'none' }} onChange={handleVideoSelect} />
+
+              {/* Media type selector */}
+              {!imagePreview && !videoFile && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                  <div onClick={() => fileRef.current?.click()}
+                    style={{ flex: 1, padding: '14px', borderRadius: 10, cursor: 'pointer', textAlign: 'center', border: '2px dashed rgba(10,102,194,0.25)' }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor='rgba(10,102,194,0.5)'}
+                    onMouseLeave={e => e.currentTarget.style.borderColor='rgba(10,102,194,0.25)'}>
+                    <p style={{ color: '#475569', fontSize: 13, margin: 0 }}>🖼️ Add Image</p>
+                    <p style={{ color: '#475569', fontSize: 11, margin: '3px 0 0' }}>Any format (JPG, PNG, AVIF, WEBP)</p>
+                  </div>
+                  <div onClick={() => videoRef.current?.click()}
+                    style={{ flex: 1, padding: '14px', borderRadius: 10, cursor: 'pointer', textAlign: 'center', border: '2px dashed rgba(10,102,194,0.25)' }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor='rgba(10,102,194,0.5)'}
+                    onMouseLeave={e => e.currentTarget.style.borderColor='rgba(10,102,194,0.25)'}>
+                    <p style={{ color: '#475569', fontSize: 13, margin: 0 }}>🎥 Add Video</p>
+                    <p style={{ color: '#475569', fontSize: 11, margin: '3px 0 0' }}>MP4, MOV, AVI any format</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Image preview */}
+              {imagePreview && (
                 <div style={{ position: 'relative' }}>
                   <img src={imagePreview} alt="" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: '1px solid rgba(10,102,194,0.2)' }} />
-                  <button onClick={() => { setImageFile(null); setImagePreview(null) }}
-                    style={{ position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,0.7)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    ×
-                  </button>
+                  <button onClick={() => { setImageFile(null); setImagePreview(null); setMediaType('none') }}
+                    style={{ position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,0.7)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 14 }}>×</button>
                 </div>
-              ) : (
-                <div onClick={() => fileRef.current?.click()}
-                  style={{ border: '2px dashed rgba(10,102,194,0.25)', borderRadius: 10, padding: '20px', textAlign: 'center', cursor: 'pointer' }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor='rgba(10,102,194,0.5)'}
-                  onMouseLeave={e => e.currentTarget.style.borderColor='rgba(10,102,194,0.25)'}>
-                  <p style={{ color: '#475569', fontSize: 13, margin: 0 }}>📷 Click to add image</p>
-                  <p style={{ color: '#475569', fontSize: 11, margin: '4px 0 0' }}>JPG, PNG supported</p>
+              )}
+
+              {/* Video preview */}
+              {videoFile && (
+                <div style={{ position: 'relative', padding: '12px 14px', background: 'rgba(10,102,194,0.06)', border: '1px solid rgba(10,102,194,0.2)', borderRadius: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Film size={20} color="#60A5FA" />
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0', margin: 0 }}>{videoFile.name}</p>
+                      <p style={{ fontSize: 11, color: '#475569', margin: 0 }}>{(videoFile.size/1024/1024).toFixed(1)} MB</p>
+                    </div>
+                  </div>
+                  <button onClick={() => { setVideoFile(null); setMediaType('none') }}
+                    style={{ position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,0.7)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 14 }}>×</button>
                 </div>
               )}
             </div>
