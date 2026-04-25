@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 
+const API = 'https://creator-os-production-0bf8.up.railway.app'
+
 const IC = {
   scissors: "M6 9l6 6M6 15l6-6M20 4l-8.5 8.5M20 20l-8.5-8.5",
   upload:   "M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12",
@@ -46,7 +48,7 @@ const PROCESS_STEPS = [
   { label: 'Extract audio track',          pct: 35 },
   { label: 'Whisper AI transcription',     pct: 60 },
   { label: 'Groq AI detect best moments', pct: 80 },
-  { label: 'Cut clips with ffmpeg',        pct: 95 },
+  { label: 'Cut clips with FFmpeg',        pct: 95 },
 ]
 
 export default function AutoClippingPage() {
@@ -59,6 +61,7 @@ export default function AutoClippingPage() {
   const [aspect,      setAspect]      = useState('9:16')
   const [uploadMode,  setUploadMode]  = useState('manual')
   const [ytConnected, setYtConnected] = useState(false)
+  const [userId,      setUserId]      = useState(null)
   const [loading,     setLoading]     = useState(false)
   const [progress,    setProgress]    = useState(0)
   const [progressMsg, setProgressMsg] = useState('')
@@ -71,8 +74,15 @@ export default function AutoClippingPage() {
   const [uploadMsg,   setUploadMsg]   = useState({})
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/clipping/youtube-status')
-      .then(r => r.json()).then(d => setYtConnected(d.connected)).catch(() => {})
+    import('../lib/supabaseClient').then(({ supabase }) => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session) return
+        const uid = session.user.id
+        setUserId(uid)
+        fetch(`${API}/api/youtube/status/${uid}`)
+          .then(r => r.json()).then(d => setYtConnected(d.connected)).catch(() => {})
+      })
+    })
   }, [])
 
   const loadFile = file => {
@@ -86,17 +96,23 @@ export default function AutoClippingPage() {
     setLoading(true); setError(''); setResults(null); setProgress(5); setProgressMsg('Uploading video…')
     try {
       const fd = new FormData()
-      fd.append('file', videoFile); fd.append('clip_duration', clipDur)
-      fd.append('max_clips', maxClips); fd.append('aspect_ratio', aspect)
+      fd.append('file', videoFile)
+      fd.append('clip_duration', clipDur)
+      fd.append('max_clips', maxClips)
+      fd.append('aspect_ratio', aspect)
 
       let si = 0
       const iv = setInterval(() => {
-        if (si < PROCESS_STEPS.length) { setProgress(PROCESS_STEPS[si].pct); setProgressMsg(PROCESS_STEPS[si].label); si++ }
+        if (si < PROCESS_STEPS.length) {
+          setProgress(PROCESS_STEPS[si].pct)
+          setProgressMsg(PROCESS_STEPS[si].label)
+          si++
+        }
       }, 3200)
 
-      const res = await fetch('http://localhost:8000/api/clipping/detect-clips', { method: 'POST', body: fd })
+      const res = await fetch(`${API}/api/clipping/detect-clips`, { method: 'POST', body: fd })
       clearInterval(iv)
-      let data; try { data = JSON.parse(await res.text()) } catch { throw new Error('Server response could not be parsed') }
+      const data = await res.json()
       if (!res.ok) throw new Error(data.detail || `Server error ${res.status}`)
 
       setProgress(100); setProgressMsg(`${data.total_clips} clips ready!`)
@@ -121,18 +137,24 @@ export default function AutoClippingPage() {
   const downloadClip = async clip => {
     setDownloading(p => ({ ...p, [clip.id]: true }))
     try {
-      const res = await fetch(`http://localhost:8000${clip.download_url}`)
+      const res = await fetch(`${API}${clip.download_url}`)
       if (!res.ok) throw new Error('Download failed')
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
-      const a = document.createElement('a'); a.href = url; a.download = `${clip.title.replace(/\s+/g, '_')}_${clip.duration}s.mp4`; a.click()
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${(clip.title || 'clip').replace(/\s+/g, '_')}_${clip.duration}s.mp4`
+      a.click()
       URL.revokeObjectURL(url)
     } catch (e) { alert('Download failed: ' + e.message) }
     finally { setDownloading(p => ({ ...p, [clip.id]: false })) }
   }
 
   const downloadAll = async () => {
-    for (const clip of results.clips) { await downloadClip(clip); await new Promise(r => setTimeout(r, 800)) }
+    for (const clip of results.clips) {
+      await downloadClip(clip)
+      await new Promise(r => setTimeout(r, 800))
+    }
   }
 
   const uploadToYouTube = async (clip, metaOverride) => {
@@ -142,11 +164,14 @@ export default function AutoClippingPage() {
     setUploadMsg(p => ({ ...p, [clip.id]: '📤 Uploading to YouTube…' }))
     try {
       const fd = new FormData()
-      fd.append('filename', clip.filename); fd.append('title', m.title || clip.title || 'Short Clip')
-      fd.append('description', m.description || ''); fd.append('hashtags', m.hashtags || '#Shorts')
-      fd.append('privacy', m.privacy || 'public')
-      const res = await fetch('http://localhost:8000/api/clipping/upload-youtube', { method: 'POST', body: fd })
-      let data; try { data = JSON.parse(await res.text()) } catch { throw new Error('Response parse error') }
+      fd.append('filename',    clip.filename || '')
+      fd.append('title',       m.title || clip.title || 'Short Clip')
+      fd.append('description', m.description || '')
+      fd.append('hashtags',    m.hashtags || '#Shorts')
+      fd.append('privacy',     m.privacy || 'public')
+      fd.append('user_id',     userId || '')
+      const res = await fetch(`${API}/api/clipping/upload-youtube`, { method: 'POST', body: fd })
+      const data = await res.json()
       if (!res.ok) throw new Error(data.detail || `Upload failed ${res.status}`)
       setUploading(p => ({ ...p, [clip.id]: 'done' }))
       setUploadMsg(p => ({ ...p, [clip.id]: data.video_url ? `✅ ${data.video_url}` : '✅ Uploaded to YouTube Shorts!' }))
@@ -157,7 +182,10 @@ export default function AutoClippingPage() {
   }
 
   const autoUploadAll = async (clips, meta) => {
-    for (const clip of clips) { await uploadToYouTube(clip, meta); await new Promise(r => setTimeout(r, 1000)) }
+    for (const clip of clips) {
+      await uploadToYouTube(clip, meta)
+      await new Promise(r => setTimeout(r, 1000))
+    }
   }
 
   const updateMeta = (id, key, val) => setClipMeta(p => ({ ...p, [id]: { ...p[id], [key]: val } }))
@@ -165,15 +193,14 @@ export default function AutoClippingPage() {
   // ─── UPLOAD SCREEN ────────────────────────────────────────────────────────
   if (!videoUrl && !loading) return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'DM Sans',sans-serif", color: '#f0f0f5', padding: '36px' }}>
-      <style>{`.ac-drop:hover{border-color:rgba(99,102,241,0.55)!important;background:rgba(99,102,241,0.04)!important;}`}</style>
+      <style>{`.ac-drop:hover{border-color:rgba(99,102,241,0.55)!important;background:rgba(99,102,241,0.04)!important;} @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@400;500;700&display=swap');`}</style>
 
-      {/* Page header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 48 }}>
         <div style={{ width: 38, height: 38, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(99,102,241,0.3)' }}>
           <Ico d={IC.scissors} s={18} c="#fff" />
         </div>
         <div>
-          <h1 style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 22, color: '#f0f0f5', lineHeight: 1 }}>Auto Clipping</h1>
+          <h1 style={{ fontFamily: 'Syne,sans-serif', fontWeight: 900, fontSize: 22, color: '#f0f0f5', lineHeight: 1 }}>Auto Clipping</h1>
           <p style={{ color: '#4b5563', fontSize: 12, marginTop: 2 }}>AI finds the best moments · Generates short clips · Auto-upload to YouTube</p>
         </div>
         <div style={{ flex: 1 }} />
@@ -182,7 +209,6 @@ export default function AutoClippingPage() {
           : <a href="/settings" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 14px', borderRadius: 100, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}><Ico d={IC.yt} s={13} c="#f87171" />Connect YouTube → Settings</a>}
       </div>
 
-      {/* Upload zone */}
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <div style={{ width: '100%', maxWidth: 680 }}>
           <div className="ac-drop"
@@ -194,7 +220,7 @@ export default function AutoClippingPage() {
               <Ico d={IC.upload} s={36} c="#6366f1" />
             </div>
             <div style={{ textAlign: 'center' }}>
-              <p style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 24, color: '#f0f0f5', marginBottom: 8 }}>Drop your long video here</p>
+              <p style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: 24, color: '#f0f0f5', marginBottom: 8 }}>Drop your long video here</p>
               <p style={{ color: '#4b5563', fontSize: 14 }}>MP4, MOV, AVI — podcast, interview, vlog, tutorial</p>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 4 }}>
@@ -209,25 +235,17 @@ export default function AutoClippingPage() {
     </div>
   )
 
-  // ─── SETTINGS SCREEN (video loaded, not yet processing) ───────────────────
+  // ─── SETTINGS SCREEN ─────────────────────────────────────────────────────
   if (videoUrl && !loading && !results && !error) return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'DM Sans',sans-serif", color: '#f0f0f5', padding: '32px 36px' }}>
-      <style>{`
-        @keyframes spin{to{transform:rotate(360deg)}}
-        .acb{cursor:pointer;border:none;transition:all .15s;font-family:'DM Sans',sans-serif;}
-        .acb:hover{filter:brightness(1.15);}
-        .acb:disabled{opacity:.4;cursor:not-allowed;}
-        .aci::placeholder{color:#374151;}
-        .aci:focus{border-color:rgba(99,102,241,0.5)!important;}
-      `}</style>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@400;500;700&display=swap'); .acb{cursor:pointer;border:none;transition:all .15s;font-family:'DM Sans',sans-serif;}.acb:hover{filter:brightness(1.15);}.acb:disabled{opacity:.4;cursor:not-allowed;}.aci::placeholder{color:#374151;}.aci:focus{border-color:rgba(99,102,241,0.5)!important;}`}</style>
 
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
         <div style={{ width: 38, height: 38, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Ico d={IC.scissors} s={18} c="#fff" />
         </div>
         <div>
-          <h1 style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 20, color: '#f0f0f5', lineHeight: 1 }}>Configure Clips</h1>
+          <h1 style={{ fontFamily: 'Syne,sans-serif', fontWeight: 900, fontSize: 20, color: '#f0f0f5', lineHeight: 1 }}>Configure Clips</h1>
           <p style={{ color: '#4b5563', fontSize: 12, marginTop: 2 }}>Set your preferences before generating</p>
         </div>
         <div style={{ flex: 1 }} />
@@ -237,12 +255,9 @@ export default function AutoClippingPage() {
         </button>
       </div>
 
-      {/* Two-column layout */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
-
-        {/* LEFT — preview */}
         <div>
-          <p style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 13, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 }}>Video Preview</p>
+          <p style={{ fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: 13, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 }}>Video Preview</p>
           <div style={{ background: '#000', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 12 }}>
             <video src={videoUrl} controls style={{ width: '100%', maxHeight: 320, display: 'block' }} />
           </div>
@@ -253,9 +268,7 @@ export default function AutoClippingPage() {
           </div>
         </div>
 
-        {/* RIGHT — settings */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
           {/* Upload Mode */}
           <div style={{ ...CARD, padding: 18 }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 12 }}>Upload Mode</p>
@@ -270,7 +283,7 @@ export default function AutoClippingPage() {
                   <div style={{ width: 26, height: 26, borderRadius: 7, background: uploadMode === m.id ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
                     <Ico d={m.icon} s={13} c={uploadMode === m.id ? '#a5b4fc' : '#4b5563'} />
                   </div>
-                  <p style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 12, color: uploadMode === m.id ? '#a5b4fc' : '#6b7280', marginBottom: 2 }}>{m.label}</p>
+                  <p style={{ fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: 12, color: uploadMode === m.id ? '#a5b4fc' : '#6b7280', marginBottom: 2 }}>{m.label}</p>
                   <p style={{ fontSize: 10, color: '#374151' }}>{m.sub}</p>
                   {uploadMode === m.id && <div style={{ position: 'absolute', top: 8, right: 8, width: 16, height: 16, background: '#6366f1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Ico d={IC.check} s={9} c="#fff" /></div>}
                 </button>
@@ -285,7 +298,7 @@ export default function AutoClippingPage() {
               {[{ val: '9:16', label: '9:16', sub: 'Shorts · Reels · TikTok' }, { val: '16:9', label: '16:9', sub: 'YouTube · Standard' }].map(f => (
                 <button key={f.val} className="acb" onClick={() => setAspect(f.val)}
                   style={{ padding: '14px 10px', borderRadius: 12, textAlign: 'center', background: aspect === f.val ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)', border: `1.5px solid ${aspect === f.val ? 'rgba(99,102,241,0.45)' : 'rgba(255,255,255,0.07)'}`, color: aspect === f.val ? '#a5b4fc' : '#6b7280' }}>
-                  <div style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 20, marginBottom: 4 }}>{f.label}</div>
+                  <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 900, fontSize: 20, marginBottom: 4 }}>{f.label}</div>
                   <div style={{ fontSize: 10 }}>{f.sub}</div>
                 </button>
               ))}
@@ -299,7 +312,7 @@ export default function AutoClippingPage() {
               {CLIP_DURATIONS.map(d => (
                 <button key={d.value} className="acb" onClick={() => setClipDur(d.value)}
                   style={{ padding: '12px 8px', borderRadius: 12, textAlign: 'center', background: clipDur === d.value ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)', border: `1.5px solid ${clipDur === d.value ? 'rgba(99,102,241,0.45)' : 'rgba(255,255,255,0.07)'}`, color: clipDur === d.value ? '#a5b4fc' : '#6b7280' }}>
-                  <div style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 20 }}>{d.label}</div>
+                  <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 900, fontSize: 20 }}>{d.label}</div>
                   <div style={{ fontSize: 9, marginTop: 3 }}>{d.tag}</div>
                 </button>
               ))}
@@ -312,16 +325,15 @@ export default function AutoClippingPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
               {MAX_CLIPS_OPTIONS.map(n => (
                 <button key={n} className="acb" onClick={() => setMaxClips(n)}
-                  style={{ padding: '12px 0', borderRadius: 12, textAlign: 'center', fontFamily: 'Syne', fontWeight: 900, fontSize: 22, background: maxClips === n ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)', border: `1.5px solid ${maxClips === n ? 'rgba(99,102,241,0.45)' : 'rgba(255,255,255,0.07)'}`, color: maxClips === n ? '#a5b4fc' : '#6b7280' }}>
+                  style={{ padding: '12px 0', borderRadius: 12, textAlign: 'center', fontFamily: 'Syne,sans-serif', fontWeight: 900, fontSize: 22, background: maxClips === n ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)', border: `1.5px solid ${maxClips === n ? 'rgba(99,102,241,0.45)' : 'rgba(255,255,255,0.07)'}`, color: maxClips === n ? '#a5b4fc' : '#6b7280' }}>
                   {n}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Generate button */}
           <button className="acb" onClick={handleGenerate}
-            style={{ width: '100%', padding: '15px 0', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', borderRadius: 16, fontSize: 15, fontWeight: 700, fontFamily: 'Syne', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, boxShadow: '0 6px 20px rgba(99,102,241,0.35)' }}>
+            style={{ width: '100%', padding: '15px 0', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', borderRadius: 16, fontSize: 15, fontWeight: 700, fontFamily: 'Syne,sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, boxShadow: '0 6px 20px rgba(99,102,241,0.35)' }}>
             <Ico d={IC.scissors} s={18} c="#fff" />
             {uploadMode === 'auto' && ytConnected ? 'Generate & Upload to YouTube' : 'Generate Clips'}
           </button>
@@ -333,31 +345,24 @@ export default function AutoClippingPage() {
   // ─── LOADING SCREEN ───────────────────────────────────────────────────────
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'DM Sans',sans-serif", color: '#f0f0f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@400;500;700&display=swap');`}</style>
       <div style={{ width: '100%', maxWidth: 480, textAlign: 'center' }}>
-        {/* Spinner */}
         <div style={{ width: 88, height: 88, margin: '0 auto 28px', position: 'relative' }}>
           <svg style={{ width: 88, height: 88, animation: 'spin 1.4s linear infinite' }} viewBox="0 0 88 88">
             <circle cx="44" cy="44" r="36" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
             <circle cx="44" cy="44" r="36" fill="none" stroke="url(#acGrad)" strokeWidth="6" strokeLinecap="round" strokeDasharray="70 155" />
-            <defs>
-              <linearGradient id="acGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#6366f1" /><stop offset="100%" stopColor="#8b5cf6" />
-              </linearGradient>
-            </defs>
+            <defs><linearGradient id="acGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#6366f1" /><stop offset="100%" stopColor="#8b5cf6" /></linearGradient></defs>
           </svg>
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Ico d={IC.scissors} s={26} c="#6366f1" />
           </div>
         </div>
-        <h2 style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 24, marginBottom: 8 }}>Processing Video</h2>
+        <h2 style={{ fontFamily: 'Syne,sans-serif', fontWeight: 900, fontSize: 24, marginBottom: 8 }}>Processing Video</h2>
         <p style={{ color: '#a5b4fc', fontWeight: 600, marginBottom: 28, fontSize: 14 }}>{progressMsg}</p>
-        {/* Progress bar */}
         <div style={{ width: '100%', background: 'rgba(255,255,255,0.06)', borderRadius: 99, height: 6, marginBottom: 8 }}>
           <div style={{ height: 6, background: 'linear-gradient(90deg,#6366f1,#8b5cf6)', borderRadius: 99, transition: 'width .7s ease', width: `${progress}%` }} />
         </div>
         <p style={{ color: '#374151', fontSize: 12, marginBottom: 32 }}>{progress}% complete</p>
-        {/* Steps */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'left' }}>
           {PROCESS_STEPS.map((step, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', borderRadius: 10, background: progress >= step.pct ? 'rgba(99,102,241,0.07)' : 'transparent', transition: 'background .4s' }}>
@@ -379,7 +384,7 @@ export default function AutoClippingPage() {
         <div style={{ width: 52, height: 52, background: 'rgba(239,68,68,0.12)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
           <Ico d={IC.close} s={22} c="#f87171" />
         </div>
-        <h3 style={{ color: '#f87171', fontFamily: 'Syne', fontWeight: 800, fontSize: 20, marginBottom: 8 }}>Clipping Failed</h3>
+        <h3 style={{ color: '#f87171', fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: 20, marginBottom: 8 }}>Clipping Failed</h3>
         <p style={{ color: '#6b7280', fontSize: 13, lineHeight: 1.6, marginBottom: 24 }}>{error}</p>
         <button onClick={() => setError('')} style={{ padding: '10px 28px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#f0f0f5', borderRadius: 12, fontSize: 13, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>
           Try Again
@@ -391,27 +396,15 @@ export default function AutoClippingPage() {
   // ─── RESULTS SCREEN ───────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f', fontFamily: "'DM Sans',sans-serif", color: '#f0f0f5', padding: '32px 36px' }}>
-      <style>{`
-        @keyframes spin{to{transform:rotate(360deg)}}
-        .acb{cursor:pointer;border:none;transition:all .15s;font-family:'DM Sans',sans-serif;}
-        .acb:hover{filter:brightness(1.15);}
-        .acb:disabled{opacity:.4;cursor:not-allowed;}
-        .aci::placeholder{color:#374151;}
-        .aci:focus{border-color:rgba(99,102,241,0.5)!important;}
-        .ac-scroll::-webkit-scrollbar{width:3px;}
-        .ac-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:99px;}
-      `}</style>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@400;500;700&display=swap'); .acb{cursor:pointer;border:none;transition:all .15s;font-family:'DM Sans',sans-serif;}.acb:hover{filter:brightness(1.15);}.acb:disabled{opacity:.4;cursor:not-allowed;}.aci::placeholder{color:#374151;}.aci:focus{border-color:rgba(99,102,241,0.5)!important;}.ac-scroll::-webkit-scrollbar{width:3px;}.ac-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:99px;}`}</style>
 
-      {/* Results header */}
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 38, height: 38, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Ico d={IC.scissors} s={18} c="#fff" />
           </div>
           <div>
-            <h1 style={{ fontFamily: 'Syne', fontWeight: 900, fontSize: 20, lineHeight: 1 }}>
-              🔥 {results.total_clips} Clips Generated
-            </h1>
+            <h1 style={{ fontFamily: 'Syne,sans-serif', fontWeight: 900, fontSize: 20, lineHeight: 1 }}>🔥 {results.total_clips} Clips Generated</h1>
             <p style={{ color: '#4b5563', fontSize: 12, marginTop: 3 }}>
               Original: {fmt(results.video_duration)} · Each clip: {results.clip_duration}s · {aspect}
               {uploadMode === 'auto' && ytConnected && <span style={{ color: '#a5b4fc', marginLeft: 8 }}>· Auto-uploading…</span>}
@@ -436,7 +429,6 @@ export default function AutoClippingPage() {
         </div>
       </div>
 
-      {/* Clip grid — wider, fills full content width */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 18 }}>
         {results.clips.sort((a, b) => b.engagement_score - a.engagement_score).map((clip, i) => {
           const meta  = clipMeta[clip.id] || {}
@@ -445,12 +437,10 @@ export default function AutoClippingPage() {
           const sc    = scoreStyle(clip.engagement_score)
           return (
             <div key={clip.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 18, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-
-              {/* Thumbnail */}
               <div style={{ background: '#000', position: 'relative', cursor: 'pointer', aspectRatio: aspect === '9:16' ? '9/16' : '16/9', maxHeight: aspect === '9:16' ? 260 : 190 }}
                 onClick={() => setPreviewing(previewing === clip.id ? null : clip.id)}>
                 <video
-                  src={`http://localhost:8000${clip.download_url}`}
+                  src={`${API}${clip.download_url}`}
                   style={{ width: '100%', height: '100%', objectFit: 'cover', display: previewing === clip.id ? 'block' : 'none' }}
                   controls autoPlay={previewing === clip.id} />
                 {previewing !== clip.id && (
@@ -458,15 +448,13 @@ export default function AutoClippingPage() {
                     <div style={{ width: 52, height: 52, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.18)' }}>
                       <Ico d={IC.play} s={18} c="#fff" />
                     </div>
-                    {/* Badges */}
                     <span style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: 10, padding: '3px 8px', borderRadius: 7, fontFamily: 'monospace' }}>{clip.duration}s</span>
-                    <span style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.65)', color: '#a5b4fc', fontSize: 10, padding: '3px 8px', borderRadius: 7, fontFamily: 'Syne', fontWeight: 800 }}>#{i + 1}</span>
+                    <span style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.65)', color: '#a5b4fc', fontSize: 10, padding: '3px 8px', borderRadius: 7, fontFamily: 'Syne,sans-serif', fontWeight: 800 }}>#{i + 1}</span>
                     <span style={{ position: 'absolute', top: 10, right: 10, fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 8, background: sc.bg, border: `1px solid ${sc.border}`, color: sc.color }}>{clip.engagement_score}%</span>
                   </div>
                 )}
               </div>
 
-              {/* Clip info */}
               <div style={{ padding: 14, flex: 1, display: 'flex', flexDirection: 'column', gap: 9 }}>
                 {clip.hook && (
                   <div style={{ background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 9, padding: '7px 11px' }}>
@@ -474,7 +462,6 @@ export default function AutoClippingPage() {
                   </div>
                 )}
 
-                {/* Editable meta */}
                 {[
                   { label: 'Title',       key: 'title',       type: 'input',    ph: 'YouTube title…' },
                   { label: 'Description', key: 'description', type: 'textarea', ph: 'Description…', rows: 2 },
@@ -489,7 +476,6 @@ export default function AutoClippingPage() {
                   </div>
                 ))}
 
-                {/* Privacy */}
                 <div>
                   <label style={{ fontSize: 9, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 4 }}>Privacy</label>
                   <select value={meta.privacy || 'public'} onChange={e => updateMeta(clip.id, 'privacy', e.target.value)} className="aci" style={{ ...INP, cursor: 'pointer' }}>
@@ -499,14 +485,12 @@ export default function AutoClippingPage() {
                   </select>
                 </div>
 
-                {/* Timecode */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#374151', fontFamily: 'monospace' }}>
                   <Ico d={IC.clock} s={10} c="#374151" />
                   {fmt(clip.start_time)} → {fmt(clip.end_time)}
                   <span style={{ marginLeft: 'auto' }}>{clip.file_size_mb} MB</span>
                 </div>
 
-                {/* Upload status */}
                 {upMsg && (
                   <div style={{ padding: '7px 11px', borderRadius: 9, fontSize: 11, fontWeight: 600, background: upSt === 'done' ? 'rgba(16,185,129,0.1)' : upSt === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(99,102,241,0.1)', border: `1px solid ${upSt === 'done' ? 'rgba(16,185,129,0.3)' : upSt === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(99,102,241,0.3)'}`, color: upSt === 'done' ? '#6ee7b7' : upSt === 'error' ? '#f87171' : '#a5b4fc' }}>
                     {upSt === 'uploading' && <span style={{ display: 'inline-block', width: 10, height: 10, border: '2px solid rgba(165,180,252,0.3)', borderTopColor: '#a5b4fc', borderRadius: '50%', animation: 'spin .8s linear infinite', marginRight: 6 }} />}
@@ -514,7 +498,6 @@ export default function AutoClippingPage() {
                   </div>
                 )}
 
-                {/* Action buttons */}
                 <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
                   <button className="acb" onClick={() => downloadClip(clip)} disabled={downloading[clip.id]}
                     style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 0', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#9ca3af', borderRadius: 10, fontSize: 12 }}>
@@ -536,7 +519,6 @@ export default function AutoClippingPage() {
         })}
       </div>
 
-      {/* Transcript preview */}
       {results.full_transcript && (
         <div style={{ ...CARD, padding: 20, marginTop: 24 }}>
           <p style={{ fontSize: 11, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 8 }}>Transcript Preview</p>
