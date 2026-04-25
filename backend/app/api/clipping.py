@@ -15,6 +15,21 @@ from groq import Groq
 router = APIRouter()
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
+
+@router.get("/system-check")
+async def system_check():
+    """Check if ffmpeg/ffprobe are available on this server."""
+    results = {}
+    for tool in ["ffmpeg", "ffprobe"]:
+        try:
+            r = subprocess.run([tool, "-version"], capture_output=True, text=True, timeout=10)
+            results[tool] = "✅ Available — " + r.stdout.split("\n")[0]
+        except FileNotFoundError:
+            results[tool] = "❌ NOT FOUND"
+        except Exception as e:
+            results[tool] = f"❌ Error: {str(e)}"
+    return results
+
 CLIPS_DIR = tempfile.gettempdir()
 
 # ── Env ───────────────────────────────────────────────────────────────────────
@@ -103,29 +118,38 @@ def run_ffmpeg(args: list, timeout: int = 300):
 
 
 def get_video_duration(path: str) -> float:
+    import re as _re
+    # Try ffprobe
     try:
         r = subprocess.run(
             ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", path],
             capture_output=True, text=True, timeout=30
         )
-        return float(json.loads(r.stdout)["format"]["duration"])
-    except FileNotFoundError:
-        # ffprobe not found — try ffmpeg
-        try:
-            r2 = subprocess.run(
-                ["ffmpeg", "-i", path],
-                capture_output=True, text=True, timeout=30
-            )
-            import re
-            m = re.search(r"Duration: (\d+):(\d+):(\d+\.\d+)", r2.stderr)
-            if m:
-                h, mn, s = int(m.group(1)), int(m.group(2)), float(m.group(3))
-                return h*3600 + mn*60 + s
-        except Exception:
-            pass
-        return 0.0
+        dur = float(json.loads(r.stdout)["format"]["duration"])
+        if dur > 0:
+            return dur
     except Exception:
-        return 0.0
+        pass
+
+    # Try ffmpeg stderr
+    try:
+        r2 = subprocess.run(
+            ["ffmpeg", "-i", path],
+            capture_output=True, text=True, timeout=30
+        )
+        output = r2.stderr + r2.stdout
+        m = _re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", output)
+        if m:
+            h, mn, s = int(m.group(1)), int(m.group(2)), float(m.group(3))
+            dur = h*3600 + mn*60 + s
+            if dur > 0:
+                return dur
+    except Exception:
+        pass
+
+    # Fallback — assume large duration so clipping proceeds
+    print(f"[WARNING] Could not get duration — assuming 3600s")
+    return 3600.0
 
 
 def _get_supabase_user(token: str):
@@ -285,10 +309,10 @@ async def detect_clips(
 
         video_duration = get_video_duration(tmp_video)
 
-        if video_duration < clip_duration:
+        if 0 < video_duration < clip_duration:
             raise HTTPException(
                 status_code=400,
-                detail=f"Video ({video_duration:.0f}s) clip duration ({clip_duration}s) se choti hai"
+                detail=f"Video ({video_duration:.0f}s) clip duration ({clip_duration}s) se choti hai — clip duration kam karo"
             )
 
         # 2. Extract audio
