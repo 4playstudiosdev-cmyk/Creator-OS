@@ -201,7 +201,13 @@ function PostTab({ userId, liStatus }) {
 
     try {
       if (mediaType === 'video' && videoFile) {
-        // Video post — upload to Supabase first then LinkedIn
+        // Check video size — LinkedIn max is ~200MB
+        const maxSize = 200 * 1024 * 1024
+        if (videoFile.size > maxSize) {
+          throw new Error(`Video too large (${(videoFile.size/1024/1024).toFixed(0)}MB). LinkedIn max is 200MB. Please compress the video first.`)
+        }
+
+        // Upload to Supabase first
         const ext  = videoFile.name.split('.').pop() || 'mp4'
         const name = `linkedin/${userId}/${Date.now()}.${ext}`
         const { error } = await supabase.storage.from('posts').upload(name, videoFile, { upsert: true, contentType: videoFile.type })
