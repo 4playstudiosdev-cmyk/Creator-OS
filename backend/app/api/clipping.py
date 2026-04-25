@@ -15,6 +15,44 @@ from groq import Groq
 router = APIRouter()
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
+HF_SPACE_URL = os.getenv("HF_SPACE_URL", "")  # e.g. https://username-nexora-clipping.hf.space
+HF_TOKEN     = os.getenv("HF_TOKEN", "")
+
+
+async def call_hf_space(video_path: str, clip_duration: int, max_clips: int, aspect_ratio: str) -> dict:
+    """Call Hugging Face Space API for GPU-accelerated clipping."""
+    if not HF_SPACE_URL:
+        raise Exception("HF_SPACE_URL not configured")
+
+    import httpx
+    # HF Gradio API endpoint
+    api_url = f"{HF_SPACE_URL}/run/predict"
+    headers = {}
+    if HF_TOKEN:
+        headers["Authorization"] = f"Bearer {HF_TOKEN}"
+
+    with open(video_path, "rb") as f:
+        video_bytes = f.read()
+
+    import base64
+    video_b64 = base64.b64encode(video_bytes).decode()
+
+    payload = {
+        "fn_index": 0,
+        "data": [
+            {"name": "video.mp4", "data": f"data:video/mp4;base64,{video_b64}"},
+            clip_duration,
+            max_clips,
+            aspect_ratio,
+        ]
+    }
+
+    async with httpx.AsyncClient(timeout=300) as c:
+        r = await c.post(api_url, json=payload, headers=headers)
+        result = r.json()
+
+    return result
+
 
 @router.get("/system-check")
 async def system_check():
@@ -731,3 +769,119 @@ async def editor_download(output_id: str):
                 headers={"Content-Disposition": f"attachment; filename=nexora_edit_{output_id[:8]}.mp4"}
             )
     raise HTTPException(404, "File not found or expired.")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AI CAPTIONS — Whisper transcribe + burn into video
+# ─────────────────────────────────────────────────────────────────────────────
+@router.post("/editor/caption")
+async def editor_caption(
+    file_id: str = Form(...),
+):
+    """Transcribe video with Whisper and burn captions."""
+    import glob, asyncio, re
+
+    # Find uploaded file
+    matches = glob.glob(os.path.join(CLIPS_DIR, f"editor_{file_id}*"))
+    if not matches:
+        raise HTTPException(404, "File not found. Please upload again.")
+
+    input_path = matches[0]
+    output_id  = str(uuid.uuid4())
+    tmpdir     = CLIPS_DIR
+    srt_path   = os.path.join(tmpdir, f"captions_{output_id}.srt")
+    out_path   = os.path.join(tmpdir, f"captioned_{output_id}.mp4")
+
+    # Step 1: Extract audio
+    audio_path = os.path.join(tmpdir, f"audio_{output_id}.wav")
+    await asyncio.get_event_loop().run_in_executor(None, lambda: subprocess.run(
+        ["ffmpeg", "-y", "-i", input_path, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", audio_path],
+        capture_output=True, timeout=120
+    ))
+
+    transcript = ""
+    segments   = []
+
+    # Step 2: Transcribe with Groq Whisper
+    try:
+        with open(audio_path, "rb") as af:
+            transcription = groq_client.audio.transcriptions.create(
+                file       = ("audio.wav", af, "audio/wav"),
+                model      = "whisper-large-v3",
+                response_format = "verbose_json",
+                timestamp_granularities = ["segment"],
+            )
+        transcript = transcription.text
+        segments   = transcription.segments or []
+        print(f"[Caption] Transcribed {len(transcript.split())} words, {len(segments)} segments")
+    except Exception as e:
+        print(f"[Caption] Groq Whisper failed: {e}")
+        # Fallback: basic sentence split
+        transcript = "Caption generation requires Groq API key."
+
+    # Step 3: Generate SRT
+    def to_srt_time(s):
+        h  = int(s // 3600)
+        m  = int((s % 3600) // 60)
+        sc = s % 60
+        return f"{h:02d}:{m:02d}:{sc:06.3f}".replace(".", ",")
+
+    srt = ""
+    if segments:
+        for i, seg in enumerate(segments, 1):
+            text = getattr(seg, "text", "") or seg.get("text", "") if isinstance(seg, dict) else getattr(seg, "text", "")
+            st   = getattr(seg, "start", 0) if not isinstance(seg, dict) else seg.get("start", 0)
+            en   = getattr(seg, "end", 0) if not isinstance(seg, dict) else seg.get("end", 0)
+            srt += f"{i}\n{to_srt_time(st)} --> {to_srt_time(en)}\n{text.strip()}\n\n"
+    else:
+        # No segments — create single caption
+        dur = get_video_duration(input_path)
+        srt = f"1\n00:00:00,000 --> {to_srt_time(dur)}\n{transcript[:80]}\n\n"
+
+    with open(srt_path, "w", encoding="utf-8") as f:
+        f.write(srt)
+
+    # Step 4: Burn captions into video
+    style = "FontSize=16,PrimaryColour=&Hffffff,OutlineColour=&H000000,BorderStyle=3,Outline=2,Shadow=1,MarginV=30"
+    result = await asyncio.get_event_loop().run_in_executor(None, lambda: subprocess.run(
+        ["ffmpeg", "-y", "-i", input_path,
+         "-vf", f"subtitles={srt_path}:force_style='{style}'",
+         "-c:v", "libx264", "-crf", "23", "-preset", "fast",
+         "-c:a", "copy", "-movflags", "+faststart", out_path],
+        capture_output=True, text=True, timeout=600
+    ))
+
+    # Cleanup audio
+    try:
+        os.unlink(audio_path)
+    except Exception:
+        pass
+
+    if not os.path.exists(out_path):
+        # Return SRT if video burn fails
+        size = os.path.getsize(srt_path) / 1024
+        return {
+            "success":      True,
+            "output_id":    output_id,
+            "download_url": f"/api/clipping/editor/download-srt/{output_id}",
+            "transcript":   transcript,
+            "type":         "srt",
+            "note":         f"Video burn failed. Download SRT file. Error: {result.stderr[-200:]}",
+        }
+
+    size_mb = round(os.path.getsize(out_path) / 1024 / 1024, 2)
+    return {
+        "success":      True,
+        "output_id":    output_id,
+        "download_url": f"/api/clipping/editor/download/{output_id}",
+        "transcript":   transcript[:500],
+        "size_mb":      size_mb,
+        "segments":     len(segments),
+    }
+
+
+@router.get("/editor/download-srt/{output_id}")
+async def download_srt(output_id: str):
+    path = os.path.join(CLIPS_DIR, f"captions_{output_id}.srt")
+    if not os.path.exists(path):
+        raise HTTPException(404, "SRT file not found.")
+    return FileResponse(path, media_type="text/plain", filename=f"nexora_captions_{output_id[:8]}.srt")
