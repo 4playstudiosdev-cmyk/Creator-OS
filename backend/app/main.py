@@ -13,6 +13,16 @@ load_dotenv()
 
 app = FastAPI()
 
+# Increase upload size limit for video files (500MB)
+from fastapi import Request
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class LargeUploadMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        return await call_next(request)
+
+app.add_middleware(LargeUploadMiddleware)
+
 # ── CORS ──────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,

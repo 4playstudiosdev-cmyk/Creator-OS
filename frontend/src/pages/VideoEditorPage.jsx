@@ -67,8 +67,6 @@ export default function VideoEditorPage() {
   const rafRef     = useRef(null)
   const trimEndRef = useRef(0)
   const stateRef   = useRef({})
-  const recorderRef   = useRef(null)
-  const recChunksRef  = useRef([])
 
   const [videoFile,    setVideoFile]    = useState(null)
   const [videoUrl,     setVideoUrl]     = useState(null)
@@ -104,7 +102,6 @@ export default function VideoEditorPage() {
   const [exporting,    setExporting]    = useState(false)
   const [exportPct,    setExportPct]    = useState(0)
   const [exportDone,   setExportDone]   = useState(false)
-  const [exportMode,   setExportMode]   = useState('browser') // browser | server
   const [serverExportRes, setServerExportRes] = useState(null)
   const [fileInfo,     setFileInfo]     = useState(null)
   const [uploading,    setUploading]    = useState(false)
@@ -254,79 +251,7 @@ export default function VideoEditorPage() {
   const addText    = () => { if (!txtContent.trim()) return; setOverlays(p => [...p, { text: txtContent, x: 100, y: 150, color: txtColor, font: txtFont, size: txtSize, bg: txtBg }]); setTxtContent('') }
   const addCaption = () => { if (!capText.trim()) return; setCaptions(p => [...p, { text: capText, start: capStart, end: capEnd }]); setCapText('') }
 
-  // ── EXPORT — Browser MediaRecorder (includes all canvas edits) ────────────
-  const handleBrowserExport = async () => {
-    const canvas = canvasRef.current, video = videoRef.current
-    if (!canvas || !video) return
-    setExporting(true); setExportPct(0); setExportDone(false)
-    recChunksRef.current = []
-
-    // Seek to trim start
-    video.currentTime = trimStart
-    await new Promise(r => { video.addEventListener('seeked', r, { once: true }) })
-
-    // Capture canvas stream
-    const canvasStream = canvas.captureStream(30)
-    const audioCtx     = new AudioContext()
-    const src          = audioCtx.createMediaElementSource(video)
-    const dst          = audioCtx.createMediaStreamDestination()
-    src.connect(dst); src.connect(audioCtx.destination)
-    const audioTrack   = dst.stream.getAudioTracks()[0]
-    if (audioTrack) canvasStream.addTrack(audioTrack)
-
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-      ? 'video/webm;codecs=vp9,opus'
-      : 'video/webm'
-
-    const recorder = new MediaRecorder(canvasStream, { mimeType, videoBitsPerSecond: 5_000_000 })
-    recorderRef.current = recorder
-    recorder.ondataavailable = e => { if (e.data.size > 0) recChunksRef.current.push(e.data) }
-    recorder.onstop = () => {
-      const blob = new Blob(recChunksRef.current, { type: mimeType })
-      const url  = URL.createObjectURL(blob)
-      const a    = document.createElement('a')
-      a.href     = url
-      a.download = `edited_${videoFile?.name?.replace(/\.[^.]+$/, '') || 'video'}.webm`
-      a.click()
-      URL.revokeObjectURL(url)
-      setExporting(false); setExportDone(true)
-      cancelAnimationFrame(rafRef.current)
-    }
-
-    recorder.start(100)
-    video.playbackRate = speed
-    video.play()
-    setIsPlaying(true)
-
-    const clipDur = trimEnd - trimStart
-    const startMs = Date.now()
-    const progIv  = setInterval(() => {
-      const elapsed = (Date.now() - startMs) / 1000
-      setExportPct(Math.min(99, (elapsed / (clipDur / speed)) * 100))
-    }, 500)
-
-    // Stop when trim end reached
-    const checkEnd = () => {
-      if (video.currentTime >= trimEnd) {
-        clearInterval(progIv); video.pause()
-        setIsPlaying(false); recorder.stop()
-        return
-      }
-      setTimeout(checkEnd, 100)
-    }
-    checkEnd()
-
-    // Draw frames during recording
-    const recordTick = () => {
-      if (!recorderRef.current || recorder.state !== 'recording') return
-      drawFrame(video.currentTime)
-      rafRef.current = requestAnimationFrame(recordTick)
-    }
-    cancelAnimationFrame(rafRef.current)
-    rafRef.current = requestAnimationFrame(recordTick)
-  }
-
-  // ── EXPORT — Server FFmpeg (trim only, no filters) ────────────────────────
+  // ── EXPORT — Server FFmpeg ────────────────────────────────────────────────
   const handleServerExport = async () => {
     if (!fileInfo) { alert('Video not uploaded to server yet. Wait a moment.'); return }
     setExporting(true); setExportPct(0); setServerExportRes(null)
@@ -348,10 +273,7 @@ export default function VideoEditorPage() {
     setExporting(false)
   }
 
-  const handleExport = () => {
-    if (exportMode === 'server') handleServerExport()
-    else handleBrowserExport()
-  }
+  const handleExport = () => { handleServerExport() }
 
   const handleAutoCaption = async () => {
     if (!fileInfo) { setAutoError('Upload the video first (wait for upload indicator)'); return }
@@ -445,19 +367,11 @@ export default function VideoEditorPage() {
         {fileInfo && !uploading && <span style={{ fontSize: 10, color: '#6ee7b7', background: 'rgba(16,185,129,0.1)', padding: '2px 8px', borderRadius: 6 }}>✓ server ready</span>}
         <div style={{ flex: 1 }} />
 
-        {/* Export mode toggle */}
-        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-          {[['browser','🎨 With Edits'],['server','⚡ FFmpeg Trim']].map(([m,l]) => (
-            <button key={m} className="vb" onClick={() => setExportMode(m)}
-              style={{ padding: '5px 10px', fontSize: 10, fontWeight: 700, background: exportMode===m ? 'rgba(99,102,241,0.3)' : 'transparent', color: exportMode===m ? '#a5b4fc' : '#6b7280', borderRight: m==='browser' ? '1px solid rgba(255,255,255,0.08)' : 'none' }}>
-              {l}
-            </button>
-          ))}
-        </div>
+        <span style={{ fontSize: 10, color: '#6ee7b7', background: 'rgba(16,185,129,0.1)', padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(16,185,129,0.2)' }}>⚡ FFmpeg Export</span>
 
         <button className="vb" onClick={() => { setVideoUrl(null); setVideoFile(null); reset() }} style={{ padding: '5px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#9ca3af', fontSize: 11 }}>New Video</button>
         <button className="vb" onClick={handleExport} disabled={exporting} style={{ padding: '6px 16px', borderRadius: 9, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 3px 12px rgba(99,102,241,0.35)' }}>
-          {exporting ? <><div style={{ width: 11, height: 11, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />{Math.round(exportPct)}%</> : exportDone ? '✅ Done!' : <><Ico d={IC.dl} s={12} c="#fff" />Export</>}
+          {exporting ? <><div style={{ width: 11, height: 11, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />{Math.round(exportPct)}%</> : exportDone ? '✅ Done!' : <><Ico d={IC.dl} s={12} c="#fff" />Export MP4</>}
         </button>
       </div>
 
@@ -497,21 +411,7 @@ export default function VideoEditorPage() {
             {activeFilter !== 'None' && <div style={{ position: 'absolute', top: 12, right: 12, background: 'rgba(99,102,241,0.85)', borderRadius: 7, padding: '3px 10px', fontSize: 11, fontWeight: 700, color: '#fff', pointerEvents: 'none' }}>{activeFilter}</div>}
             {speed !== 1 && <div style={{ position: 'absolute', top: 12, left: 14, background: 'rgba(245,158,11,0.85)', borderRadius: 7, padding: '3px 10px', fontSize: 11, fontWeight: 700, color: '#fff', pointerEvents: 'none' }}>{speed}×</div>}
 
-            {/* Export mode notice */}
-            {exportMode === 'browser' && (
-              <div style={{ position: 'absolute', bottom: 12, right: 12, background: 'rgba(99,102,241,0.85)', borderRadius: 7, padding: '3px 10px', fontSize: 10, fontWeight: 700, color: '#fff', pointerEvents: 'none' }}>🎨 Export includes all edits</div>
-            )}
 
-            {/* Export in progress overlay */}
-            {exporting && exportMode === 'browser' && (
-              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                <p style={{ color: '#a5b4fc', fontWeight: 700, fontSize: 15 }}>🎬 Recording with edits... {Math.round(exportPct)}%</p>
-                <div style={{ width: 280, height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 99 }}>
-                  <div style={{ height: 6, background: 'linear-gradient(90deg,#6366f1,#8b5cf6)', borderRadius: 99, width: `${exportPct}%`, transition: 'width .5s' }} />
-                </div>
-                <p style={{ color: '#4b5563', fontSize: 11 }}>Don't close the window — video is being recorded</p>
-              </div>
-            )}
           </div>
 
           {/* PLAYBACK BAR */}
@@ -726,13 +626,8 @@ export default function VideoEditorPage() {
 
           {/* Export footer */}
           <div style={{ padding: 14, borderTop: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
-            {/* Export mode info */}
-            <div style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 8, background: exportMode === 'browser' ? 'rgba(99,102,241,0.08)' : 'rgba(16,185,129,0.08)', border: `1px solid ${exportMode === 'browser' ? 'rgba(99,102,241,0.2)' : 'rgba(16,185,129,0.2)'}` }}>
-              <p style={{ fontSize: 10, color: exportMode === 'browser' ? '#a5b4fc' : '#6ee7b7', lineHeight: 1.6 }}>
-                {exportMode === 'browser'
-                  ? '🎨 Includes: filters, text, captions, speed, brightness. Exports as WebM.'
-                  : '⚡ FFmpeg trim only. Faster, MP4 output. No filters/text.'}
-              </p>
+            <div style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
+              <p style={{ fontSize: 10, color: '#6ee7b7', lineHeight: 1.6 }}>⚡ FFmpeg trim — fast MP4 export. Captions burned server-side with Whisper.</p>
             </div>
 
             {exporting && (
@@ -742,20 +637,16 @@ export default function VideoEditorPage() {
               </div>
             )}
 
-            {exportDone && exportMode === 'server' && serverExportRes && (
+            {exportDone && serverExportRes && (
               <a href={`${API}${serverExportRes.download_url}`} download
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 9, color: '#6ee7b7', textDecoration: 'none', fontSize: 12, fontWeight: 700, marginBottom: 10 }}>
                 <Ico d={IC.dl} s={13} c="#6ee7b7" /> Download MP4
               </a>
             )}
-            {exportDone && exportMode === 'browser' && (
-              <div style={{ marginBottom: 10, padding: '8px 12px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 10 }}>
-                <p style={{ color: '#6ee7b7', fontSize: 12, fontWeight: 600 }}>✅ Exported with all edits!</p>
-              </div>
-            )}
+
 
             <button className="vb" onClick={handleExport} disabled={exporting} style={{ width: '100%', padding: '11px 0', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', borderRadius: 12, fontSize: 13, fontWeight: 700, boxShadow: '0 4px 14px rgba(99,102,241,0.3)' }}>
-              {exporting ? `Exporting ${Math.round(exportPct)}%` : exportMode === 'browser' ? '🎨 Export With Edits' : '⚡ Export MP4 (Trim)'}
+              {exporting ? `Exporting ${Math.round(exportPct)}%` : '⚡ Export MP4 (Trim)'}
             </button>
           </div>
         </div>
