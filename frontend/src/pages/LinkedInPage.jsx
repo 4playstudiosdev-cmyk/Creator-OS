@@ -172,9 +172,19 @@ function PostTab({ userId, liStatus }) {
   const handleImageSelect = (e) => {
     const file = e.target.files[0]
     if (!file) return
+
+    // Block SVG and unsupported formats
+    const blocked = ['image/svg+xml', 'image/svg', 'image/tiff', 'image/bmp']
+    if (blocked.includes(file.type)) {
+      setMsg(`${file.type} format not supported by LinkedIn. Use JPG, PNG, AVIF, or WEBP.`)
+      setState('error')
+      return
+    }
+
     setImageFile(file); setVideoFile(null)
     setMediaType('image')
     setImagePreview(URL.createObjectURL(file))
+    setState('idle'); setMsg('')
   }
 
   const handleVideoSelect = (e) => {
@@ -321,7 +331,7 @@ function PostTab({ userId, liStatus }) {
             {/* Media upload — image or video */}
             <div style={{ marginBottom: 14 }}>
               <label style={lbl}>Media (optional)</label>
-              <input ref={fileRef}  type="file" accept="image/*"  style={{ display: 'none' }} onChange={handleImageSelect} />
+              <input ref={fileRef}  type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/gif,image/heic"  style={{ display: 'none' }} onChange={handleImageSelect} />
               <input ref={videoRef} type="file" accept="video/*"  style={{ display: 'none' }} onChange={handleVideoSelect} />
 
               {/* Media type selector */}
@@ -332,7 +342,7 @@ function PostTab({ userId, liStatus }) {
                     onMouseEnter={e => e.currentTarget.style.borderColor='rgba(10,102,194,0.5)'}
                     onMouseLeave={e => e.currentTarget.style.borderColor='rgba(10,102,194,0.25)'}>
                     <p style={{ color: '#475569', fontSize: 13, margin: 0 }}>🖼️ Add Image</p>
-                    <p style={{ color: '#475569', fontSize: 11, margin: '3px 0 0' }}>Any format (JPG, PNG, AVIF, WEBP)</p>
+                    <p style={{ color: '#475569', fontSize: 11, margin: '3px 0 0' }}>JPG, PNG, AVIF, WEBP (not SVG)</p>
                   </div>
                   <div onClick={() => videoRef.current?.click()}
                     style={{ flex: 1, padding: '14px', borderRadius: 10, cursor: 'pointer', textAlign: 'center', border: '2px dashed rgba(10,102,194,0.25)' }}

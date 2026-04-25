@@ -643,86 +643,83 @@ PAGE_ID = "1119718397895935"  # Dreambyte Facebook Page ID
 async def get_messages(user_id: str, sb=Depends(get_sb)):
     """
     Get Instagram DMs via Facebook Page Conversations API.
-    Uses Page token with pages_messaging + instagram_manage_messages.
+    Requires: instagram_manage_messages + pages_messaging
     """
     tok, ig_uid = get_token(user_id, sb)
 
-    # Try Instagram conversations first
-    async with httpx.AsyncClient(timeout=20) as c:
-        r = await c.get(
-            f"{IG_GRAPH}/{ig_uid}/conversations",
-            params={
-                "platform":     "instagram",
-                "fields":       "id,messages{message,from,to,created_time,attachments}",
-                "access_token": tok,
-            }
-        )
-        d = r.json()
-        print(f"[Instagram DMs IG] Status: {r.status_code}, Body: {str(d)[:200]}")
-
-    if "error" not in d and d.get("data"):
-        conversations = []
-        for conv in d.get("data", []):
+    def parse_convos(data_list):
+        convos = []
+        for conv in data_list:
             msgs = conv.get("messages", {}).get("data", [])
             if not msgs:
                 continue
             latest = msgs[0]
             sender = latest.get("from", {})
-            conversations.append({
+            convos.append({
                 "id":           conv["id"],
                 "last_message": latest.get("message", "📎 Attachment"),
                 "from":         sender.get("username") or sender.get("name", "Unknown"),
                 "from_id":      sender.get("id", ""),
                 "timestamp":    latest.get("created_time", ""),
-                "messages":     [
+                "messages": [
                     {
                         "message":      m.get("message", ""),
                         "from":         m.get("from", {}).get("username") or m.get("from", {}).get("name", ""),
                         "created_time": m.get("created_time", ""),
                     }
-                    for m in msgs[:15]
+                    for m in msgs[:20]
                 ],
             })
-        return {"conversations": conversations, "total": len(conversations)}
+        return convos
 
-    # Fallback: Try Page conversations
+    fields = "id,messages{message,from,to,created_time}"
+
+    # Try 1: IG Business account conversations
+    async with httpx.AsyncClient(timeout=20) as c:
+        r = await c.get(
+            f"{IG_GRAPH}/{ig_uid}/conversations",
+            params={"platform": "instagram", "fields": fields, "access_token": tok}
+        )
+        d = r.json()
+        print(f"[Instagram DMs] IG endpoint: {r.status_code}, data: {len(d.get('data',[]))}")
+
+    if "error" not in d and d.get("data"):
+        convos = parse_convos(d["data"])
+        if convos:
+            return {"conversations": convos, "total": len(convos)}
+
+    # Try 2: Facebook Page conversations (instagram platform)
     async with httpx.AsyncClient(timeout=20) as c:
         r2 = await c.get(
             f"{IG_GRAPH}/{PAGE_ID}/conversations",
-            params={
-                "platform":     "instagram",
-                "fields":       "id,messages{message,from,to,created_time}",
-                "access_token": tok,
-            }
+            params={"platform": "instagram", "fields": fields, "access_token": tok}
         )
         d2 = r2.json()
-        print(f"[Instagram DMs Page] Status: {r2.status_code}, Body: {str(d2)[:200]}")
+        print(f"[Instagram DMs] Page endpoint: {r2.status_code}, data: {len(d2.get('data',[]))}")
 
-    if "error" in d2:
-        err_msg = d2["error"]["message"]
-        return {
-            "conversations": [],
-            "total": 0,
-            "note": f"DMs need instagram_manage_messages permission. Error: {err_msg}"
-        }
+    if "error" not in d2:
+        convos = parse_convos(d2.get("data", []))
+        return {"conversations": convos, "total": len(convos)}
 
-    conversations = []
-    for conv in d2.get("data", []):
-        msgs = conv.get("messages", {}).get("data", [])
-        if not msgs:
-            continue
-        latest = msgs[0]
-        sender = latest.get("from", {})
-        conversations.append({
-            "id":           conv["id"],
-            "last_message": latest.get("message", ""),
-            "from":         sender.get("username") or sender.get("name", "Unknown"),
-            "from_id":      sender.get("id", ""),
-            "timestamp":    latest.get("created_time", ""),
-            "messages":     msgs[:15],
-        })
+    # Try 3: Page inbox (messenger)
+    async with httpx.AsyncClient(timeout=20) as c:
+        r3 = await c.get(
+            f"{IG_GRAPH}/{PAGE_ID}/conversations",
+            params={"fields": fields, "access_token": tok}
+        )
+        d3 = r3.json()
+        print(f"[Instagram DMs] Page messenger: {r3.status_code}")
 
-    return {"conversations": conversations, "total": len(conversations)}
+    if "error" not in d3:
+        convos = parse_convos(d3.get("data", []))
+        return {"conversations": convos, "total": len(convos)}
+
+    err = d2.get("error", {}).get("message", "Unknown error")
+    return {
+        "conversations": [],
+        "total": 0,
+        "note": f"DMs API error: {err}. Token may need instagram_manage_messages + pages_messaging scope."
+    }
 
 
 class SendMessageRequest(BaseModel):
