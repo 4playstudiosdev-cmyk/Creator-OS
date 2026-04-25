@@ -1,478 +1,485 @@
 // src/pages/VideoEditorPage.jsx
-// Video Editor for Nexora OS — Timeline + Trim + Cut + AI Captions
-// Backend: FFmpeg via clipping.py
+// Nexora OS Video Editor — Powered by Creatomate
+// Features: Upload → Effects → Captions → Transitions → Export
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { supabase } from '../lib/supabaseClient'
 import {
-  Film, Upload, Scissors, Download, Play, Pause,
-  Plus, Trash2, CheckCircle, AlertCircle, Loader,
-  RefreshCw, ChevronLeft, ChevronRight, Type,
-  ZapIcon, SkipBack, SkipForward, Volume2
+  Film, Upload, Download, Play, Pause, Loader,
+  CheckCircle, AlertCircle, RefreshCw, Zap,
+  Type, Music, Sparkles, Monitor, Smartphone,
+  Square, ArrowRight, Image, Volume2, ChevronDown
 } from 'lucide-react'
 
 const API = 'https://creator-os-production-0bf8.up.railway.app'
 
-const card  = { background: 'rgba(15,26,20,0.8)', border: '1px solid rgba(0,229,160,0.1)', borderRadius: 14, padding: 20 }
-const lbl   = { fontSize: 12, fontWeight: 700, color: '#9DC4B0', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '.06em' }
-const inp   = { padding: '8px 12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(0,229,160,0.12)', borderRadius: 8, color: '#D8EEE5', fontSize: 13, outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
-const acBtn = (c='#00E5A0', dis=false) => ({ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 16px', background: dis ? 'rgba(255,255,255,0.04)' : `rgba(${c==='#00E5A0'?'0,229,160':c==='#F87171'?'248,113,113':'96,165,250'},0.12)`, border: `1px solid rgba(${c==='#00E5A0'?'0,229,160':c==='#F87171'?'248,113,113':'96,165,250'},${dis?'0.06':'0.3'})`, borderRadius: 9, color: dis ? '#4A6357' : c, fontSize: 13, fontWeight: 700, cursor: dis ? 'not-allowed' : 'pointer', fontFamily: 'inherit', transition: 'all .15s' })
+// ── Design ─────────────────────────────────────────────────────────────────
+const BG   = '#070D0A'
+const card = { background: 'rgba(15,26,20,0.9)', border: '1px solid rgba(0,229,160,0.1)', borderRadius: 14, padding: 20 }
+const lbl  = { fontSize: 11, fontWeight: 700, color: '#7A9E8E', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.08em' }
+const inp  = { padding: '9px 12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(0,229,160,0.12)', borderRadius: 8, color: '#D8EEE5', fontSize: 13, outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box', transition: 'border-color .15s' }
+const ta   = { ...inp, resize: 'vertical', minHeight: 70 }
+const gBtn = (dis) => ({ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 20px', background: dis ? 'rgba(0,229,160,0.1)' : 'linear-gradient(135deg,#00E5A0,#00B87A)', color: dis ? '#4A6357' : '#070D0A', border: 'none', borderRadius: 11, cursor: dis ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 800, fontFamily: 'inherit', width: '100%', transition: 'all .15s' })
+const selBtn = (active) => ({ padding: '9px 14px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, border: `1px solid ${active ? 'rgba(0,229,160,0.5)' : 'rgba(0,229,160,0.1)'}`, background: active ? 'rgba(0,229,160,0.1)' : 'transparent', color: active ? '#00E5A0' : '#7A9E8E', transition: 'all .15s', fontFamily: 'inherit' })
 
-const toTime = (s) => {
-  if (!s && s !== 0) return '0:00'
-  const m = Math.floor(s / 60), sc = Math.floor(s % 60)
-  return `${m}:${sc.toString().padStart(2,'0')}`
-}
+// ── Presets ────────────────────────────────────────────────────────────────
+const PRESETS = [
+  { id: 'shorts',    label: '📱 Shorts',    desc: '9:16 · TikTok style captions',   icon: <Smartphone size={14}/> },
+  { id: 'youtube',   label: '▶️ YouTube',   desc: '16:9 · Clean white captions',     icon: <Monitor size={14}/> },
+  { id: 'instagram', label: '📸 Instagram', desc: '1:1 · Bold center text',          icon: <Square size={14}/> },
+  { id: 'tiktok',    label: '🎵 TikTok',    desc: '9:16 · Yellow zoom captions',     icon: <Zap size={14}/> },
+  { id: 'cinematic', label: '🎬 Cinematic', desc: '16:9 · Fade transitions',         icon: <Film size={14}/> },
+]
 
-const toTimeMs = (s) => {
-  const m = Math.floor(s / 60), sc = Math.floor(s % 60), ms = Math.floor((s % 1) * 10)
-  return `${m}:${sc.toString().padStart(2,'0')}.${ms}`
-}
+const TRANSITIONS = ['none','fade','slide','zoom','wipe','spin','flip']
+const CAPTION_STYLES = [
+  { id: 'bottom_white', label: '⬇ Bottom White',  desc: 'Semi-transparent bg' },
+  { id: 'center_bold',  label: '⊕ Center Bold',   desc: 'White, centered' },
+  { id: 'tiktok',       label: '🎵 TikTok Yellow', desc: 'Yellow, no bg' },
+]
+const ASPECT_RATIOS = [
+  { id: '9:16',  label: '9:16',  icon: '📱', desc: 'Shorts/TikTok' },
+  { id: '16:9',  label: '16:9',  icon: '🖥️', desc: 'YouTube' },
+  { id: '1:1',   label: '1:1',   icon: '⬜', desc: 'Instagram' },
+  { id: '4:5',   label: '4:5',   icon: '📷', desc: 'IG Portrait' },
+]
 
 export default function VideoEditorPage() {
-  // ── State ──────────────────────────────────────────────────────────────────
-  const [fileInfo,    setFileInfo]    = useState(null)
-  const [uploading,   setUploading]   = useState(false)
-  const [uploadErr,   setUploadErr]   = useState('')
-  const [currentTime, setCurrentTime] = useState(0)
-  const [duration,    setDuration]    = useState(0)
-  const [playing,     setPlaying]     = useState(false)
-  const [volume,      setVolume]      = useState(1)
-  const [mode,        setMode]        = useState('trim') // trim | cut | caption
-  const [trimStart,   setTrimStart]   = useState(0)
-  const [trimEnd,     setTrimEnd]     = useState(0)
-  const [segments,    setSegments]    = useState([])
-  const [exporting,   setExporting]   = useState(false)
-  const [exportRes,   setExportRes]   = useState(null)
-  const [exportErr,   setExportErr]   = useState('')
-  const [captionRes,  setCaptionRes]  = useState(null)
-  const [captioning,  setCaptioning]  = useState(false)
-  const [captionErr,  setCaptionErr]  = useState('')
-  const [localSrc,    setLocalSrc]    = useState(null)
-  const [isDragging,  setIsDragging]  = useState(null) // 'start' | 'end' | segId
-  const videoRef   = useRef()
-  const fileRef    = useRef()
-  const timelineRef= useRef()
+  const [step,          setStep]          = useState(1) // 1=upload 2=edit 3=export
+  const [userId,        setUserId]        = useState(null)
+  const [localSrc,      setLocalSrc]      = useState(null)
+  const [videoUrl,      setVideoUrl]      = useState(null)
+  const [uploading,     setUploading]     = useState(false)
+  const [uploadErr,     setUploadErr]     = useState('')
+  const [playing,       setPlaying]       = useState(false)
+  const [currentTime,   setCurrentTime]   = useState(0)
+  const [duration,      setDuration]      = useState(0)
 
-  // ── Video events ───────────────────────────────────────────────────────────
+  // Editor settings
+  const [mode,          setMode]          = useState('preset') // preset | custom
+  const [selectedPreset,setSelectedPreset]= useState('shorts')
+  const [aspectRatio,   setAspectRatio]   = useState('9:16')
+  const [transition,    setTransition]    = useState('fade')
+  const [captionText,   setCaptionText]   = useState('')
+  const [captionStyle,  setCaptionStyle]  = useState('bottom_white')
+  const [overlayText,   setOverlayText]   = useState('')
+  const [overlayColor,  setOverlayColor]  = useState('#ffffff')
+  const [bgMusicUrl,    setBgMusicUrl]    = useState('')
+  const [bgMusicVol,    setBgMusicVol]    = useState(0.3)
+  const [trimStart,     setTrimStart]     = useState(0)
+  const [trimEnd,       setTrimEnd]       = useState(0)
+  const [useTrim,       setUseTrim]       = useState(false)
+
+  // Render state
+  const [rendering,     setRendering]     = useState(false)
+  const [renderId,      setRenderId]      = useState(null)
+  const [renderStatus,  setRenderStatus]  = useState(null)
+  const [renderResult,  setRenderResult]  = useState(null)
+  const [renderErr,     setRenderErr]     = useState('')
+
+  const fileRef  = useRef()
+  const videoRef = useRef()
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setUserId(session.user.id)
+    })
+  }, [])
+
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
-    const onTime   = () => setCurrentTime(v.currentTime)
-    const onEnded  = () => setPlaying(false)
-    const onLoaded = () => {
-      setDuration(v.duration)
-      setTrimEnd(v.duration)
-      setSegments([{ id: 1, start: 0, end: Math.min(30, v.duration) }])
-    }
+    const onTime  = () => setCurrentTime(v.currentTime)
+    const onMeta  = () => { setDuration(v.duration); setTrimEnd(v.duration) }
     v.addEventListener('timeupdate', onTime)
-    v.addEventListener('ended', onEnded)
-    v.addEventListener('loadedmetadata', onLoaded)
-    return () => { v.removeEventListener('timeupdate', onTime); v.removeEventListener('ended', onEnded); v.removeEventListener('loadedmetadata', onLoaded) }
+    v.addEventListener('loadedmetadata', onMeta)
+    return () => { v.removeEventListener('timeupdate', onTime); v.removeEventListener('loadedmetadata', onMeta) }
   }, [localSrc])
 
-  const seekTo = (t) => { if (videoRef.current) { videoRef.current.currentTime = Math.max(0, Math.min(t, duration)); setCurrentTime(videoRef.current.currentTime) } }
-  const togglePlay = () => { if (!videoRef.current) return; playing ? videoRef.current.pause() : videoRef.current.play(); setPlaying(!playing) }
-  const pct = duration > 0 ? (currentTime / duration) * 100 : 0
+  // Poll render status
+  useEffect(() => {
+    if (!renderId) return
+    const poll = setInterval(async () => {
+      try {
+        const r = await fetch(`${API}/api/editor/render/${renderId}`)
+        const d = await r.json()
+        setRenderStatus(d)
+        if (d.status === 'succeeded') {
+          setRenderResult(d); setRendering(false); clearInterval(poll); setStep(3)
+        } else if (d.status === 'failed') {
+          setRenderErr(d.error || 'Render failed.'); setRendering(false); clearInterval(poll)
+        }
+      } catch {}
+    }, 2500)
+    return () => clearInterval(poll)
+  }, [renderId])
 
-  // ── Upload ─────────────────────────────────────────────────────────────────
+  // ── Upload ────────────────────────────────────────────────────────────────
   const handleUpload = async (e) => {
     const f = e.target.files[0]
-    if (!f) return
-    setUploading(true); setUploadErr(''); setFileInfo(null); setExportRes(null); setCaptionRes(null)
-    setLocalSrc(URL.createObjectURL(f))
+    if (!f || !userId) return
+    setUploading(true); setUploadErr(''); setLocalSrc(URL.createObjectURL(f))
 
     const form = new FormData()
+    form.append('user_id', userId)
     form.append('file', f)
+
     try {
-      const r = await fetch(`${API}/api/clipping/editor/upload`, { method: 'POST', body: form })
+      const r = await fetch(`${API}/api/editor/upload-video`, { method: 'POST', body: form })
       const d = await r.json()
       if (!r.ok) throw new Error(d.detail || 'Upload failed.')
-      setFileInfo(d)
+      setVideoUrl(d.url)
+      setStep(2)
     } catch (e) { setUploadErr(e.message) }
     setUploading(false)
   }
 
-  // ── Timeline click ─────────────────────────────────────────────────────────
-  const onTimelineClick = (e) => {
-    const rect = timelineRef.current.getBoundingClientRect()
-    const t    = ((e.clientX - rect.left) / rect.width) * duration
-    seekTo(t)
-  }
-
-  // ── Set markers at current time ────────────────────────────────────────────
-  const setTrimStartHere = () => setTrimStart(parseFloat(currentTime.toFixed(2)))
-  const setTrimEndHere   = () => setTrimEnd(parseFloat(currentTime.toFixed(2)))
-  const setSegStartHere  = (id) => setSegments(s => s.map(sg => sg.id===id ? {...sg, start: parseFloat(currentTime.toFixed(2))} : sg))
-  const setSegEndHere    = (id) => setSegments(s => s.map(sg => sg.id===id ? {...sg, end: parseFloat(currentTime.toFixed(2))} : sg))
-
-  // ── Export ─────────────────────────────────────────────────────────────────
-  const handleExport = async () => {
-    if (!fileInfo) return
-    setExporting(true); setExportErr(''); setExportRes(null)
+  // ── Render ────────────────────────────────────────────────────────────────
+  const handleRender = async () => {
+    if (!videoUrl) return
+    setRendering(true); setRenderErr(''); setRenderResult(null); setRenderId(null)
 
     try {
-      if (mode === 'trim') {
-        const form = new FormData()
-        form.append('file_id', fileInfo.file_id)
-        form.append('start_time', String(trimStart))
-        form.append('end_time', String(trimEnd))
-        const r = await fetch(`${API}/api/clipping/editor/trim`, { method: 'POST', body: form })
+      let body
+      if (mode === 'preset') {
+        body = {
+          user_id:   userId,
+          video_url: videoUrl,
+          preset:    selectedPreset,
+          text:      captionText || undefined,
+          music_url: bgMusicUrl  || undefined,
+        }
+        const r = await fetch(`${API}/api/editor/quick-preset`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        })
         const d = await r.json()
-        if (!r.ok) throw new Error(d.detail || 'Trim failed.')
-        setExportRes(d)
-      } else if (mode === 'cut') {
-        const valid = segments.filter(s => s.end > s.start)
-        if (!valid.length) throw new Error('Add valid segments first.')
-        const form = new FormData()
-        form.append('file_id', fileInfo.file_id)
-        form.append('cuts', JSON.stringify(valid.map(s => ({ start: s.start, end: s.end }))))
-        const r = await fetch(`${API}/api/clipping/editor/cut`, { method: 'POST', body: form })
+        if (!r.ok) throw new Error(d.detail || 'Render failed.')
+        setRenderId(d.render_id)
+      } else {
+        body = {
+          user_id:      userId,
+          video_url:    videoUrl,
+          aspect_ratio: aspectRatio,
+          transition,
+          caption_text:  captionText  || undefined,
+          caption_style: captionStyle,
+          overlay_text:  overlayText  || undefined,
+          overlay_color: overlayColor,
+          bg_music_url:  bgMusicUrl   || undefined,
+          bg_music_vol:  bgMusicVol,
+          trim_start:    useTrim ? trimStart : undefined,
+          trim_end:      useTrim ? trimEnd   : undefined,
+        }
+        const r = await fetch(`${API}/api/editor/render`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        })
         const d = await r.json()
-        if (!r.ok) throw new Error(d.detail || 'Cut failed.')
-        setExportRes(d)
+        if (!r.ok) throw new Error(d.detail || 'Render failed.')
+        setRenderId(d.render_id)
       }
-    } catch (e) { setExportErr(e.message) }
-    setExporting(false)
+    } catch (e) { setRenderErr(e.message); setRendering(false) }
   }
 
-  // ── AI Captions ────────────────────────────────────────────────────────────
-  const handleCaption = async () => {
-    if (!fileInfo) return
-    setCaptioning(true); setCaptionErr(''); setCaptionRes(null)
-    try {
-      const form = new FormData()
-      form.append('file_id', fileInfo.file_id)
-      const r = await fetch(`${API}/api/clipping/editor/caption`, { method: 'POST', body: form })
-      const d = await r.json()
-      if (!r.ok) throw new Error(d.detail || 'Caption failed.')
-      setCaptionRes(d)
-    } catch (e) { setCaptionErr(e.message) }
-    setCaptioning(false)
+  const reset = () => {
+    setStep(1); setLocalSrc(null); setVideoUrl(null); setRenderResult(null)
+    setRenderId(null); setRenderStatus(null); setRendering(false); setRenderErr('')
+    setCaptionText(''); setOverlayText(''); setBgMusicUrl('')
   }
 
-  const addSeg = () => {
-    const last = segments[segments.length - 1]
-    const s    = last ? Math.min(last.end + 2, duration) : 0
-    setSegments([...segments, { id: Date.now(), start: s, end: Math.min(s + 30, duration) }])
-  }
+  const pct = duration > 0 ? (currentTime / duration) * 100 : 0
 
-  const totalDur = mode === 'trim'
-    ? Math.max(0, trimEnd - trimStart)
-    : segments.reduce((a,s) => a + Math.max(0, s.end - s.start), 0)
-
-  if (!fileInfo && !localSrc) return (
+  // ── STEP 1 — Upload ───────────────────────────────────────────────────────
+  if (step === 1) return (
     <div style={{ fontFamily: "'Instrument Sans',system-ui,sans-serif", color: '#D8EEE5' }}>
       <style>{`@keyframes sp{to{transform:rotate(360deg)}}`}</style>
+
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
-        <div style={{ width: 46, height: 46, borderRadius: 12, background: 'rgba(0,229,160,0.1)', border: '1px solid rgba(0,229,160,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: 46, height: 46, borderRadius: 13, background: 'linear-gradient(135deg,rgba(0,229,160,0.15),rgba(0,229,160,0.05))', border: '1px solid rgba(0,229,160,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Film size={22} color="#00E5A0" />
         </div>
         <div>
-          <h1 style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 20, fontWeight: 800, color: '#fff', margin: 0 }}>Video Editor</h1>
-          <p style={{ fontSize: 13, color: '#7A9E8E', margin: 0 }}>Trim • Cut • AI Captions — powered by FFmpeg</p>
+          <h1 style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 22, fontWeight: 800, color: '#fff', margin: 0 }}>Video Editor</h1>
+          <p style={{ fontSize: 13, color: '#7A9E8E', margin: 0 }}>Powered by Creatomate — Effects • Captions • Transitions • Music</p>
         </div>
       </div>
 
-      <input ref={fileRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={handleUpload} />
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16 }}>
         <div style={card}>
-          <div onClick={() => fileRef.current?.click()}
-            style={{ border: '2px dashed rgba(0,229,160,0.2)', borderRadius: 12, padding: '52px', textAlign: 'center', cursor: 'pointer', transition: 'border-color .2s' }}
-            onMouseEnter={e => e.currentTarget.style.borderColor='rgba(0,229,160,0.5)'}
+          <input ref={fileRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={handleUpload} />
+          <div onClick={() => !uploading && fileRef.current?.click()}
+            style={{ border: '2px dashed rgba(0,229,160,0.2)', borderRadius: 14, padding: '52px 32px', textAlign: 'center', cursor: uploading ? 'default' : 'pointer' }}
+            onMouseEnter={e => { if (!uploading) e.currentTarget.style.borderColor='rgba(0,229,160,0.5)' }}
             onMouseLeave={e => e.currentTarget.style.borderColor='rgba(0,229,160,0.2)'}>
-            {uploading
-              ? <><Loader size={32} color="#00E5A0" style={{ display: 'block', margin: '0 auto 12px', animation: 'sp .8s linear infinite' }} /><p style={{ color: '#9DC4B0', fontSize: 14, margin: 0 }}>Uploading to server...</p></>
-              : <><Upload size={36} color="#4A6357" style={{ display: 'block', margin: '0 auto 14px' }} /><p style={{ color: '#9DC4B0', fontSize: 15, fontWeight: 600, margin: 0 }}>Click to upload video</p><p style={{ color: '#4A6357', fontSize: 12, margin: '6px 0 0' }}>MP4, MOV, AVI, MKV • Any size</p></>}
+            {uploading ? (
+              <>
+                <Loader size={36} color="#00E5A0" style={{ display: 'block', margin: '0 auto 14px', animation: 'sp .8s linear infinite' }} />
+                <p style={{ color: '#9DC4B0', fontSize: 15, fontWeight: 600, margin: 0 }}>Uploading to server...</p>
+                <p style={{ color: '#4A6357', fontSize: 12, margin: '6px 0 0' }}>Please wait</p>
+              </>
+            ) : (
+              <>
+                <Upload size={40} color="#4A6357" style={{ display: 'block', margin: '0 auto 16px' }} />
+                <p style={{ color: '#9DC4B0', fontSize: 16, fontWeight: 700, margin: 0 }}>Drop video or click to upload</p>
+                <p style={{ color: '#4A6357', fontSize: 13, margin: '8px 0 0' }}>MP4, MOV, AVI, MKV • Any size</p>
+              </>
+            )}
           </div>
-          {uploadErr && <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 10, color: '#F87171', fontSize: 13 }}>{uploadErr}</div>}
+          {uploadErr && <div style={{ marginTop: 12, padding: '10px 14px', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 10, color: '#F87171', fontSize: 13 }}>{uploadErr}</div>}
         </div>
-        <div style={card}>
-          <h4 style={{ fontSize: 13, fontWeight: 700, color: '#fff', margin: '0 0 14px' }}>🎬 Features</h4>
-          {[['✂️ Trim','Cut start/end, exact timestamps'],['🔪 Multi-cut','Keep multiple segments, join them'],['📝 AI Captions','Whisper transcribe + burn into video'],['⬇️ Export','Download as MP4 (H.264)'],['🎵 Audio','AAC stereo output'],['⚡ FFmpeg','High quality, no watermark']].map(([k,v]) => (
-            <div key={k} style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#D8EEE5', minWidth: 90 }}>{k}</span>
-              <span style={{ fontSize: 12, color: '#7A9E8E' }}>{v}</span>
-            </div>
-          ))}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={card}>
+            <div style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 14 }}>✨ Features</div>
+            {[
+              ['🎨 Effects',     'Brightness, contrast, saturation filters'],
+              ['📝 AI Captions', 'Auto-burn subtitles in multiple styles'],
+              ['🔀 Transitions', 'Fade, slide, zoom, wipe, spin, flip'],
+              ['🎵 Background Music', 'Add music with volume control'],
+              ['📱 Presets',    'Shorts, YouTube, TikTok, Instagram'],
+              ['✂️ Trim',       'Set start/end timestamps'],
+              ['🖼️ Text Overlay','Custom title text with colors'],
+              ['⬇️ Export',     'HD MP4 download, no watermark'],
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: 'flex', gap: 10, marginBottom: 9 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#D8EEE5', minWidth: 120 }}>{k}</span>
+                <span style={{ fontSize: 12, color: '#7A9E8E' }}>{v}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
   )
 
+  // ── STEP 3 — Done ─────────────────────────────────────────────────────────
+  if (step === 3 && renderResult) return (
+    <div style={{ fontFamily: "'Instrument Sans',system-ui,sans-serif", color: '#D8EEE5', maxWidth: 600, margin: '60px auto', textAlign: 'center' }}>
+      <div style={card}>
+        <CheckCircle size={56} color="#00E5A0" style={{ display: 'block', margin: '0 auto 20px' }} />
+        <h2 style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 24, fontWeight: 800, color: '#fff', margin: '0 0 8px' }}>Video Ready! 🎉</h2>
+        <p style={{ fontSize: 14, color: '#7A9E8E', margin: '0 0 24px' }}>
+          Your edited video has been rendered by Creatomate
+        </p>
+        <a href={renderResult.download_url} target="_blank" rel="noopener" download
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 32px', background: 'linear-gradient(135deg,#00E5A0,#00B87A)', color: '#070D0A', borderRadius: 12, textDecoration: 'none', fontSize: 15, fontWeight: 800, marginBottom: 14 }}>
+          <Download size={18} /> Download MP4
+        </a>
+        <br />
+        <button onClick={reset} style={{ background: 'none', border: '1px solid rgba(0,229,160,0.2)', borderRadius: 9, color: '#9DC4B0', fontSize: 13, padding: '9px 20px', cursor: 'pointer', fontFamily: 'inherit' }}>
+          Edit Another Video
+        </button>
+      </div>
+    </div>
+  )
+
+  // ── STEP 2 — Editor ───────────────────────────────────────────────────────
   return (
     <div style={{ fontFamily: "'Instrument Sans',system-ui,sans-serif", color: '#D8EEE5' }}>
-      <style>{`@keyframes sp{to{transform:rotate(360deg)}} @keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}`}</style>
+      <style>{`@keyframes sp{to{transform:rotate(360deg)}} @keyframes progBar{0%{background-position:0 0}100%{background-position:60px 0}}`}</style>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Film size={20} color="#00E5A0" />
           <span style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontWeight: 800, fontSize: 17, color: '#fff' }}>Video Editor</span>
-          {fileInfo && <span style={{ fontSize: 12, color: '#7A9E8E' }}>• {fileInfo.filename?.split('/').pop()} • {toTime(duration)} • {fileInfo.size_mb}MB</span>}
+          <span style={{ fontSize: 12, color: '#4A6357', padding: '3px 8px', background: 'rgba(0,229,160,0.06)', borderRadius: 6, border: '1px solid rgba(0,229,160,0.12)' }}>Creatomate</span>
         </div>
-        <button onClick={() => { setFileInfo(null); setLocalSrc(null); setExportRes(null); setCaptionRes(null); setPlaying(false) }}
-          style={{ ...acBtn(), padding: '7px 14px', fontSize: 12 }}>
+        <button onClick={reset} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: 'rgba(0,229,160,0.06)', border: '1px solid rgba(0,229,160,0.15)', borderRadius: 8, color: '#9DC4B0', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
           <RefreshCw size={12} /> New Video
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 14 }}>
-        {/* Left — Preview + Timeline */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 14 }}>
+
+        {/* Left — Preview + Settings */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-          {/* Video player */}
-          <div style={{ ...card, padding: 14 }}>
-            <video ref={videoRef} src={localSrc} style={{ width: '100%', borderRadius: 10, background: '#000', maxHeight: 300, objectFit: 'contain', display: 'block' }}
-              onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} />
-
-            {/* Transport controls */}
-            <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <button onClick={() => seekTo(0)} style={{ background: 'none', border: 'none', color: '#9DC4B0', cursor: 'pointer', padding: 4 }}><SkipBack size={16} /></button>
-              <button onClick={() => seekTo(currentTime - 5)} style={{ background: 'none', border: 'none', color: '#9DC4B0', cursor: 'pointer', padding: 4, fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}><ChevronLeft size={14} />5s</button>
-              <button onClick={togglePlay}
-                style={{ width: 38, height: 38, borderRadius: '50%', background: '#00E5A0', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
-                {playing ? <Pause size={16} color="#070D0A" /> : <Play size={16} color="#070D0A" style={{ marginLeft: 2 }} />}
-              </button>
-              <button onClick={() => seekTo(currentTime + 5)} style={{ background: 'none', border: 'none', color: '#9DC4B0', cursor: 'pointer', padding: 4, fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}>5s<ChevronRight size={14} /></button>
-              <button onClick={() => seekTo(duration)} style={{ background: 'none', border: 'none', color: '#9DC4B0', cursor: 'pointer', padding: 4 }}><SkipForward size={16} /></button>
-
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
-                <Volume2 size={14} color="#7A9E8E" />
-                <input type="range" min={0} max={1} step={0.05} value={volume}
-                  onChange={e => { setVolume(e.target.value); if (videoRef.current) videoRef.current.volume = e.target.value }}
-                  style={{ flex: 1, accentColor: '#00E5A0', height: 3 }} />
-              </div>
-
-              <span style={{ fontSize: 12, color: '#00E5A0', fontFamily: 'monospace', minWidth: 90, textAlign: 'right' }}>
-                {toTimeMs(currentTime)} / {toTime(duration)}
-              </span>
-            </div>
+          {/* Video preview */}
+          <div style={{ ...card, padding: 12 }}>
+            <video ref={videoRef} src={localSrc} style={{ width: '100%', borderRadius: 10, background: '#000', maxHeight: 280, objectFit: 'contain', display: 'block' }}
+              onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} controls />
           </div>
 
-          {/* Timeline */}
-          <div style={{ ...card, padding: '14px 16px' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#9DC4B0', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.06em' }}>Timeline</div>
-
-            {/* Main scrubber */}
-            <div ref={timelineRef}
-              style={{ position: 'relative', height: 48, background: 'rgba(255,255,255,0.04)', borderRadius: 8, cursor: 'pointer', overflow: 'hidden', marginBottom: 6 }}
-              onClick={onTimelineClick}>
-
-              {/* Playhead */}
-              <div style={{ position: 'absolute', left: `${pct}%`, top: 0, bottom: 0, width: 2, background: '#00E5A0', zIndex: 10, pointerEvents: 'none' }}>
-                <div style={{ position: 'absolute', top: -4, left: -4, width: 10, height: 10, borderRadius: '50%', background: '#00E5A0' }} />
-              </div>
-
-              {/* Trim region */}
-              {mode === 'trim' && (
-                <div style={{
-                  position: 'absolute',
-                  left: `${(trimStart/duration)*100}%`,
-                  width: `${((trimEnd-trimStart)/duration)*100}%`,
-                  top: 0, bottom: 0,
-                  background: 'rgba(0,229,160,0.2)',
-                  border: '1px solid rgba(0,229,160,0.5)',
-                }}>
-                  {/* Start handle */}
-                  <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 6, background: '#FBBF24', cursor: 'ew-resize', borderRadius: '4px 0 0 4px' }} />
-                  {/* End handle */}
-                  <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 6, background: '#F87171', cursor: 'ew-resize', borderRadius: '0 4px 4px 0' }} />
-                </div>
-              )}
-
-              {/* Segments */}
-              {mode === 'cut' && segments.map((seg, i) => (
-                <div key={seg.id} style={{
-                  position: 'absolute',
-                  left: `${(seg.start/duration)*100}%`,
-                  width: `${Math.max((seg.end-seg.start)/duration*100, 0.5)}%`,
-                  top: 4, bottom: 4,
-                  background: `rgba(${i%3===0?'0,229,160':i%3===1?'96,165,250':'251,191,36'},0.3)`,
-                  border: `1px solid rgba(${i%3===0?'0,229,160':i%3===1?'96,165,250':'251,191,36'},0.6)`,
-                  borderRadius: 4,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 10, color: '#fff', fontWeight: 700,
-                }}>
-                  {i+1}
-                </div>
-              ))}
+          {/* Mode selector */}
+          <div style={card}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+              <button style={selBtn(mode === 'preset')} onClick={() => setMode('preset')}>⚡ Quick Presets</button>
+              <button style={selBtn(mode === 'custom')} onClick={() => setMode('custom')}>🎨 Custom Settings</button>
             </div>
 
-            {/* Time markers */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#4A6357', marginBottom: 10 }}>
-              {[0, 0.25, 0.5, 0.75, 1].map(f => (
-                <span key={f}>{toTime(f * duration)}</span>
-              ))}
-            </div>
-
-            {/* Mode-specific controls */}
-            {mode === 'trim' && (
-              <div style={{ display: 'flex', gap: 8 }}>
-                <div style={{ flex: 1, padding: '8px 10px', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 8 }}>
-                  <div style={{ fontSize: 10, color: '#FBBF24', fontWeight: 700, marginBottom: 3 }}>START</div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <input style={{ ...inp, padding: '5px 8px', fontSize: 12, flex: 1 }} type="number" value={trimStart} min={0} max={trimEnd-0.1} step={0.1}
-                      onChange={e => setTrimStart(Math.max(0, parseFloat(e.target.value)))} />
-                    <button onClick={setTrimStartHere} style={{ padding: '5px 8px', background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 6, color: '#FBBF24', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
-                      📍 Here
-                    </button>
-                  </div>
-                  <div style={{ fontSize: 10, color: '#7A9E8E', marginTop: 3 }}>{toTimeMs(trimStart)}</div>
-                </div>
-                <div style={{ flex: 1, padding: '8px 10px', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 8 }}>
-                  <div style={{ fontSize: 10, color: '#F87171', fontWeight: 700, marginBottom: 3 }}>END</div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <input style={{ ...inp, padding: '5px 8px', fontSize: 12, flex: 1 }} type="number" value={trimEnd} min={trimStart+0.1} max={duration} step={0.1}
-                      onChange={e => setTrimEnd(Math.min(duration, parseFloat(e.target.value)))} />
-                    <button onClick={setTrimEndHere} style={{ padding: '5px 8px', background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 6, color: '#F87171', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
-                      📍 Here
-                    </button>
-                  </div>
-                  <div style={{ fontSize: 10, color: '#7A9E8E', marginTop: 3 }}>{toTimeMs(trimEnd)}</div>
-                </div>
-                <div style={{ padding: '8px 12px', background: 'rgba(0,229,160,0.06)', border: '1px solid rgba(0,229,160,0.15)', borderRadius: 8, display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 80 }}>
-                  <div style={{ fontSize: 10, color: '#9DC4B0' }}>Output</div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#00E5A0', fontFamily: "'Cabinet Grotesk',sans-serif" }}>{toTime(totalDur)}</div>
-                </div>
-              </div>
-            )}
-
-            {mode === 'cut' && (
+            {mode === 'preset' ? (
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <span style={{ fontSize: 12, color: '#9DC4B0', fontWeight: 700 }}>Segments — Output: {toTime(totalDur)}</span>
-                  <button onClick={addSeg} style={{ ...acBtn(), padding: '5px 10px', fontSize: 11 }}><Plus size={12} /> Add Segment</button>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto' }}>
-                  {segments.map((seg, i) => (
-                    <div key={seg.id} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(0,229,160,0.08)' }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#00E5A0', minWidth: 20 }}>{i+1}</span>
-                      <div style={{ flex: 1, display: 'flex', gap: 6 }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 9, color: '#7A9E8E', marginBottom: 2 }}>Start</div>
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            <input style={{ ...inp, padding: '4px 6px', fontSize: 11 }} type="number" value={seg.start} min={0} max={seg.end-0.1} step={0.1}
-                              onChange={e => setSegments(s => s.map(sg => sg.id===seg.id ? {...sg, start: parseFloat(e.target.value)} : sg))} />
-                            <button onClick={() => setSegStartHere(seg.id)} style={{ padding: '4px 6px', background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 5, color: '#FBBF24', fontSize: 10, cursor: 'pointer', fontFamily: 'inherit' }}>📍</button>
-                          </div>
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 9, color: '#7A9E8E', marginBottom: 2 }}>End</div>
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            <input style={{ ...inp, padding: '4px 6px', fontSize: 11 }} type="number" value={seg.end} min={seg.start+0.1} max={duration} step={0.1}
-                              onChange={e => setSegments(s => s.map(sg => sg.id===seg.id ? {...sg, end: parseFloat(e.target.value)} : sg))} />
-                            <button onClick={() => setSegEndHere(seg.id)} style={{ padding: '4px 6px', background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 5, color: '#F87171', fontSize: 10, cursor: 'pointer', fontFamily: 'inherit' }}>📍</button>
-                          </div>
-                        </div>
-                      </div>
-                      <span style={{ fontSize: 11, color: '#4A6357', minWidth: 35 }}>{toTime(seg.end-seg.start)}</span>
-                      <button onClick={() => setSegments(s => s.filter(sg => sg.id !== seg.id))} style={{ background: 'none', border: 'none', color: '#F87171', cursor: 'pointer', padding: 2 }}><Trash2 size={13} /></button>
+                <label style={lbl}>Choose Preset</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {PRESETS.map(p => (
+                    <div key={p.id} onClick={() => setSelectedPreset(p.id)}
+                      style={{ padding: '12px 14px', borderRadius: 10, cursor: 'pointer', border: `1px solid ${selectedPreset===p.id ? 'rgba(0,229,160,0.5)' : 'rgba(0,229,160,0.08)'}`, background: selectedPreset===p.id ? 'rgba(0,229,160,0.06)' : 'rgba(255,255,255,0.02)', transition: 'all .15s' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: selectedPreset===p.id ? '#00E5A0' : '#D8EEE5', marginBottom: 3 }}>{p.label}</div>
+                      <div style={{ fontSize: 11, color: '#7A9E8E' }}>{p.desc}</div>
                     </div>
                   ))}
+                </div>
+              </div>
+            ) : (
+              <div>
+                {/* Aspect Ratio */}
+                <div style={{ marginBottom: 16 }}>
+                  <label style={lbl}>Aspect Ratio</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {ASPECT_RATIOS.map(ar => (
+                      <button key={ar.id} style={{ ...selBtn(aspectRatio===ar.id), flex: 1, padding: '8px 6px', textAlign: 'center' }} onClick={() => setAspectRatio(ar.id)}>
+                        <div style={{ fontSize: 14 }}>{ar.icon}</div>
+                        <div style={{ fontSize: 12 }}>{ar.label}</div>
+                        <div style={{ fontSize: 10, color: '#7A9E8E' }}>{ar.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Transition */}
+                <div style={{ marginBottom: 16 }}>
+                  <label style={lbl}>Transition Effect</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {TRANSITIONS.map(t => (
+                      <button key={t} style={{ ...selBtn(transition===t), padding: '6px 12px', fontSize: 12 }} onClick={() => setTransition(t)}>
+                        {t === 'none' ? '⛔ None' : t === 'fade' ? '🌅 Fade' : t === 'slide' ? '➡️ Slide' : t === 'zoom' ? '🔍 Zoom' : t === 'wipe' ? '🧹 Wipe' : t === 'spin' ? '🌀 Spin' : '🔄 Flip'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Trim */}
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ ...lbl, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="checkbox" checked={useTrim} onChange={e => setUseTrim(e.target.checked)} style={{ accentColor: '#00E5A0' }} />
+                    Trim Video
+                  </label>
+                  {useTrim && (
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ ...lbl, fontSize: 10 }}>Start (s)</label>
+                        <input style={inp} type="number" value={trimStart} min={0} max={trimEnd-0.1} step={0.5} onChange={e => setTrimStart(parseFloat(e.target.value))} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ ...lbl, fontSize: 10 }}>End (s)</label>
+                        <input style={inp} type="number" value={trimEnd} min={trimStart+0.1} max={duration} step={0.5} onChange={e => setTrimEnd(parseFloat(e.target.value))} />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Right — Tools panel */}
+        {/* Right — Text, Music, Export */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-          {/* Mode selector */}
+          {/* Captions */}
           <div style={card}>
-            <div style={lbl}>Edit Mode</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {[['trim','✂️ Trim','Cut start & end'],['cut','🔪 Multi-Cut','Keep segments'],['caption','📝 AI Captions','Auto-transcribe & burn']].map(([v,l,d]) => (
-                <div key={v} onClick={() => { setMode(v); setExportRes(null); setExportErr('') }}
-                  style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', border: `1px solid ${mode===v ? 'rgba(0,229,160,0.4)' : 'rgba(0,229,160,0.08)'}`, background: mode===v ? 'rgba(0,229,160,0.06)' : 'transparent', transition: 'all .15s' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: mode===v ? '#00E5A0' : '#D8EEE5' }}>{l}</div>
-                  <div style={{ fontSize: 11, color: '#7A9E8E' }}>{d}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <Type size={14} color="#60A5FA" />
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>Captions & Text</span>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={lbl}>Caption Text (subtitle burned in)</label>
+              <textarea style={ta} value={captionText} onChange={e => setCaptionText(e.target.value)}
+                placeholder="Your caption text here...&#10;Can be multi-line"
+                onFocus={e => e.target.style.borderColor='rgba(0,229,160,0.4)'}
+                onBlur={e => e.target.style.borderColor='rgba(0,229,160,0.12)'} />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={lbl}>Caption Style</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {CAPTION_STYLES.map(cs => (
+                  <div key={cs.id} onClick={() => setCaptionStyle(cs.id)}
+                    style={{ padding: '8px 12px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${captionStyle===cs.id ? 'rgba(0,229,160,0.4)' : 'rgba(0,229,160,0.08)'}`, background: captionStyle===cs.id ? 'rgba(0,229,160,0.06)' : 'transparent', transition: 'all .15s' }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: captionStyle===cs.id ? '#00E5A0' : '#D8EEE5' }}>{cs.label}</span>
+                    <span style={{ fontSize: 11, color: '#7A9E8E', marginLeft: 8 }}>{cs.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 6 }}>
+              <label style={lbl}>Title Overlay (optional)</label>
+              <input style={{ ...inp, marginBottom: 8 }} value={overlayText} onChange={e => setOverlayText(e.target.value)}
+                placeholder="Add title overlay text..."
+                onFocus={e => e.target.style.borderColor='rgba(0,229,160,0.4)'}
+                onBlur={e => e.target.style.borderColor='rgba(0,229,160,0.12)'} />
+              {overlayText && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <label style={{ ...lbl, margin: 0 }}>Color</label>
+                  <input type="color" value={overlayColor} onChange={e => setOverlayColor(e.target.value)}
+                    style={{ width: 32, height: 28, borderRadius: 6, border: '1px solid rgba(0,229,160,0.2)', cursor: 'pointer', background: 'none' }} />
+                  <span style={{ fontSize: 12, color: overlayColor }}>{overlayColor}</span>
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
-          {/* Export / Caption */}
+          {/* Music */}
           <div style={card}>
-            <div style={lbl}>Export</div>
-
-            {exportErr && <div style={{ padding: '8px 12px', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 8, color: '#F87171', fontSize: 12, marginBottom: 10 }}>{exportErr}</div>}
-            {captionErr && <div style={{ padding: '8px 12px', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 8, color: '#F87171', fontSize: 12, marginBottom: 10 }}>{captionErr}</div>}
-
-            {mode === 'caption' ? (
-              captionRes ? (
-                <div style={{ textAlign: 'center' }}>
-                  <CheckCircle size={32} color="#00E5A0" style={{ display: 'block', margin: '0 auto 10px' }} />
-                  <p style={{ color: '#00E5A0', fontWeight: 700, fontSize: 14, margin: '0 0 6px' }}>Captions Ready! ✅</p>
-                  {captionRes.transcript && <p style={{ fontSize: 11, color: '#7A9E8E', margin: '0 0 12px', lineHeight: 1.5 }}>{captionRes.transcript.slice(0, 150)}...</p>}
-                  <a href={`${API}${captionRes.download_url}`} download
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 18px', background: '#00E5A0', color: '#070D0A', borderRadius: 9, textDecoration: 'none', fontSize: 13, fontWeight: 700 }}>
-                    <Download size={14} /> Download
-                  </a>
-                  <button onClick={() => setCaptionRes(null)} style={{ display: 'block', margin: '8px auto 0', background: 'none', border: '1px solid rgba(0,229,160,0.2)', borderRadius: 7, color: '#9DC4B0', fontSize: 11, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>Process Again</button>
-                </div>
-              ) : (
-                <>
-                  <p style={{ fontSize: 12, color: '#7A9E8E', marginBottom: 12, lineHeight: 1.6 }}>
-                    Whisper AI will transcribe your video and burn captions into it.
-                  </p>
-                  <button style={{ ...acBtn('#60A5FA', captioning), width: '100%', padding: '12px' }}
-                    onClick={handleCaption} disabled={captioning}>
-                    {captioning ? <><Loader size={14} style={{ animation: 'sp .7s linear infinite' }} /> Transcribing...</> : <><Type size={14} /> Generate AI Captions</>}
-                  </button>
-                  {captioning && <p style={{ fontSize: 11, color: '#4A6357', textAlign: 'center', marginTop: 6 }}>This may take 1-3 minutes...</p>}
-                </>
-              )
-            ) : exportRes ? (
-              <div style={{ textAlign: 'center' }}>
-                <CheckCircle size={32} color="#00E5A0" style={{ display: 'block', margin: '0 auto 10px' }} />
-                <p style={{ color: '#00E5A0', fontWeight: 700, fontSize: 14, margin: '0 0 4px' }}>Export Done! 🎉</p>
-                <p style={{ fontSize: 12, color: '#7A9E8E', margin: '0 0 14px' }}>{toTime(exportRes.duration)} • {exportRes.size_mb}MB{exportRes.segments ? ` • ${exportRes.segments} segments` : ''}</p>
-                <a href={`${API}${exportRes.download_url}`} download
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 18px', background: '#00E5A0', color: '#070D0A', borderRadius: 9, textDecoration: 'none', fontSize: 13, fontWeight: 700 }}>
-                  <Download size={14} /> Download MP4
-                </a>
-                <button onClick={() => setExportRes(null)} style={{ display: 'block', margin: '8px auto 0', background: 'none', border: '1px solid rgba(0,229,160,0.2)', borderRadius: 7, color: '#9DC4B0', fontSize: 11, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>Edit Again</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <Music size={14} color="#A78BFA" />
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>Background Music</span>
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <label style={lbl}>Music URL (MP3/public link)</label>
+              <input style={inp} value={bgMusicUrl} onChange={e => setBgMusicUrl(e.target.value)}
+                placeholder="https://example.com/music.mp3"
+                onFocus={e => e.target.style.borderColor='rgba(0,229,160,0.4)'}
+                onBlur={e => e.target.style.borderColor='rgba(0,229,160,0.12)'} />
+            </div>
+            {bgMusicUrl && (
+              <div>
+                <label style={lbl}>Volume — {Math.round(bgMusicVol * 100)}%</label>
+                <input type="range" min={0} max={1} step={0.05} value={bgMusicVol}
+                  onChange={e => setBgMusicVol(parseFloat(e.target.value))}
+                  style={{ width: '100%', accentColor: '#00E5A0', height: 4 }} />
               </div>
-            ) : (
-              <>
-                <div style={{ padding: '8px 12px', background: 'rgba(0,229,160,0.05)', borderRadius: 8, marginBottom: 12 }}>
-                  <div style={{ fontSize: 11, color: '#9DC4B0' }}>Output duration</div>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: '#00E5A0', fontFamily: "'Cabinet Grotesk',sans-serif" }}>{toTime(totalDur)}</div>
-                </div>
-                {exporting && (
-                  <div style={{ marginBottom: 10 }}>
-                    <div style={{ height: 4, background: 'rgba(0,229,160,0.1)', borderRadius: 2, overflow: 'hidden', marginBottom: 5 }}>
-                      <div style={{ height: '100%', width: '60%', background: '#00E5A0', borderRadius: 2, animation: 'slide 1.5s ease infinite' }} />
-                    </div>
-                    <p style={{ fontSize: 11, color: '#4A6357', textAlign: 'center' }}>FFmpeg processing... 30-120s</p>
-                  </div>
-                )}
-                <button style={{ ...acBtn('#00E5A0', exporting), width: '100%', padding: '12px' }}
-                  onClick={handleExport} disabled={exporting}>
-                  {exporting ? <><Loader size={14} style={{ animation: 'sp .7s linear infinite' }} /> Processing...</> : mode === 'trim' ? <><Scissors size={14} /> Trim & Export</> : <><Scissors size={14} /> Cut & Join</>}
-                </button>
-              </>
             )}
           </div>
 
-          {/* Tips */}
+          {/* Export */}
           <div style={card}>
-            <div style={lbl}>Tips</div>
-            {(mode === 'trim' ? [
-              'Play → pause at exact point → 📍 Here',
-              'Use number inputs for precision',
-              'Output re-encoded in H.264',
-            ] : mode === 'cut' ? [
-              'Add segments you want to KEEP',
-              'Segments joined in order',
-              '📍 buttons set from current time',
-            ] : [
-              'Whisper base model used',
-              'Works best with speech/dialogue',
-              'Captions burned directly into video',
-              'Download SRT if burn fails',
-            ]).map(t => <p key={t} style={{ fontSize: 12, color: '#7A9E8E', margin: '0 0 6px', paddingLeft: 10, borderLeft: '2px solid rgba(0,229,160,0.2)', lineHeight: 1.5 }}>{t}</p>)}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <Sparkles size={14} color="#00E5A0" />
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>Export with Creatomate</span>
+            </div>
+
+            {renderErr && (
+              <div style={{ padding: '10px 14px', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 9, color: '#F87171', fontSize: 13, marginBottom: 12 }}>
+                {renderErr}
+              </div>
+            )}
+
+            {rendering && renderStatus && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#9DC4B0', marginBottom: 6 }}>
+                  <span>🎬 {renderStatus.status === 'rendering' ? 'Rendering...' : renderStatus.status === 'planned' ? 'Queued...' : renderStatus.status}</span>
+                  <span>{Math.round((renderStatus.progress || 0) * 100)}%</span>
+                </div>
+                <div style={{ height: 6, background: 'rgba(0,229,160,0.08)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${(renderStatus.progress || 0) * 100}%`, background: 'linear-gradient(90deg,#00E5A0,#00B87A)', borderRadius: 3, transition: 'width 1s ease' }} />
+                </div>
+                <p style={{ fontSize: 11, color: '#4A6357', marginTop: 6, textAlign: 'center' }}>
+                  Creatomate rendering in cloud... usually 30-90s
+                </p>
+              </div>
+            )}
+
+            <button style={gBtn(rendering || !videoUrl)} onClick={handleRender} disabled={rendering || !videoUrl}>
+              {rendering
+                ? <><Loader size={15} style={{ animation: 'sp .7s linear infinite' }} /> Rendering...</>
+                : <><Sparkles size={15} /> Render & Export</>}
+            </button>
+
+            <p style={{ fontSize: 11, color: '#4A6357', textAlign: 'center', marginTop: 8, lineHeight: 1.5 }}>
+              Cloud render — HD quality, no watermark
+            </p>
           </div>
         </div>
       </div>
