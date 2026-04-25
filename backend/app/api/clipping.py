@@ -69,6 +69,7 @@ async def system_check():
     return results
 
 CLIPS_DIR = tempfile.gettempdir()
+os.makedirs(CLIPS_DIR, exist_ok=True)
 
 # ── Env ───────────────────────────────────────────────────────────────────────
 APP_ENV      = os.getenv("APP_ENV", "production")
@@ -339,11 +340,16 @@ async def detect_clips(
     clips_info = []
 
     try:
-        # 1. Save video
+        # 1. Save video — streaming for large files
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
-            content   = await file.read()
-            f.write(content)
             tmp_video = f.name
+            chunk_size = 1024 * 1024  # 1MB chunks
+            while True:
+                chunk = await file.read(chunk_size)
+                if not chunk:
+                    break
+                f.write(chunk)
+        print(f"[Clipping] Saved video: {tmp_video}, size: {os.path.getsize(tmp_video)/1024/1024:.1f}MB")
 
         video_duration = get_video_duration(tmp_video)
 
@@ -444,7 +450,12 @@ Return ONLY JSON: {{"clips":[{{"start_time":0,"end_time":{clip_duration},"title"
                 "-avoid_negative_ts", "make_zero", "-y", clip_path
             ], timeout=300)
 
+            print(f"[Clip {i+1}] FFmpeg return: {r.returncode}, exists: {os.path.exists(clip_path)}")
             if r.returncode != 0:
+                print(f"[Clip {i+1}] FFmpeg stderr: {r.stderr[-300:]}")
+                continue
+            if not os.path.exists(clip_path):
+                print(f"[Clip {i+1}] File not created at {clip_path}")
                 continue
 
             clip_size = os.path.getsize(clip_path) if os.path.exists(clip_path) else 0
@@ -464,7 +475,8 @@ Return ONLY JSON: {{"clips":[{{"start_time":0,"end_time":{clip_duration},"title"
             })
 
         if not clips_info:
-            raise HTTPException(500, "Koi clip generate nahi hua")
+            # Debug info
+            raise HTTPException(500, f"Koi clip generate nahi hua. Video duration: {video_duration:.0f}s, Suggested clips: {len(suggested_clips)}, FFmpeg output dir: {CLIPS_DIR}")
 
         return {
             "clips":            clips_info,
