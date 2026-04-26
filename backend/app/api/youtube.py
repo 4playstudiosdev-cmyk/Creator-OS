@@ -449,6 +449,8 @@ async def upload_video(
         os.unlink(tmp_path)
 
         try:
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc).isoformat()
             sb.table("scheduled_posts").insert({
                 "user_id":      user_id,
                 "title":        title,
@@ -457,7 +459,9 @@ async def upload_video(
                 "platforms":    ["youtube"],
                 "status":       "published",
                 "privacy":      privacy,
-                "created_at":   datetime.now(timezone.utc).isoformat(),
+                "scheduled_for": now,
+                "published_at": now,
+                "created_at":   now,
             }).execute()
         except Exception as db_err:
             print(f"[YT Upload] DB save error (non-critical): {db_err}")

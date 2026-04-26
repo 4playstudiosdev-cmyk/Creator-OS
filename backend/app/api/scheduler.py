@@ -73,8 +73,15 @@ async def publish_post(post: dict, sb) -> bool:
                     success = r.status_code == 200
 
                 elif platform == "youtube":
-                    print(f"[Scheduler] YouTube requires manual upload — skipping auto-post")
-                    success = True  # Mark as processed
+                    # YouTube videos uploaded via UI are already published
+                    # Only skip if status is already published
+                    if post.get("status") == "published":
+                        print(f"[Scheduler] YouTube post {post['id'][:8]} already published — skipping")
+                        success = True
+                    else:
+                        print(f"[Scheduler] YouTube requires video file — cannot auto-post, marking needs_media")
+                        sb.table("scheduled_posts").update({"status":"needs_media"}).eq("id",post["id"]).execute()
+                        continue
 
                 elif platform == "tiktok":
                     print(f"[Scheduler] TikTok requires video file — skipping auto-post")

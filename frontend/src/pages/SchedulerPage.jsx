@@ -112,10 +112,13 @@ export default function SchedulerPage() {
   }, [])
 
   useEffect(() => {
-    // Reset content type when platform changes
     const types = CONTENT_TYPES[selPlatform]
     setSelType(types[0].id)
     setFile(null); setFilePreview(null); setPostResult(null); setPostError('')
+    // Reset privacy to platform-appropriate default
+    if (selPlatform === 'linkedin') setPrivacy('PUBLIC')
+    else if (selPlatform === 'tiktok') setPrivacy('SELF_ONLY')
+    else setPrivacy('public')
   }, [selPlatform])
 
   const checkConnections = async (uid) => {
