@@ -660,131 +660,126 @@ export default function SchedulerPage() {
         )}
 
         {/* ── CALENDAR VIEW ── */}
-        {view === 'calendar' && (() => {
-          // Safe calendar rendering with all error handling inline
-          const year  = calDate.getFullYear()
-          const month = calDate.getMonth()
-          const firstDaySafe  = Math.max(0, new Date(year, month, 1).getDay())
-          const daysInMonthSafe = new Date(year, month + 1, 0).getDate()
-          const todaySafe = new Date()
+        {/* ── CALENDAR VIEW ── */}
+        {view === 'calendar' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <div style={card}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+                <button onClick={()=>setCalDate(d=>new Date(d.getFullYear(),d.getMonth()-1,1))}
+                  style={{ width:32,height:32,borderRadius:8,background:T.cardAlt,border:`1px solid ${T.border}`,color:T.text,cursor:'pointer',fontSize:18,lineHeight:1 }}>‹</button>
+                <h2 style={{ ...h2, margin:0 }}>{MONTHS[calDate.getMonth()]} {calDate.getFullYear()}</h2>
+                <button onClick={()=>setCalDate(d=>new Date(d.getFullYear(),d.getMonth()+1,1))}
+                  style={{ width:32,height:32,borderRadius:8,background:T.cardAlt,border:`1px solid ${T.border}`,color:T.text,cursor:'pointer',fontSize:18,lineHeight:1 }}>›</button>
+              </div>
 
-          const getPostsSafe = (day) => {
-            try {
-              return calPosts.filter(p => {
-                const dt = p.scheduled_for || p.scheduled_at
-                if (!dt) return false
-                const pd = new Date(dt)
-                return !isNaN(pd) && pd.getDate()===day && pd.getMonth()===month && pd.getFullYear()===year
-              })
-            } catch { return [] }
-          }
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4, marginBottom:8 }}>
+                {DAYS.map(d => (
+                  <div key={d} style={{ textAlign:'center', fontSize:11, fontWeight:700, color:T.textMuted, padding:'4px 0', textTransform:'uppercase', letterSpacing:'.06em' }}>{d}</div>
+                ))}
+              </div>
 
-          return (
-            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-              <div style={card}>
-                {/* Month nav */}
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
-                  <button onClick={()=>setCalDate(d=>new Date(d.getFullYear(),d.getMonth()-1,1))}
-                    style={{ width:32,height:32,borderRadius:8,background:T.cardAlt,border:`1px solid ${T.border}`,color:T.text,cursor:'pointer',fontSize:18 }}>‹</button>
-                  <h2 style={{ ...h2, margin:0 }}>
-                    {MONTHS[month]} {year}
-                  </h2>
-                  <button onClick={()=>setCalDate(d=>new Date(d.getFullYear(),d.getMonth()+1,1))}
-                    style={{ width:32,height:32,borderRadius:8,background:T.cardAlt,border:`1px solid ${T.border}`,color:T.text,cursor:'pointer',fontSize:18 }}>›</button>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4 }}>
+                {Array.from({ length: Math.max(0, new Date(calDate.getFullYear(), calDate.getMonth(), 1).getDay()) }).map((_,i) => (
+                  <div key={`e${i}`} />
+                ))}
+                {Array.from({ length: new Date(calDate.getFullYear(), calDate.getMonth()+1, 0).getDate() }).map((_,i) => {
+                  const day = i + 1
+                  const isToday = today.getDate()===day && today.getMonth()===calDate.getMonth() && today.getFullYear()===calDate.getFullYear()
+                  const dayPosts = calPosts.filter(p => {
+                    try {
+                      const dt = p.scheduled_for || p.scheduled_at
+                      if (!dt) return false
+                      const pd = new Date(dt)
+                      return pd.getDate()===day && pd.getMonth()===calDate.getMonth() && pd.getFullYear()===calDate.getFullYear()
+                    } catch { return false }
+                  })
+                  return (
+                    <div key={day} style={{ minHeight:72, padding:'6px 7px', borderRadius:10, background:isToday?T.goldBg:T.cardAlt, border:`1px solid ${isToday?T.borderGold:T.border}` }}>
+                      <div style={{ fontSize:12, fontWeight:isToday?800:500, color:isToday?T.gold:T.textMuted, marginBottom:4 }}>{day}</div>
+                      {dayPosts.slice(0,2).map((p,pi) => {
+                        const platId = Array.isArray(p.platforms)?p.platforms[0]:(p.platform||'')
+                        const pc = PLATFORMS.find(pl=>pl.id===platId)?.color || T.gold
+                        return (
+                          <div key={pi} style={{ fontSize:9, padding:'2px 5px', borderRadius:4, background:`${pc}20`, color:pc, fontWeight:700, marginBottom:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                            {platId} · {(p.caption||p.content||'Post').slice(0,12)}
+                          </div>
+                        )
+                      })}
+                      {dayPosts.length > 2 && <div style={{ fontSize:9, color:T.textMuted }}>+{dayPosts.length-2} more</div>}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div style={card}>
+              <h2 style={h2}>Scheduled Posts ({calPosts.filter(p=>p.status==='scheduled').length})</h2>
+              {calLoading ? (
+                <div style={{ textAlign:'center', padding:24 }}>
+                  <div style={{ width:24,height:24,border:`2px solid ${T.borderGold}`,borderTopColor:T.gold,borderRadius:'50%',animation:'sp .8s linear infinite',margin:'0 auto' }} />
                 </div>
-
-                {/* Day headers */}
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4, marginBottom:8 }}>
-                  {DAYS.map(d => (
-                    <div key={d} style={{ textAlign:'center', fontSize:11, fontWeight:700, color:T.textMuted, padding:'4px 0', textTransform:'uppercase', letterSpacing:'.06em' }}>{d}</div>
-                  ))}
+              ) : calPosts.filter(p=>p.status==='scheduled').length === 0 ? (
+                <div style={{ textAlign:'center', padding:'32px 0', color:T.textMuted }}>
+                  <div style={{ fontSize:36, marginBottom:10 }}>📅</div>
+                  <p style={{ fontSize:13 }}>No scheduled posts yet</p>
+                  <button onClick={()=>setView('compose')} style={{ marginTop:10, padding:'8px 18px', background:T.goldBg, border:`1px solid ${T.borderGold}`, borderRadius:9, color:T.gold, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                    Create a Post
+                  </button>
                 </div>
-
-                {/* Grid */}
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4 }}>
-                  {Array.from({ length: firstDaySafe }).map((_,i) => <div key={`empty-${i}`} />)}
-                  {Array.from({ length: daysInMonthSafe }).map((_,i) => {
-                    const day = i + 1
-                    const isToday = todaySafe.getDate()===day && todaySafe.getMonth()===month && todaySafe.getFullYear()===year
-                    const posts = getPostsSafe(day)
+              ) : (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:10 }}>
+                  {calPosts.filter(p=>p.status==='scheduled').map(post => {
+                    const platId = Array.isArray(post.platforms)?post.platforms[0]:(post.platform||'')
+                    const pc = PLATFORMS.find(p=>p.id===platId)?.color || T.gold
+                    const dt = post.scheduled_for || post.scheduled_at
                     return (
-                      <div key={`day-${day}`} style={{ minHeight:72, padding:'6px 7px', borderRadius:10, background:isToday?T.goldBg:T.cardAlt, border:`1px solid ${isToday?T.borderGold:T.border}` }}>
-                        <div style={{ fontSize:12, fontWeight:isToday?800:500, color:isToday?T.gold:T.textMuted, marginBottom:4 }}>{day}</div>
-                        {posts.slice(0,2).map((p,pi) => {
-                          const platId = Array.isArray(p.platforms) ? p.platforms[0] : (p.platform||'')
-                          const pc = PLATFORMS.find(pl=>pl.id===platId)?.color || T.gold
-                          return (
-                            <div key={pi} style={{ fontSize:9, padding:'1px 5px', borderRadius:4, background:`${pc}20`, color:pc, fontWeight:700, marginBottom:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                              {platId} · {(p.caption||p.content||'Post').slice(0,10)}
-                            </div>
-                          )
-                        })}
-                        {posts.length > 2 && <div style={{ fontSize:9, color:T.textMuted }}>+{posts.length-2}</div>}
+                      <div key={post.id} style={{ padding:'12px 14px', borderRadius:12, background:T.cardAlt, border:`1px solid ${T.border}` }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
+                          <span style={{ fontSize:11, fontWeight:700, color:pc, background:`${pc}18`, padding:'2px 8px', borderRadius:100 }}>{platId||'unknown'}</span>
+                          <span style={{ fontSize:10, color:T.textMuted }}>{post.content_type||'post'}</span>
+                        </div>
+                        <p style={{ fontSize:12, color:T.text, margin:'0 0 6px', overflow:'hidden', textOverflow:'ellipsis', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>
+                          {post.caption||post.content||'No content'}
+                        </p>
+                        <div style={{ fontSize:11, color:T.textMuted }}>
+                          📅 {dt ? (() => { try { return new Date(dt).toLocaleString('en',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) } catch { return dt } })() : '—'}
+                        </div>
+                        {post.media_url && (
+                          <div style={{ fontSize:10, color:T.success, marginTop:4 }}>🖼️ Media attached</div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {calPosts.filter(p=>p.status==='draft').length > 0 && (
+              <div style={card}>
+                <h2 style={h2}>Drafts ({calPosts.filter(p=>p.status==='draft').length})</h2>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))', gap:8 }}>
+                  {calPosts.filter(p=>p.status==='draft').map(post => {
+                    const platId = Array.isArray(post.platforms)?post.platforms[0]:(post.platform||'')
+                    const pc = PLATFORMS.find(p=>p.id===platId)?.color || T.gold
+                    return (
+                      <div key={post.id} style={{ padding:'11px 13px', borderRadius:11, background:T.cardAlt, border:`1px solid ${T.border}` }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
+                          <span style={{ fontSize:10, fontWeight:700, color:pc }}>{platId||'draft'}</span>
+                          <span style={{ fontSize:9, padding:'1px 6px', borderRadius:100, background:T.goldBg, color:T.gold, fontWeight:700 }}>Draft</span>
+                        </div>
+                        <p style={{ fontSize:12, color:T.textSub, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                          {post.caption||post.content||'Empty draft'}
+                        </p>
                       </div>
                     )
                   })}
                 </div>
               </div>
+            )}
+          </div>
+        )}
 
-              {/* Scheduled posts list */}
-              <div style={card}>
-                <h2 style={h2}>Scheduled Posts ({calPosts.filter(p=>p.status==='scheduled').length})</h2>
-                {calLoading
-                  ? <div style={{ textAlign:'center',padding:24 }}><div style={{ width:24,height:24,border:`2px solid ${T.borderGold}`,borderTopColor:T.gold,borderRadius:'50%',animation:'sp .8s linear infinite',margin:'0 auto' }}/></div>
-                  : calPosts.filter(p=>p.status==='scheduled').length===0
-                  ? <div style={{ textAlign:'center',padding:'32px 0',color:T.textMuted }}>
-                      <div style={{ fontSize:36,marginBottom:10 }}>📅</div>
-                      <p style={{ fontSize:13 }}>No scheduled posts</p>
-                      <button onClick={()=>setView('compose')} style={{ marginTop:10,padding:'8px 18px',background:T.goldBg,border:`1px solid ${T.borderGold}`,borderRadius:9,color:T.gold,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit' }}>
-                        Create a Post
-                      </button>
-                    </div>
-                  : <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:10 }}>
-                      {calPosts.filter(p=>p.status==='scheduled').map(post => {
-                        const platId = Array.isArray(post.platforms)?post.platforms[0]:(post.platform||'')
-                        const pc = PLATFORMS.find(p=>p.id===platId)?.color || T.gold
-                        const dt = post.scheduled_for || post.scheduled_at
-                        return (
-                          <div key={post.id} style={{ padding:'12px 14px',borderRadius:12,background:T.cardAlt,border:`1px solid ${T.border}` }}>
-                            <div style={{ display:'flex',justifyContent:'space-between',marginBottom:6 }}>
-                              <span style={{ fontSize:11,fontWeight:700,color:pc,background:`${pc}18`,padding:'2px 8px',borderRadius:100 }}>{platId||'—'}</span>
-                              <span style={{ fontSize:10,color:T.textMuted }}>{post.content_type||'post'}</span>
-                            </div>
-                            <p style={{ fontSize:12,color:T.text,margin:'0 0 6px',overflow:'hidden',textOverflow:'ellipsis',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical' }}>
-                              {post.caption||post.content||'No content'}
-                            </p>
-                            <div style={{ fontSize:11,color:T.textMuted }}>
-                              📅 {dt ? (() => { try { return new Date(dt).toLocaleString('en',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) } catch { return dt } })() : '—'}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>}
-              </div>
-
-              {/* Drafts */}
-              {calPosts.filter(p=>p.status==='draft').length > 0 && (
-                <div style={card}>
-                  <h2 style={h2}>Drafts ({calPosts.filter(p=>p.status==='draft').length})</h2>
-                  <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:8 }}>
-                    {calPosts.filter(p=>p.status==='draft').map(post => {
-                      const platId = Array.isArray(post.platforms)?post.platforms[0]:(post.platform||'')
-                      const pc = PLATFORMS.find(p=>p.id===platId)?.color || T.gold
-                      return (
-                        <div key={post.id} style={{ padding:'11px 13px',borderRadius:11,background:T.cardAlt,border:`1px solid ${T.border}` }}>
-                          <div style={{ display:'flex',justifyContent:'space-between',marginBottom:5 }}>
-                            <span style={{ fontSize:10,fontWeight:700,color:pc }}>{platId||'draft'}</span>
-                            <span style={{ fontSize:9,padding:'1px 6px',borderRadius:100,background:T.goldBg,color:T.gold,fontWeight:700 }}>Draft</span>
-                          </div>
-                          <p style={{ fontSize:12,color:T.textSub,margin:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>
-                            {post.caption||post.content||'Empty draft'}
-                          </p>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )
-        })()}
+      </div>
+    </div>
+  )
+}
