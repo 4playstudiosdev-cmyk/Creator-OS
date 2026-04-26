@@ -1,6 +1,8 @@
 // src/pages/RepurposePage.jsx
 // Nexora OS — Multi-Platform Content Repurposing Engine
 
+const API = 'https://creator-os-production-0bf8.up.railway.app'
+
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
@@ -139,41 +141,7 @@ export default function RepurposePage() {
     }, 1100)
 
     try {
-      const sys = `You are a viral content strategist. Generate platform-optimized content. Return ONLY valid JSON, no markdown.`
 
-      const platDetails = selPlats.map(pid => {
-        const p = PLATFORMS.find(pl => pl.id===pid)
-        const opts = platOpts[pid]
-        let extra = ''
-        if (pid==='twitter') extra = `Format as numbered thread (1/ 2/ etc). ${opts?.thread_length||'7 tweets'}`
-        if (pid==='instagram') extra = opts?.hashtags ? 'Include 20-25 relevant hashtags at end.' : 'No hashtags.'
-        if (pid==='linkedin') extra = opts?.thought_lead ? 'Thought-leadership style with personal story.' : 'Professional with clear value.'
-        if (pid==='tiktok') extra = `Hook intensity: ${opts?.hook||'High'}. Start with strongest hook. TikTok script format.`
-        if (pid==='youtube') extra = 'YouTube description with timestamps structure.'
-        return `- ${p.label} (max ${p.limit} chars): ${extra}`
-      }).join('\n')
-
-      const prompt = `Repurpose this content for multiple social platforms.
-
-CONTENT:
-"""
-${input.slice(0, 2000)}
-"""
-
-SETTINGS:
-- Tone: ${tone}
-- Length: ${length}
-- Audience: ${audience}
-
-PLATFORM REQUIREMENTS:
-${platDetails}
-
-Return this exact JSON (no extra text):
-{
-  "platforms": {
-    ${selPlats.map(p => `"${p}": {"content": "platform-optimized content here", "score": 85, "virality": "high", "best_time": "${AI_TIMES[p]}", "tip": "one actionable tip"}`).join(',\n    ')}
-  }
-}`
 
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',

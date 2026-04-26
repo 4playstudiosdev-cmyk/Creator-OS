@@ -1,3 +1,5 @@
+const API = 'https://creator-os-production-0bf8.up.railway.app'
+
 // src/pages/ScriptStudioPage.jsx
 // Nexora OS — AI Script Studio
 // Hook generator, scene breakdown, interactive editing, score, templates
@@ -132,22 +134,18 @@ export default function ScriptStudioPage() {
     if (!topic.trim()) return
     setLoadingHooks(true); setHooks([]); setSelHook(null)
     try {
-      const r = await fetch('https://api.anthropic.com/v1/messages', {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json', 'anthropic-dangerous-direct-browser-ipc':'true' },
-        body: JSON.stringify({
-          model:'claude-sonnet-4-20250514',
-          max_tokens:1000,
-          system:'You are a viral content hook expert. Generate 5 diverse, high-performing hooks. Return ONLY valid JSON.',
-          messages:[{ role:'user', content:`Generate 5 different hook styles for this topic: "${topic}"
-Platform: ${plat.label}
-Tone: ${tone}
-Return JSON: {"hooks":[{"style":"Question Hook","text":"...","why":"why this works"},{"style":"Shock Stat","text":"...","why":"..."},{"style":"Story Hook","text":"...","why":"..."},{"style":"Controversial","text":"...","why":"..."},{"style":"Promise Hook","text":"...","why":"..."}]}` }]
-        })
+      const r = await fetch(`${API}/api/ai/hooks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic, platform, tone })
       })
-      const d = await r.json()
-      const m = (d.content?.[0]?.text||'').match(/\{[\s\S]*\}/)
-      if (m) { const p = JSON.parse(m[0]); setHooks(p.hooks||[]) }
+      if (r.ok) {
+        const d = await r.json()
+        setHooks(d.hooks || [])
+      } else {
+        const e = await r.json().catch(()=>({}))
+        console.error('[Hooks] Error:', e.detail)
+      }
     } catch {}
     setLoadingHooks(false)
   }
@@ -201,15 +199,22 @@ Return this exact JSON:
   "estimated_duration": "4 min 30 sec"
 }`
 
-      const r = await fetch('https://api.anthropic.com/v1/messages', {
-        method:'POST', headers:{'Content-Type':'application/json','anthropic-dangerous-direct-browser-ipc':'true'},
-        body:JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:4000, system:systemMsg, messages:[{role:'user',content:prompt}] })
+      const r = await fetch(`${API}/api/ai/script`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic, platform, duration, tone,
+          energy, complexity,
+          scene_mode: sceneMode,
+          fast_mode:  fastMode,
+          hook: selHook && hooks.length > 0 ? hooks.find(h=>h.style===selHook)?.text : null,
+        })
       })
-      const d = await r.json()
-      const txt = d.content?.[0]?.text||''
-      const m = txt.match(/\{[\s\S]*\}/)
-      if (!m) throw new Error('Parse failed')
-      const parsed = JSON.parse(m[0])
+      if (!r.ok) {
+        const e = await r.json().catch(()=>({}))
+        throw new Error(e.detail || `Server error ${r.status}`)
+      }
+      const parsed = await r.json()
       clearInterval(msgTimer.current); setProgress(100)
       setScript(parsed)
 

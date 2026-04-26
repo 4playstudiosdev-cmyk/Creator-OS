@@ -124,7 +124,7 @@ export default function YouTubeStudioPage() {
 
   const loadComments = async () => {
     try {
-      const r = await fetch(`${API}/api/youtube/inbox/${userId}?limit=50`)
+      const r = await fetch(`${API}/api/youtube/comments/${userId}?limit=50`)
       const d = await r.json()
       setComments(d.messages || [])
     } catch {}
@@ -189,13 +189,35 @@ export default function YouTubeStudioPage() {
         form.append('file', file)
         if (thumb) form.append('thumbnail', thumb)
 
-        const progIv = setInterval(() => setProgress(p => Math.min(p+3, 90)), 500)
-        const r = await fetch(`${API}/api/youtube/upload`, { method:'POST', body:form })
-        clearInterval(progIv); setProgress(100)
-        const d = await r.json()
-        if (!r.ok) throw new Error(d.detail || 'Upload failed.')
-        await saveToScheduler('published')
-        setPostResult({ message:'✅ Uploaded to YouTube!', url: d.video_url })
+        // Progress simulation — YouTube upload can take 2-5 minutes
+        let prog = 0
+        const progIv = setInterval(() => {
+          prog = Math.min(prog + (prog < 50 ? 5 : prog < 80 ? 2 : 0.5), 92)
+          setProgress(Math.round(prog))
+        }, 1000)
+
+        try {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 10 * 60 * 1000) // 10 min timeout
+
+          const r = await fetch(`${API}/api/youtube/upload-video`, {
+            method: 'POST',
+            body: form,
+            signal: controller.signal,
+          })
+          clearTimeout(timeoutId)
+          clearInterval(progIv)
+          setProgress(100)
+
+          const d = await r.json()
+          if (!r.ok) throw new Error(d.detail || 'Upload failed.')
+          await saveToScheduler('published')
+          setPostResult({ message:'✅ Uploaded to YouTube!', url: d.video_url })
+        } catch (fetchErr) {
+          clearInterval(progIv)
+          if (fetchErr.name === 'AbortError') throw new Error('Upload timeout — video too large. Try a shorter video or schedule instead.')
+          throw fetchErr
+        }
       }
     } catch (e) { setPostError(e.message) }
     setPosting(false)
@@ -424,10 +446,13 @@ export default function YouTubeStudioPage() {
                     {/* Progress */}
                     {posting && action==='now' && (
                       <div style={{ marginBottom:12 }}>
-                        <div style={{ height:4, background:T.border, borderRadius:2, overflow:'hidden', marginBottom:5 }}>
-                          <div style={{ height:'100%', width:`${progress}%`, background:T.yt, borderRadius:2, transition:'width .5s' }}/>
+                        <div style={{ height:5, background:T.border, borderRadius:3, overflow:'hidden', marginBottom:6 }}>
+                          <div style={{ height:'100%', width:`${progress}%`, background:`linear-gradient(90deg,${T.yt},#FF6B6B)`, borderRadius:3, transition:'width 1s ease' }}/>
                         </div>
-                        <p style={{ fontSize:11, color:T.textMuted, textAlign:'center' }}>Uploading to YouTube... {progress}%</p>
+                        <p style={{ fontSize:11, color:T.textMuted, textAlign:'center' }}>
+                          {progress < 30 ? '⬆️ Uploading video...' : progress < 70 ? '⚙️ Processing...' : progress < 95 ? '🎬 Almost done...' : '✅ Finalizing...'} {progress}%
+                        </p>
+                        <p style={{ fontSize:10, color:T.textMuted, textAlign:'center', marginTop:3 }}>Large videos may take 2-5 minutes — please wait</p>
                       </div>
                     )}
                   </>
