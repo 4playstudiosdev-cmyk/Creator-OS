@@ -185,90 +185,115 @@ export default function SchedulerPage() {
 
   const handlePost = async () => {
     const plat = PLATFORMS.find(p => p.id === selPlatform)
-    if (!connected[selPlatform] && !plat.comingSoon) {
-      setPostError(`Connect ${plat.label} first in Settings.`)
-      return
+    if (!connected[selPlatform] && !plat?.comingSoon) {
+      setPostError(`Connect ${plat?.label} first in Settings.`); return
     }
     if (!caption.trim() && !file) {
-      setPostError('Add a caption or media.')
-      return
+      setPostError('Add a caption or media first.'); return
     }
 
     setPosting(true); setPostError(''); setPostResult(null)
 
     try {
+      // ── STEP 1: Upload file to Supabase (always — for all actions) ──────
+      let uploadedUrl = null
+      if (file) {
+        const ext  = (file.name || 'file').split('.').pop().toLowerCase() || 'mp4'
+        const path = `scheduler/${userId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+        const { error: upErr } = await supabase.storage
+          .from('posts')
+          .upload(path, file, { upsert: true, contentType: file.type })
+
+        if (upErr) {
+          console.error('[Scheduler] Storage upload error:', upErr)
+          setPostError(`File upload failed: ${upErr.message}`)
+          setPosting(false); return
+        }
+        const { data: urlData } = supabase.storage.from('posts').getPublicUrl(path)
+        uploadedUrl = urlData?.publicUrl || null
+        console.log('[Scheduler] File uploaded to Supabase:', uploadedUrl)
+      }
+
+      // ── STEP 2: Action ───────────────────────────────────────────────────
       if (action === 'draft') {
         await saveToSupabase('draft', null, uploadedUrl)
-        setPostResult({ success: true, message: `Draft saved for ${plat.label}! ✅` })
+        setPostResult({ success: true, message: `✅ Draft saved for ${plat?.label}!` })
 
       } else if (action === 'schedule') {
-        const scheduledAt = buildScheduledFor()
-        if (!scheduledAt) { setPostError('Pick a date for scheduling.'); setPosting(false); return }
-        await saveToSupabase('scheduled', scheduledAt)
-        setPostResult({ success: true, message: `Post scheduled for ${new Date(scheduledAt).toLocaleString()} ✅` })
+        const scheduledFor = buildScheduledFor()
+        if (!scheduledFor) {
+          setPostError('Pick a date and time for scheduling.')
+          setPosting(false); return
+        }
+        await saveToSupabase('scheduled', scheduledFor, uploadedUrl)
+        setPostResult({
+          success: true,
+          message: `📅 Scheduled for ${new Date(scheduledFor).toLocaleString('en', { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}`
+        })
 
       } else if (action === 'now') {
-        // Post immediately — uploadedUrl already uploaded above
-
-        // Call correct API endpoint
+        // ── Post Now — call platform API ──────────────────────────────────
         let r, d
+
         if (selPlatform === 'youtube') {
+          if (!file) { setPostError('Select a video file for YouTube.'); setPosting(false); return }
           const form = new FormData()
-          form.append('user_id', userId)
-          form.append('title', caption.slice(0, 100) || 'Nexora OS Upload')
+          form.append('user_id',     userId)
+          form.append('title',       caption.slice(0, 100) || 'Nexora OS Upload')
           form.append('description', caption)
-          form.append('privacy', privacy)
-          if (file) form.append('file', file)
-          r = await fetch(`${API}/api/youtube/upload-video`, { method: 'POST', body: form })
+          form.append('privacy',     privacy)
+          form.append('file',        file)
+          r = await fetch(`${API}/api/youtube/upload-video`, { method:'POST', body:form })
           d = await r.json()
 
         } else if (selPlatform === 'instagram') {
           if (!uploadedUrl) {
-            setPostError('Instagram requires an image. Please select an image file first.')
+            setPostError('Select an image/video first — Instagram requires media.')
             setPosting(false); return
           }
-          console.log('[Scheduler] Instagram post with image:', uploadedUrl)
-          r = await fetch(`${API}/api/instagram/${selType === 'story' ? 'story' : 'post'}`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: userId, caption, image_url: uploadedUrl }),
+          r = await fetch(`${API}/api/instagram/${selType==='story'?'story':'post'}`, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ user_id:userId, caption, image_url:uploadedUrl })
           })
           d = await r.json()
-          console.log('[Scheduler] Instagram response:', JSON.stringify(d).slice(0,200))
 
         } else if (selPlatform === 'linkedin') {
-          // LinkedIn only accepts PUBLIC or CONNECTIONS
-          const linkedinVis = privacy === 'PUBLIC_TO_EVERYONE' ? 'PUBLIC' : privacy === 'public' ? 'PUBLIC' : 'CONNECTIONS'
-          const body = { user_id: userId, text: caption, visibility: linkedinVis }
-          if (uploadedUrl && selType === 'video') {
-            body.video_url = uploadedUrl
-            r = await fetch(`${API}/api/linkedin/post-video`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-          } else {
-            if (uploadedUrl) body.image_url = uploadedUrl
-            r = await fetch(`${API}/api/linkedin/post`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+          const vis  = privacy==='CONNECTIONS'?'CONNECTIONS':'PUBLIC'
+          const body = { user_id:userId, text:caption, visibility:vis }
+          if (uploadedUrl) {
+            if (selType === 'video') body.video_url = uploadedUrl
+            else body.image_url = uploadedUrl
           }
+          const endpoint = (uploadedUrl && selType==='video') ? 'post-video' : 'post'
+          r = await fetch(`${API}/api/linkedin/${endpoint}`, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(body)
+          })
           d = await r.json()
 
         } else if (selPlatform === 'tiktok') {
           if (!file) { setPostError('Select a video for TikTok.'); setPosting(false); return }
           const form = new FormData()
           form.append('user_id', userId)
-          form.append('title', caption.slice(0, 150))
+          form.append('title',   caption.slice(0, 150))
           form.append('privacy', 'SELF_ONLY')
-          form.append('file', file)
-          r = await fetch(`${API}/api/tiktok/upload-file`, { method: 'POST', body: form })
+          form.append('file',    file)
+          r = await fetch(`${API}/api/tiktok/upload-file`, { method:'POST', body:form })
           d = await r.json()
 
         } else {
-          setPostError(`${PLATFORMS.find(p=>p.id===selPlatform)?.label} coming soon!`)
+          setPostError(`${plat?.label} coming soon!`)
           setPosting(false); return
         }
 
-        if (!r.ok) throw new Error(d.detail || 'Post failed.')
+        if (!r?.ok) throw new Error(d?.detail || d?.message || `Post failed (${r?.status})`)
         await saveToSupabase('published', null, uploadedUrl)
-        setPostResult({ success: true, message: `Posted to ${PLATFORMS.find(p=>p.id===selPlatform)?.label}! 🎉` })
+        setPostResult({ success:true, message:`🎉 Posted to ${plat?.label}!` })
       }
+
     } catch (e) {
-      setPostError(e.message)
+      console.error('[Scheduler] handlePost error:', e)
+      setPostError(e.message || 'Something went wrong. Try again.')
     }
     setPosting(false)
   }
