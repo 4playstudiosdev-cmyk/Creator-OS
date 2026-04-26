@@ -1,60 +1,88 @@
-// src/pages/YouTubeStudio.jsx
-// Complete YouTube Studio — Upload, Community, Videos (privacy edit), Analytics, Comments+Video Detail
+// src/pages/YouTubeStudioPage.jsx
+// Nexora OS — YouTube Studio
+// Upload + Post Now / Schedule / Draft — all go to scheduler page
 
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import {
-  Youtube, Upload, Users, BarChart2, MessageCircle,
-  CheckCircle, AlertCircle, Loader, RefreshCw,
-  Play, Eye, ThumbsUp, Clock, Send, Image,
-  Calendar, Lock, Globe, EyeOff, ChevronLeft,
-  TrendingUp, Tag, Hash, ArrowUpRight
-} from 'lucide-react'
 
 const API = 'https://creator-os-production-0bf8.up.railway.app'
 
-const fmt = (n) => {
-  if (!n && n !== 0) return '0'
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K'
-  return String(n)
+const DARK = {
+  bg:'#0A0A0F',card:'#111318',cardAlt:'#1A1D24',border:'rgba(255,255,255,0.07)',
+  borderGold:'rgba(245,200,66,0.15)',gold:'#F5C842',goldBg:'rgba(245,200,66,0.08)',
+  text:'#FFFFFF',textSub:'#E2E8F0',textMuted:'#64748B',
+  success:'#4ADE80',successBg:'rgba(74,222,128,0.1)',
+  danger:'#FB7185',dangerBg:'rgba(251,113,133,0.1)',
+  yt:'#FF0000',ytBg:'rgba(255,0,0,0.08)',ytBorder:'rgba(255,0,0,0.2)',
+  input:'#1A1D24',inputBorder:'rgba(255,255,255,0.1)',
+}
+const LIGHT = {
+  bg:'#FFFDF5',card:'#FFFFFF',cardAlt:'#FEF9E7',border:'rgba(0,0,0,0.08)',
+  borderGold:'rgba(180,130,0,0.2)',gold:'#D97706',goldBg:'#FEF3C7',
+  text:'#1C1917',textSub:'#44403C',textMuted:'#A8A29E',
+  success:'#16A34A',successBg:'#F0FDF4',
+  danger:'#E11D48',dangerBg:'#FFF1F2',
+  yt:'#FF0000',ytBg:'rgba(255,0,0,0.06)',ytBorder:'rgba(255,0,0,0.15)',
+  input:'#FFFFFF',inputBorder:'rgba(0,0,0,0.12)',
 }
 
-const timeAgo = (ts) => {
-  if (!ts) return ''
-  const diff = Date.now() - new Date(ts).getTime()
-  const m = Math.floor(diff / 60000)
-  if (m < 60) return `${m}m ago`
-  if (m < 1440) return `${Math.floor(m / 60)}h ago`
-  return `${Math.floor(m / 1440)}d ago`
-}
+const AI_TIMES = { youtube:'6:00 PM' }
 
-// Get browser timezone offset in minutes (e.g. PKT = -300)
-const getBrowserOffset = () => new Date().getTimezoneOffset()
+const fmt = n => !n&&n!==0?'0':n>=1e6?(n/1e6).toFixed(1)+'M':n>=1000?(n/1000).toFixed(1)+'K':String(n)
 
-const card    = { background: 'rgba(15,26,20,0.6)', border: '1px solid rgba(0,229,160,0.1)', borderRadius: 14, padding: 22 }
-const lbl     = { fontSize: 13, fontWeight: 600, color: '#9DC4B0', display: 'block', marginBottom: 6 }
-const inp     = { width: '100%', padding: '10px 14px', boxSizing: 'border-box', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(0,229,160,0.12)', borderRadius: 10, color: '#D8EEE5', fontSize: 14, outline: 'none', fontFamily: 'inherit', transition: 'border-color .18s' }
-const ta      = { ...inp, resize: 'vertical', minHeight: 90 }
-const tabBtn  = (a) => ({ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 9, cursor: 'pointer', fontWeight: 600, fontSize: 13, border: 'none', fontFamily: 'inherit', transition: 'all .15s', background: a ? '#FF0000' : 'rgba(255,0,0,0.08)', color: a ? '#fff' : '#9DC4B0' })
-const redBtn  = (dis) => ({ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '12px 16px', background: dis ? 'rgba(255,0,0,0.3)' : '#FF0000', color: '#fff', border: 'none', borderRadius: 10, cursor: dis ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 700, fontFamily: 'inherit', marginTop: 14 })
-const statCard = { background: 'rgba(255,0,0,0.05)', border: '1px solid rgba(255,0,0,0.1)', borderRadius: 12, padding: '16px 18px' }
+export default function YouTubeStudioPage() {
+  const navigate = useNavigate()
+  const [theme, setTheme] = useState(() => localStorage.getItem('nexora-theme')||'dark')
+  const T = theme==='dark' ? DARK : LIGHT
 
-export default function YouTubeStudio() {
-  const [tab,     setTab]     = useState('upload')
-  const [userId,  setUserId]  = useState(null)
-  const [ytStatus,setYtStatus]= useState(null)
-  const [loading, setLoading] = useState(true)
+  const [tab,        setTab]        = useState('upload')
+  const [userId,     setUserId]     = useState(null)
+  const [ytStatus,   setYtStatus]   = useState(null)
+  const [loading,    setLoading]    = useState(true)
+
+  // Upload form
+  const [file,       setFile]       = useState(null)
+  const [preview,    setPreview]    = useState(null)
+  const [thumb,      setThumb]      = useState(null)
+  const [thumbPrev,  setThumbPrev]  = useState(null)
+  const [title,      setTitle]      = useState('')
+  const [desc,       setDesc]       = useState('')
+  const [tags,       setTags]       = useState('')
+  const [privacy,    setPrivacy]    = useState('private')
+  const [action,     setAction]     = useState('now') // now | schedule | draft
+  const [schedDate,  setSchedDate]  = useState('')
+  const [schedTime,  setSchedTime]  = useState('')
+  const [useAiTime,  setUseAiTime]  = useState(true)
+  const [posting,    setPosting]    = useState(false)
+  const [postResult, setPostResult] = useState(null)
+  const [postError,  setPostError]  = useState('')
+  const [progress,   setProgress]   = useState(0)
+
+  // My Videos
+  const [videos,     setVideos]     = useState([])
+  const [vidLoading, setVidLoading] = useState(false)
+
+  // Analytics
+  const [analytics,  setAnalytics]  = useState(null)
+
+  // Comments
+  const [comments,   setComments]   = useState([])
+  const [comFilter,  setComFilter]  = useState('all')
+  const [replyText,  setReplyText]  = useState({})
+  const [replySent,  setReplySent]  = useState({})
+  const [selComment, setSelComment] = useState(null)
+
+  const fileRef  = useRef()
+  const thumbRef = useRef()
+
+  useEffect(() => { localStorage.setItem('nexora-theme', theme) }, [theme])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) return
       const uid = session.user.id
       setUserId(uid)
-      const params = new URLSearchParams(window.location.search)
-      if (params.get('connected') === 'true') {
-        window.history.replaceState({}, '', '/youtube')
-      }
       checkStatus(uid)
     })
   }, [])
@@ -63,868 +91,569 @@ export default function YouTubeStudio() {
     setLoading(true)
     try {
       const r = await fetch(`${API}/api/youtube/status/${uid}`)
-      setYtStatus(await r.json())
-    } catch {
-      setYtStatus({ connected: false, error: 'Cannot reach backend' })
-    }
+      const d = await r.json()
+      setYtStatus(d)
+    } catch { setYtStatus({ connected: false }) }
     setLoading(false)
   }
 
-  const handleConnect    = () => { if (!userId) return; window.location.href = `${API}/api/youtube/auth?user_id=${userId}` }
-  const handleDisconnect = async () => {
-    if (!userId) return
-    await fetch(`${API}/api/youtube/disconnect/${userId}`, { method: 'DELETE' })
-    setYtStatus({ connected: false })
+  useEffect(() => {
+    if (!userId || !ytStatus?.connected) return
+    if (tab === 'videos')    loadVideos()
+    if (tab === 'analytics') loadAnalytics()
+    if (tab === 'comments')  loadComments()
+  }, [tab, userId, ytStatus])
+
+  const loadVideos = async () => {
+    setVidLoading(true)
+    try {
+      const r = await fetch(`${API}/api/youtube/videos/${userId}`)
+      const d = await r.json()
+      setVideos(d.videos || [])
+    } catch {}
+    setVidLoading(false)
   }
 
+  const loadAnalytics = async () => {
+    try {
+      const r = await fetch(`${API}/api/youtube/analytics/${userId}`)
+      const d = await r.json()
+      setAnalytics(d)
+    } catch {}
+  }
+
+  const loadComments = async () => {
+    try {
+      const r = await fetch(`${API}/api/youtube/inbox/${userId}?limit=50`)
+      const d = await r.json()
+      setComments(d.messages || [])
+    } catch {}
+  }
+
+  const onFile = (e) => {
+    const f = e.target.files[0]; if (!f) return
+    setFile(f); setPreview(URL.createObjectURL(f))
+    if (!title) setTitle(f.name.replace(/\.[^.]+$/, '').replace(/[-_]/g,' '))
+  }
+
+  const onThumb = (e) => {
+    const f = e.target.files[0]; if (!f) return
+    setThumb(f); setThumbPrev(URL.createObjectURL(f))
+  }
+
+  const buildScheduledFor = () => {
+    if (!schedDate) return null
+    const time = useAiTime ? AI_TIMES.youtube : schedTime
+    try { return new Date(`${schedDate} ${time}`).toISOString() } catch { return null }
+  }
+
+  const saveToScheduler = async (status, scheduledFor = null) => {
+    if (!userId) return
+    await supabase.from('scheduled_posts').insert({
+      user_id:       userId,
+      platforms:     ['youtube'],
+      content:       desc || title,
+      caption:       title,
+      title,
+      status,
+      scheduled_for: scheduledFor,
+      privacy,
+      created_at:    new Date().toISOString(),
+    }).catch(console.error)
+  }
+
+  const handlePost = async () => {
+    if (!file && action === 'now') { setPostError('Select a video file first.'); return }
+    if (!title.trim()) { setPostError('Add a title.'); return }
+    setPosting(true); setPostError(''); setPostResult(null); setProgress(0)
+
+    try {
+      if (action === 'draft') {
+        await saveToScheduler('draft')
+        setPostResult({ message: '📝 Draft saved! Check Scheduler.' })
+
+      } else if (action === 'schedule') {
+        const sf = buildScheduledFor()
+        if (!sf) { setPostError('Pick a date first.'); setPosting(false); return }
+        await saveToScheduler('scheduled', sf)
+        setPostResult({ message: `📅 Scheduled for ${new Date(sf).toLocaleString()}` })
+
+      } else {
+        // Post Now — upload to YouTube
+        const form = new FormData()
+        form.append('user_id', userId)
+        form.append('title', title)
+        form.append('description', desc)
+        form.append('tags', tags)
+        form.append('privacy', privacy)
+        form.append('file', file)
+        if (thumb) form.append('thumbnail', thumb)
+
+        const progIv = setInterval(() => setProgress(p => Math.min(p+3, 90)), 500)
+        const r = await fetch(`${API}/api/youtube/upload`, { method:'POST', body:form })
+        clearInterval(progIv); setProgress(100)
+        const d = await r.json()
+        if (!r.ok) throw new Error(d.detail || 'Upload failed.')
+        await saveToScheduler('published')
+        setPostResult({ message:'✅ Uploaded to YouTube!', url: d.video_url })
+      }
+    } catch (e) { setPostError(e.message) }
+    setPosting(false)
+  }
+
+  const resetForm = () => {
+    setFile(null); setPreview(null); setThumb(null); setThumbPrev(null)
+    setTitle(''); setDesc(''); setTags(''); setPostResult(null); setPostError('')
+    setProgress(0)
+  }
+
+  const sendReply = async (commentId) => {
+    const text = replyText[commentId]
+    if (!text?.trim()) return
+    try {
+      const r = await fetch(`${API}/api/youtube/reply-comment`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ user_id:userId, comment_id:commentId, message:text })
+      })
+      if (r.ok) { setReplySent(p=>({...p,[commentId]:true})); setReplyText(p=>({...p,[commentId]:''})) }
+    } catch {}
+  }
+
+  const changePrivacy = async (videoId, priv) => {
+    try {
+      await fetch(`${API}/api/youtube/video/${videoId}/privacy`, {
+        method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ user_id:userId, privacy:priv })
+      })
+      setVideos(v => v.map(vid => vid.id===videoId ? {...vid, privacy:priv} : vid))
+    } catch {}
+  }
+
+  const card  = { background:T.card, border:`1px solid ${T.border}`, borderRadius:16, padding:20 }
+  const inp   = { background:T.input, border:`1px solid ${T.inputBorder}`, borderRadius:9, padding:'10px 13px', color:T.text, fontSize:13, outline:'none', fontFamily:'inherit', width:'100%', boxSizing:'border-box', transition:'border-color .15s' }
+  const ta    = { ...inp, resize:'vertical', minHeight:90 }
+  const lbl   = { fontSize:11, fontWeight:700, color:T.textMuted, textTransform:'uppercase', letterSpacing:'.07em', display:'block', marginBottom:7 }
+  const h2    = { fontFamily:"'Syne',sans-serif", fontSize:15, fontWeight:700, color:T.text, margin:'0 0 14px' }
+
   if (loading) return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 14 }}>
-      <div style={{ width: 38, height: 38, border: '3px solid rgba(255,0,0,0.15)', borderTopColor: '#FF0000', borderRadius: '50%', animation: 'sp .8s linear infinite' }} />
-      <p style={{ color: '#4A6357', fontSize: 13 }}>Loading YouTube Studio...</p>
-      <style>{`@keyframes sp{to{transform:rotate(360deg)}}`}</style>
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh', background:T.bg }}>
+      <style>{`@keyframes sp{to{transform:rotate(360deg)}} @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@400;500;700&display=swap');`}</style>
+      <div style={{ width:36,height:36,border:`3px solid ${T.ytBorder}`,borderTopColor:T.yt,borderRadius:'50%',animation:'sp .8s linear infinite' }}/>
     </div>
   )
 
   if (!ytStatus?.connected) return (
-    <div style={{ fontFamily: "'Instrument Sans',system-ui,sans-serif" }}>
-      <div style={{ ...card, maxWidth: 480, margin: '60px auto', textAlign: 'center', padding: 40 }}>
-        <div style={{ width: 64, height: 64, borderRadius: 16, background: 'rgba(255,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-          <Youtube size={32} color="#FF0000" />
-        </div>
-        <h2 style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 8px' }}>Connect YouTube</h2>
-        <p style={{ fontSize: 14, color: '#7A9E8E', margin: '0 0 28px', lineHeight: 1.6 }}>
-          Connect your YouTube channel to upload videos, post to Community, view analytics, and manage comments.
-        </p>
-        <button onClick={handleConnect} style={{ ...redBtn(false), width: 'auto', padding: '12px 32px', margin: '0 auto' }}>
-          <Youtube size={16} /> Connect YouTube Channel
+    <div style={{ minHeight:'100vh', background:T.bg, fontFamily:"'DM Sans',sans-serif", display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@400;500;700&display=swap');`}</style>
+      <div style={{ ...card, maxWidth:440, textAlign:'center', padding:40 }}>
+        <div style={{ fontSize:48, marginBottom:16 }}>▶️</div>
+        <h2 style={{ fontFamily:"'Syne',sans-serif", fontSize:22, fontWeight:800, color:T.text, margin:'0 0 10px' }}>Connect YouTube</h2>
+        <p style={{ color:T.textMuted, fontSize:14, margin:'0 0 24px' }}>Connect your YouTube channel to upload, manage, and analyze your content.</p>
+        <button onClick={() => window.location.href=`${API}/api/youtube/auth?user_id=${userId}`}
+          style={{ padding:'12px 28px', background:T.yt, color:'#fff', border:'none', borderRadius:11, fontSize:14, fontWeight:800, cursor:'pointer', fontFamily:"'Syne',sans-serif" }}>
+          ▶ Connect YouTube
         </button>
-        {ytStatus?.error && <p style={{ fontSize: 12, color: '#F87171', marginTop: 12 }}>{ytStatus.error}</p>}
       </div>
     </div>
   )
 
-  const tabs = [
-    { key: 'upload',    label: 'Upload',    icon: <Upload size={14} />      },
-    { key: 'community', label: 'Community', icon: <Users size={14} />       },
-    { key: 'videos',    label: 'My Videos', icon: <Play size={14} />        },
-    { key: 'analytics', label: 'Analytics', icon: <BarChart2 size={14} />   },
-    { key: 'inbox',     label: 'Comments',  icon: <MessageCircle size={14}/> },
+  const TABS = [
+    { id:'upload',    label:'⬆️ Upload' },
+    { id:'videos',    label:'🎬 My Videos' },
+    { id:'analytics', label:'📊 Analytics' },
+    { id:'comments',  label:'💬 Comments' },
   ]
 
-  return (
-    <div style={{ fontFamily: "'Instrument Sans',system-ui,sans-serif", color: '#D8EEE5' }}>
-      <style>{`@keyframes sp{to{transform:rotate(360deg)}}`}</style>
+  const filteredComments = comFilter==='all' ? comments
+    : comFilter==='pending' ? comments.filter(c=>!c.replied&&!replySent[c.id])
+    : comments.filter(c=>c.replied||replySent[c.id])
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {ytStatus.channel_thumb
-            ? <img src={ytStatus.channel_thumb} alt="" style={{ width: 46, height: 46, borderRadius: '50%', border: '2px solid #FF0000' }} />
-            : <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,0,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Youtube size={22} color="#FF0000" /></div>}
-          <div>
-            <h1 style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 20, fontWeight: 800, color: '#fff', margin: 0 }}>{ytStatus.channel_name || 'YouTube Studio'}</h1>
-            <p style={{ fontSize: 13, color: '#7A9E8E', margin: 0 }}>
-              {fmt(ytStatus.subscribers)} subscribers
-              {ytStatus.expired && <span style={{ color: '#F87171', marginLeft: 8 }}>⚠ Token expired — reconnect</span>}
-            </p>
+  return (
+    <div style={{ minHeight:'100vh', background:T.bg, fontFamily:"'DM Sans',sans-serif", color:T.text, transition:'background .25s,color .25s' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@400;500;700&display=swap');
+        @keyframes sp{to{transform:rotate(360deg)}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+        .fa{animation:fadeUp .35s ease both}
+        .ch:hover{filter:brightness(1.08)} .ch{transition:all .15s}
+        textarea::placeholder,input::placeholder{color:${T.textMuted}}
+        *{box-sizing:border-box}
+        input[type=date],input[type=time]{color-scheme:${theme}}
+      `}</style>
+
+      <div style={{ maxWidth:1280, margin:'0 auto', padding:'28px 24px' }}>
+
+        {/* Header */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24, flexWrap:'wrap', gap:12 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+            {ytStatus.thumbnail
+              ? <img src={ytStatus.thumbnail} alt="" style={{ width:46,height:46,borderRadius:'50%',border:`2px solid ${T.yt}` }}/>
+              : <div style={{ width:46,height:46,borderRadius:'50%',background:T.ytBg,border:`1px solid ${T.ytBorder}`,display:'flex',alignItems:'center',justifyContent:'center',color:T.yt,fontSize:18,fontWeight:900 }}>▶</div>}
+            <div>
+              <h1 style={{ fontFamily:"'Syne',sans-serif", fontSize:20, fontWeight:800, color:T.text, margin:0 }}>
+                {ytStatus.channel_title || ytStatus.channel_name || 'YouTube Studio'}
+              </h1>
+              <p style={{ fontSize:12, color:T.textMuted, margin:0 }}>
+                {ytStatus.subscribers ? `${fmt(ytStatus.subscribers)} subscribers` : 'YouTube Studio'}
+              </p>
+            </div>
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => checkStatus(userId)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'rgba(255,0,0,0.08)', border: '1px solid rgba(255,0,0,0.15)', borderRadius: 8, color: '#FF0000', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-            <RefreshCw size={13} /> Refresh
-          </button>
-          {ytStatus.expired && (
-            <button onClick={handleConnect}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: '#FF0000', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-              Reconnect
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={() => navigate('/schedule')}
+              style={{ padding:'7px 14px', borderRadius:9, background:T.goldBg, border:`1px solid ${T.borderGold}`, color:T.gold, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+              📅 Scheduler
             </button>
-          )}
-          <button onClick={handleDisconnect}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.15)', borderRadius: 8, color: '#F87171', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-            Disconnect
-          </button>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 22, flexWrap: 'wrap' }}>
-        {tabs.map(t => (
-          <button key={t.key} style={tabBtn(tab === t.key)} onClick={() => setTab(t.key)}>
-            {t.icon} {t.label}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'upload'    && <UploadTab    userId={userId} />}
-      {tab === 'community' && <CommunityTab userId={userId} />}
-      {tab === 'videos'    && <VideosTab    userId={userId} />}
-      {tab === 'analytics' && <AnalyticsTab userId={userId} />}
-      {tab === 'inbox'     && <InboxTab     userId={userId} />}
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// UPLOAD TAB — timezone fix
-// ─────────────────────────────────────────────────────────────────────────────
-function UploadTab({ userId }) {
-  const [title,       setTitle]       = useState('')
-  const [description, setDescription] = useState('')
-  const [tags,        setTags]        = useState('')
-  const [privacy,     setPrivacy]     = useState('private')
-  const [scheduleAt,  setScheduleAt]  = useState('')
-  const [file,        setFile]        = useState(null)
-  const [state,       setState]       = useState('idle')
-  const [msg,         setMsg]         = useState('')
-  const [result,      setResult]      = useState(null)
-  const [progress,    setProgress]    = useState(0)
-  const fileRef = useRef()
-
-  // Get local timezone info for display
-  const tzOffset = getBrowserOffset()
-  const tzHours  = -tzOffset / 60
-  const tzLabel  = `UTC${tzHours >= 0 ? '+' : ''}${tzHours}`
-
-  const handleUpload = async () => {
-    if (!title.trim()) { setMsg('Title is required.'); setState('error'); return }
-    if (!file) { setMsg('Please select a video file.'); setState('error'); return }
-    if (privacy === 'scheduled' && !scheduleAt) { setMsg('Please set schedule date/time.'); setState('error'); return }
-
-    setState('loading'); setMsg(''); setProgress(0)
-
-    const form = new FormData()
-    form.append('user_id', userId)
-    form.append('title', title)
-    form.append('description', description)
-    form.append('tags', tags)
-    form.append('privacy', privacy)
-    form.append('scheduled_at', scheduleAt)
-    form.append('timezone_offset', String(tzOffset)) // send browser offset to backend
-    form.append('file', file)
-
-    try {
-      const progressInterval = setInterval(() => setProgress(p => Math.min(p + 4, 88)), 1200)
-      const res = await fetch(`${API}/api/youtube/upload-video`, { method: 'POST', body: form })
-      clearInterval(progressInterval)
-      setProgress(100)
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'Upload failed.')
-      setState('success'); setResult(data)
-    } catch (e) { setState('error'); setMsg(e.message); setProgress(0) }
-  }
-
-  const privacyOptions = [
-    { value: 'public',    label: 'Public',   icon: <Globe size={13} />,   desc: 'Publish immediately'   },
-    { value: 'private',   label: 'Draft',    icon: <Lock size={13} />,    desc: 'Save as draft'         },
-    { value: 'unlisted',  label: 'Unlisted', icon: <EyeOff size={13} />,  desc: 'Link only'             },
-    { value: 'scheduled', label: 'Schedule', icon: <Calendar size={13}/>, desc: 'Auto-publish at time'  },
-  ]
-
-  const reset = () => { setState('idle'); setMsg(''); setResult(null); setTitle(''); setDescription(''); setTags(''); setFile(null); setPrivacy('private'); setScheduleAt(''); setProgress(0) }
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16, alignItems: 'start' }}>
-      <div style={card}>
-        <h3 style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: '#fff', margin: '0 0 18px' }}>Upload Video</h3>
-
-        {state === 'success' ? (
-          <div style={{ textAlign: 'center', padding: '28px 0' }}>
-            <CheckCircle size={44} color="#00E5A0" style={{ display: 'block', margin: '0 auto 14px' }} />
-            <p style={{ color: '#00E5A0', fontWeight: 700, fontSize: 15, margin: '0 0 8px' }}>
-              {result?.status === 'scheduled' ? 'Video Scheduled! 📅' : result?.status === 'private' ? 'Saved as Draft! 📝' : 'Video Published! 🎉'}
-            </p>
-            {result?.url && <a href={result.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#60A5FA', textDecoration: 'none', display: 'block', marginBottom: 16 }}>View on YouTube →</a>}
-            <button onClick={reset} style={{ padding: '9px 20px', background: 'none', border: '1px solid rgba(0,229,160,0.2)', borderRadius: 8, color: '#9DC4B0', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Upload Another</button>
+            <button onClick={()=>setTheme(t=>t==='dark'?'light':'dark')}
+              style={{ padding:'7px 14px', borderRadius:100, background:T.cardAlt, border:`1px solid ${T.border}`, color:T.textMuted, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
+              {theme==='dark'?'☀️':'🌙'}
+            </button>
           </div>
-        ) : (
-          <>
-            {/* File zone */}
-            <div onClick={() => fileRef.current?.click()}
-              style={{ border: '2px dashed rgba(255,0,0,0.2)', borderRadius: 10, padding: '24px', textAlign: 'center', cursor: 'pointer', marginBottom: 16 }}
-              onMouseEnter={e => e.currentTarget.style.borderColor='rgba(255,0,0,0.4)'}
-              onMouseLeave={e => e.currentTarget.style.borderColor='rgba(255,0,0,0.2)'}>
-              <input ref={fileRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={e => { setFile(e.target.files[0]); setState('idle'); setMsg('') }} />
-              {file ? (
-                <div><Play size={24} color="#FF0000" style={{ display: 'block', margin: '0 auto 8px' }} />
-                  <p style={{ color: '#D8EEE5', fontSize: 13, margin: 0, fontWeight: 600 }}>{file.name}</p>
-                  <p style={{ color: '#4A6357', fontSize: 11, margin: '4px 0 0' }}>{(file.size/1024/1024).toFixed(1)} MB</p>
-                </div>
-              ) : (
-                <><Upload size={26} color="#4A6357" style={{ display: 'block', margin: '0 auto 10px' }} />
-                  <p style={{ color: '#4A6357', fontSize: 13, margin: 0 }}>Click to select video</p>
-                  <p style={{ color: '#4A6357', fontSize: 11, margin: '5px 0 0' }}>MP4, MOV, AVI • Max 128GB</p></>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display:'flex', gap:8, marginBottom:22, flexWrap:'wrap' }}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={()=>setTab(t.id)} className="ch"
+              style={{ padding:'9px 18px', borderRadius:9, border:'none', fontFamily:'inherit', fontWeight:600, fontSize:13, cursor:'pointer', transition:'all .15s', background:tab===t.id?T.yt:T.cardAlt, color:tab===t.id?'#fff':T.textMuted }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── UPLOAD TAB ── */}
+        {tab === 'upload' && (
+          <div style={{ display:'grid', gridTemplateColumns:'1.2fr 1fr', gap:16 }}>
+
+            {/* Left */}
+            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              <div style={card}>
+                <h2 style={h2}>Upload Video</h2>
+
+                {postResult ? (
+                  <div style={{ textAlign:'center', padding:'28px 0' }}>
+                    <div style={{ fontSize:40, marginBottom:12 }}>{action==='now'?'🎉':action==='schedule'?'📅':'📝'}</div>
+                    <p style={{ color:T.success, fontWeight:700, fontSize:15, margin:'0 0 8px' }}>{postResult.message}</p>
+                    {postResult.url && <a href={postResult.url} target="_blank" rel="noopener" style={{ fontSize:13, color:T.yt, textDecoration:'none', display:'block', marginBottom:14 }}>View on YouTube →</a>}
+                    <div style={{ display:'flex', gap:8, justifyContent:'center' }}>
+                      <button onClick={resetForm} style={{ padding:'9px 20px', background:T.ytBg, border:`1px solid ${T.ytBorder}`, borderRadius:9, color:T.yt, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                        Upload Another
+                      </button>
+                      <button onClick={()=>navigate('/schedule')} style={{ padding:'9px 20px', background:T.goldBg, border:`1px solid ${T.borderGold}`, borderRadius:9, color:T.gold, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                        View Schedule
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Video file */}
+                    <input ref={fileRef} type="file" accept="video/*" style={{ display:'none' }} onChange={onFile}/>
+                    {preview ? (
+                      <div style={{ position:'relative', marginBottom:14 }}>
+                        <video src={preview} style={{ width:'100%', borderRadius:12, maxHeight:220, objectFit:'contain', background:'#000' }} controls/>
+                        <button onClick={()=>{setFile(null);setPreview(null)}} style={{ position:'absolute',top:8,right:8,width:28,height:28,borderRadius:'50%',background:'rgba(0,0,0,.7)',border:'none',color:'#fff',cursor:'pointer',fontSize:15 }}>×</button>
+                      </div>
+                    ) : (
+                      <div onClick={()=>fileRef.current?.click()} style={{ border:`2px dashed ${T.ytBorder}`, borderRadius:12, padding:'32px', textAlign:'center', cursor:'pointer', marginBottom:14, transition:'border-color .15s' }}
+                        onMouseEnter={e=>e.currentTarget.style.borderColor=T.yt+'60'}
+                        onMouseLeave={e=>e.currentTarget.style.borderColor=T.ytBorder}>
+                        <div style={{ fontSize:36, marginBottom:8 }}>🎬</div>
+                        <p style={{ color:T.textMuted, fontSize:13, margin:0 }}>Click to select video</p>
+                        <p style={{ color:T.textMuted, fontSize:11, margin:'4px 0 0', opacity:.7 }}>MP4, MOV, AVI • Any size</p>
+                      </div>
+                    )}
+
+                    {/* Title */}
+                    <div style={{ marginBottom:12 }}>
+                      <label style={lbl}>Title <span style={{ float:'right', fontWeight:400, color:title.length>95?T.danger:T.textMuted }}>{title.length}/100</span></label>
+                      <input style={inp} value={title} onChange={e=>setTitle(e.target.value.slice(0,100))} placeholder="Your video title..."
+                        onFocus={e=>e.target.style.borderColor=T.yt+'60'} onBlur={e=>e.target.style.borderColor=T.inputBorder}/>
+                    </div>
+
+                    {/* Description */}
+                    <div style={{ marginBottom:12 }}>
+                      <label style={lbl}>Description</label>
+                      <textarea style={{ ...ta, minHeight:100 }} value={desc} onChange={e=>setDesc(e.target.value)}
+                        placeholder="Describe your video... Add timestamps, links, chapters"
+                        onFocus={e=>e.target.style.borderColor=T.yt+'60'} onBlur={e=>e.target.style.borderColor=T.inputBorder}/>
+                    </div>
+
+                    {/* Tags */}
+                    <div style={{ marginBottom:12 }}>
+                      <label style={lbl}>Tags (comma separated)</label>
+                      <input style={inp} value={tags} onChange={e=>setTags(e.target.value)} placeholder="creator, youtube, tutorial, growth"
+                        onFocus={e=>e.target.style.borderColor=T.yt+'60'} onBlur={e=>e.target.style.borderColor=T.inputBorder}/>
+                    </div>
+
+                    {/* Thumbnail */}
+                    <div style={{ marginBottom:12 }}>
+                      <label style={lbl}>Custom Thumbnail (optional)</label>
+                      <input ref={thumbRef} type="file" accept="image/*" style={{ display:'none' }} onChange={onThumb}/>
+                      {thumbPrev ? (
+                        <div style={{ position:'relative' }}>
+                          <img src={thumbPrev} alt="" style={{ width:'100%', borderRadius:10, maxHeight:120, objectFit:'cover' }}/>
+                          <button onClick={()=>{setThumb(null);setThumbPrev(null)}} style={{ position:'absolute',top:6,right:6,width:24,height:24,borderRadius:'50%',background:'rgba(0,0,0,.7)',border:'none',color:'#fff',cursor:'pointer',fontSize:13 }}>×</button>
+                        </div>
+                      ) : (
+                        <div onClick={()=>thumbRef.current?.click()} style={{ border:`1px dashed ${T.border}`, borderRadius:9, padding:'14px', textAlign:'center', cursor:'pointer', color:T.textMuted, fontSize:12 }}>
+                          🖼️ Upload thumbnail (1280×720 recommended)
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Privacy */}
+                    <div style={{ marginBottom:14 }}>
+                      <label style={lbl}>Privacy</label>
+                      <div style={{ display:'flex', gap:7 }}>
+                        {['public','private','unlisted'].map(v => (
+                          <div key={v} className="ch" onClick={()=>setPrivacy(v)}
+                            style={{ flex:1, padding:'9px', borderRadius:9, cursor:'pointer', textAlign:'center', border:`1.5px solid ${privacy===v?T.yt+'60':T.border}`, background:privacy===v?T.ytBg:T.cardAlt }}>
+                            <span style={{ fontSize:14 }}>{v==='public'?'🌍':v==='private'?'🔒':'🔗'}</span>
+                            <div style={{ fontSize:11, fontWeight:600, color:privacy===v?T.text:T.textMuted, marginTop:2, textTransform:'capitalize' }}>{v}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Error */}
+                    {postError && (
+                      <div style={{ padding:'10px 14px', background:T.dangerBg, border:`1px solid ${T.danger}40`, borderRadius:10, color:T.danger, fontSize:13, marginBottom:12 }}>
+                        ⚠️ {postError}
+                      </div>
+                    )}
+
+                    {/* Progress */}
+                    {posting && action==='now' && (
+                      <div style={{ marginBottom:12 }}>
+                        <div style={{ height:4, background:T.border, borderRadius:2, overflow:'hidden', marginBottom:5 }}>
+                          <div style={{ height:'100%', width:`${progress}%`, background:T.yt, borderRadius:2, transition:'width .5s' }}/>
+                        </div>
+                        <p style={{ fontSize:11, color:T.textMuted, textAlign:'center' }}>Uploading to YouTube... {progress}%</p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Right — Action + Schedule + Tips */}
+            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+
+              {/* Action */}
+              {!postResult && (
+                <>
+                  <div style={card}>
+                    <label style={lbl}>Action</label>
+                    <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
+                      {[
+                        { id:'now',      icon:'⚡', label:'Post Now',   desc:'Upload immediately to YouTube' },
+                        { id:'schedule', icon:'📅', label:'Schedule',   desc:'AI picks best time — 6 PM' },
+                        { id:'draft',    icon:'📝', label:'Save Draft', desc:'Save to scheduler, publish later' },
+                      ].map(a => (
+                        <div key={a.id} className="ch" onClick={()=>setAction(a.id)}
+                          style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:11, cursor:'pointer', border:`1.5px solid ${action===a.id?T.yt+'60':T.border}`, background:action===a.id?T.ytBg:T.cardAlt }}>
+                          <span style={{ fontSize:20 }}>{a.icon}</span>
+                          <div>
+                            <div style={{ fontSize:13, fontWeight:700, color:action===a.id?T.text:T.textSub }}>{a.label}</div>
+                            <div style={{ fontSize:11, color:T.textMuted }}>{a.desc}</div>
+                          </div>
+                          {action===a.id && <div style={{ marginLeft:'auto', width:16,height:16,borderRadius:'50%',background:T.yt,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:10 }}>✓</div>}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Schedule options */}
+                    {action === 'schedule' && (
+                      <div className="fa" style={{ padding:'12px 14px', background:T.goldBg, border:`1px solid ${T.borderGold}`, borderRadius:11, marginBottom:14 }}>
+                        <div style={{ fontSize:13, fontWeight:700, color:T.gold, marginBottom:3 }}>🤖 AI Recommends: 6:00 PM</div>
+                        <div style={{ fontSize:11, color:T.textMuted, marginBottom:10 }}>Peak watch time for YouTube audience</div>
+                        <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, cursor:'pointer' }}>
+                          <input type="checkbox" checked={useAiTime} onChange={e=>setUseAiTime(e.target.checked)} style={{ accentColor:T.gold }}/>
+                          <span style={{ fontSize:12, color:T.textSub, fontWeight:600 }}>Use AI recommended time</span>
+                        </label>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                          <div>
+                            <label style={{ ...lbl, marginBottom:4 }}>Date</label>
+                            <input type="date" style={inp} value={schedDate} min={new Date().toISOString().split('T')[0]}
+                              onChange={e=>setSchedDate(e.target.value)}/>
+                          </div>
+                          <div>
+                            <label style={{ ...lbl, marginBottom:4 }}>Time {useAiTime&&<span style={{ color:T.gold }}>(AI)</span>}</label>
+                            <input type="time" style={{ ...inp, opacity:useAiTime?.8:1 }} value={useAiTime?'18:00':schedTime} disabled={useAiTime} onChange={e=>setSchedTime(e.target.value)}/>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <button onClick={handlePost} disabled={posting}
+                      style={{ width:'100%', padding:'13px', borderRadius:12, background:posting?T.ytBg:T.yt, color:posting?T.textMuted:'#fff', border:'none', fontSize:15, fontWeight:800, cursor:posting?'not-allowed':'pointer', fontFamily:"'Syne',sans-serif", boxShadow:posting?'none':'0 4px 20px rgba(255,0,0,0.3)', transition:'all .15s' }}>
+                      {posting
+                        ? <span style={{ display:'flex',alignItems:'center',justifyContent:'center',gap:8 }}>
+                            <span style={{ width:15,height:15,border:'2px solid rgba(255,255,255,.3)',borderTopColor:'#fff',borderRadius:'50%',animation:'sp .8s linear infinite',display:'inline-block' }}/>
+                            {action==='now'?'Uploading...':action==='schedule'?'Scheduling...':'Saving...'}
+                          </span>
+                        : action==='now' ? '⚡ Upload to YouTube'
+                          : action==='schedule' ? '📅 Schedule Post'
+                          : '📝 Save as Draft'}
+                    </button>
+                  </div>
+
+                  {/* Tips */}
+                  <div style={card}>
+                    <label style={lbl}>YouTube Tips</label>
+                    {['Titles under 60 chars rank better','First 48h = critical for algorithm','Add chapters with timestamps','Upload Tue–Thu for best reach','Custom thumbnail = 3× more clicks','End screen in last 20 seconds'].map(tip => (
+                      <p key={tip} style={{ fontSize:12, color:T.textMuted, margin:'0 0 7px', paddingLeft:10, borderLeft:`2px solid ${T.ytBorder}`, lineHeight:1.5 }}>{tip}</p>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
+          </div>
+        )}
 
-            {/* Title */}
-            <div style={{ marginBottom: 14 }}>
-              <label style={lbl}>Title <span style={{ float: 'right', fontWeight: 400, color: title.length > 90 ? '#F87171' : '#4A6357' }}>{title.length}/100</span></label>
-              <input style={inp} value={title} onChange={e => setTitle(e.target.value.slice(0, 100))} placeholder="Video title..."
-                onFocus={e => e.target.style.borderColor='rgba(255,0,0,0.4)'} onBlur={e => e.target.style.borderColor='rgba(0,229,160,0.12)'} />
-            </div>
-
-            {/* Description */}
-            <div style={{ marginBottom: 14 }}>
-              <label style={lbl}>Description</label>
-              <textarea style={ta} value={description} onChange={e => setDescription(e.target.value)} placeholder="Add timestamps, links, hashtags..."
-                onFocus={e => e.target.style.borderColor='rgba(255,0,0,0.4)'} onBlur={e => e.target.style.borderColor='rgba(0,229,160,0.12)'} />
-            </div>
-
-            {/* Tags */}
-            <div style={{ marginBottom: 16 }}>
-              <label style={lbl}>Tags <span style={{ fontWeight: 400, color: '#4A6357' }}>(comma separated)</span></label>
-              <input style={inp} value={tags} onChange={e => setTags(e.target.value)} placeholder="nexora, creator, tutorial"
-                onFocus={e => e.target.style.borderColor='rgba(255,0,0,0.4)'} onBlur={e => e.target.style.borderColor='rgba(0,229,160,0.12)'} />
-            </div>
-
-            {/* Privacy */}
-            <div style={{ marginBottom: 14 }}>
-              <label style={lbl}>Visibility</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {privacyOptions.map(opt => (
-                  <div key={opt.value} onClick={() => setPrivacy(opt.value)}
-                    style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', border: `1px solid ${privacy===opt.value ? 'rgba(255,0,0,0.4)' : 'rgba(0,229,160,0.1)'}`, background: privacy===opt.value ? 'rgba(255,0,0,0.08)' : 'transparent', transition: 'all .15s' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: privacy===opt.value ? '#FF0000' : '#9DC4B0', fontWeight: 600, fontSize: 13, marginBottom: 2 }}>
-                      {opt.icon} {opt.label}
+        {/* ── MY VIDEOS ── */}
+        {tab === 'videos' && (
+          <div style={card}>
+            <h2 style={h2}>My Videos ({videos.length})</h2>
+            {vidLoading ? (
+              <div style={{ textAlign:'center', padding:40 }}>
+                <div style={{ width:32,height:32,border:`3px solid ${T.ytBorder}`,borderTopColor:T.yt,borderRadius:'50%',animation:'sp .8s linear infinite',margin:'0 auto' }}/>
+              </div>
+            ) : videos.length===0 ? (
+              <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted }}>
+                <div style={{ fontSize:40, marginBottom:12 }}>🎬</div>
+                <p style={{ fontSize:13 }}>No videos yet</p>
+              </div>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                {videos.map(v => (
+                  <div key={v.id} style={{ display:'flex', gap:14, padding:'14px', background:T.cardAlt, borderRadius:12, border:`1px solid ${T.border}`, alignItems:'center' }}>
+                    {v.thumbnail
+                      ? <img src={v.thumbnail} alt="" style={{ width:120, height:68, borderRadius:8, objectFit:'cover', flexShrink:0 }}/>
+                      : <div style={{ width:120, height:68, borderRadius:8, background:T.border, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', color:T.textMuted }}>🎬</div>}
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:14, fontWeight:700, color:T.text, marginBottom:4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{v.title}</div>
+                      <div style={{ display:'flex', gap:12, fontSize:12, color:T.textMuted, flexWrap:'wrap' }}>
+                        <span>👁️ {fmt(v.views)}</span>
+                        <span>👍 {fmt(v.likes)}</span>
+                        <span>💬 {fmt(v.comments)}</span>
+                        <span>⏱️ {v.duration}</span>
+                      </div>
                     </div>
-                    <div style={{ fontSize: 11, color: '#4A6357' }}>{opt.desc}</div>
+                    <div style={{ flexShrink:0 }}>
+                      <select value={v.privacy||'public'} onChange={e=>changePrivacy(v.id,e.target.value)}
+                        style={{ ...inp, width:'auto', padding:'5px 10px', fontSize:12, cursor:'pointer', background:T.card }}>
+                        <option value="public">🌍 Public</option>
+                        <option value="private">🔒 Private</option>
+                        <option value="unlisted">🔗 Unlisted</option>
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── ANALYTICS ── */}
+        {tab === 'analytics' && (
+          <div>
+            {!analytics ? (
+              <div style={{ textAlign:'center', padding:48 }}>
+                <div style={{ width:32,height:32,border:`3px solid ${T.ytBorder}`,borderTopColor:T.yt,borderRadius:'50%',animation:'sp .8s linear infinite',margin:'0 auto 12px' }}/>
+                <p style={{ color:T.textMuted }}>Loading analytics...</p>
+              </div>
+            ) : (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:12 }}>
+                {[
+                  { label:'Views (28d)',        value:fmt(analytics.views_28d||analytics.views||0),    icon:'👁️' },
+                  { label:'Watch Time',         value:analytics.watch_time||'—',                        icon:'⏱️' },
+                  { label:'Subscribers',        value:'+'+fmt(analytics.new_subscribers||0),           icon:'📈' },
+                  { label:'Impressions',        value:fmt(analytics.impressions||0),                   icon:'📢' },
+                  { label:'Click-Through',      value:(analytics.ctr||0)+'%',                          icon:'🎯' },
+                  { label:'Avg View Duration',  value:analytics.avg_view_duration||'—',               icon:'📊' },
+                ].map(stat => (
+                  <div key={stat.label} style={{ ...card }}>
+                    <div style={{ fontSize:24, marginBottom:8 }}>{stat.icon}</div>
+                    <div style={{ fontFamily:"'Syne',sans-serif", fontSize:22, fontWeight:800, color:T.yt, marginBottom:4 }}>{stat.value}</div>
+                    <div style={{ fontSize:11, color:T.textMuted, textTransform:'uppercase', letterSpacing:'.06em' }}>{stat.label}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── COMMENTS ── */}
+        {tab === 'comments' && (
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1.5fr', gap:14 }}>
+            <div style={card}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                <h2 style={{ ...h2, margin:0 }}>Comments ({comments.length})</h2>
+              </div>
+              <div style={{ display:'flex', gap:6, marginBottom:12 }}>
+                {[['all','All'],['pending','🔴 Pending'],['replied','✅ Replied']].map(([k,l]) => (
+                  <button key={k} onClick={()=>setComFilter(k)}
+                    style={{ padding:'4px 10px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit', border:'none', background:comFilter===k?T.ytBg:T.cardAlt, color:comFilter===k?T.yt:T.textMuted }}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <div style={{ maxHeight:500, overflowY:'auto', display:'flex', flexDirection:'column', gap:5 }}>
+                {filteredComments.length===0 ? (
+                  <div style={{ textAlign:'center', padding:'28px 0', color:T.textMuted, fontSize:13 }}>No comments</div>
+                ) : filteredComments.map(c => (
+                  <div key={c.id} onClick={()=>setSelComment(c)}
+                    style={{ padding:'10px 12px', borderRadius:10, cursor:'pointer', border:`1.5px solid ${selComment?.id===c.id?T.yt+'60':T.border}`, background:selComment?.id===c.id?T.ytBg:T.cardAlt }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                      <span style={{ fontSize:12, fontWeight:700, color:T.yt }}>@{c.from||c.author}</span>
+                      <span style={{ fontSize:9, padding:'1px 6px', borderRadius:100, fontWeight:700, background:c.replied||replySent[c.id]?T.successBg:T.dangerBg, color:c.replied||replySent[c.id]?T.success:T.danger }}>
+                        {c.replied||replySent[c.id]?'✓':'pending'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize:12, color:T.textSub, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.text}</div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Schedule — timezone aware */}
-            {privacy === 'scheduled' && (
-              <div style={{ marginBottom: 14 }}>
-                <label style={lbl}>
-                  Schedule Date & Time
-                  <span style={{ float: 'right', fontWeight: 400, color: '#00E5A0' }}>Your local time ({tzLabel})</span>
-                </label>
-                <input style={inp} type="datetime-local" value={scheduleAt} onChange={e => setScheduleAt(e.target.value)}
-                  onFocus={e => e.target.style.borderColor='rgba(255,0,0,0.4)'} onBlur={e => e.target.style.borderColor='rgba(0,229,160,0.12)'} />
-                <p style={{ fontSize: 11, color: '#4A6357', marginTop: 5 }}>
-                  ✅ Enter your local time — Nexora automatically converts to UTC for YouTube.
-                </p>
-              </div>
-            )}
-
-            {/* Progress */}
-            {state === 'loading' && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12, color: '#7A9E8E' }}>
-                  <span>Uploading to YouTube...</span><span>{progress}%</span>
-                </div>
-                <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${progress}%`, background: '#FF0000', borderRadius: 3, transition: 'width .5s' }} />
-                </div>
-              </div>
-            )}
-
-            {/* Error */}
-            {state === 'error' && (
-              <div style={{ display: 'flex', gap: 8, padding: '10px 14px', borderRadius: 10, background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.3)', marginBottom: 12 }}>
-                <AlertCircle size={15} color="#F87171" style={{ flexShrink: 0, marginTop: 1 }} />
-                <span style={{ fontSize: 13, color: '#F87171' }}>{msg}</span>
-              </div>
-            )}
-
-            <button style={redBtn(state === 'loading')} onClick={handleUpload} disabled={state === 'loading'}>
-              {state === 'loading'
-                ? <><Loader size={15} style={{ animation: 'sp .7s linear infinite' }} /> Uploading...</>
-                : <><Upload size={15} /> {privacy==='scheduled' ? 'Schedule Video' : privacy==='private' ? 'Save as Draft' : 'Publish Video'}</>}
-            </button>
-          </>
-        )}
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={card}>
-          <h4 style={{ fontSize: 13, fontWeight: 700, color: '#fff', margin: '0 0 12px' }}>📹 Upload Tips</h4>
-          {[['Best format','MP4 (H.264)'],['Resolution','1080p or 4K'],['Max size','128 GB'],['Thumbnail','Add after in YT Studio'],['Chapters','Use timestamps in desc']].map(([k,v]) => (
-            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid rgba(255,0,0,0.06)', fontSize: 12 }}>
-              <span style={{ color: '#7A9E8E' }}>{k}</span><span style={{ color: '#D8EEE5', fontWeight: 600 }}>{v}</span>
-            </div>
-          ))}
-        </div>
-        <div style={card}>
-          <h4 style={{ fontSize: 13, fontWeight: 700, color: '#fff', margin: '0 0 10px' }}>🕐 Schedule Timezone</h4>
-          <p style={{ fontSize: 13, color: '#00E5A0', fontWeight: 700, marginBottom: 6 }}>Your timezone: {tzLabel}</p>
-          <p style={{ fontSize: 12, color: '#7A9E8E', lineHeight: 1.6 }}>
-            Enter your <strong style={{ color: '#D8EEE5' }}>local time</strong> — Nexora converts it automatically to UTC for YouTube. No manual conversion needed.
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// COMMUNITY TAB
-// ─────────────────────────────────────────────────────────────────────────────
-function CommunityTab({ userId }) {
-  const [text, setText] = useState('')
-  const [copied, setCopied] = useState(false)
-
-  const copyText = () => {
-    if (!text.trim()) return
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  const openYouTubeStudio = () => {
-    window.open('https://studio.youtube.com', '_blank')
-  }
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16, alignItems: 'start' }}>
-      <div style={card}>
-        <h3 style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: '#fff', margin: '0 0 8px' }}>
-          Community Post
-        </h3>
-
-        {/* Info banner */}
-        <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', marginBottom: 18 }}>
-          <p style={{ fontSize: 12, color: '#FBBF24', lineHeight: 1.7, margin: 0 }}>
-            <strong>ℹ️ Note:</strong> YouTube does not allow third-party apps to post Community Posts via API.
-            Write your post below, copy it, then paste it in YouTube Studio.
-          </p>
-        </div>
-
-        {/* Text composer */}
-        <div style={{ marginBottom: 14 }}>
-          <label style={lbl}>
-            Write Your Post
-            <span style={{ float: 'right', fontWeight: 400, color: text.length > 2800 ? '#F87171' : '#4A6357' }}>{text.length}/3000</span>
-          </label>
-          <textarea style={{ ...ta, minHeight: 140 }} value={text}
-            onChange={e => setText(e.target.value.slice(0, 3000))}
-            placeholder="Write your community post here... Share updates, behind-the-scenes, ask questions"
-            onFocus={e => e.target.style.borderColor='rgba(255,0,0,0.4)'}
-            onBlur={e => e.target.style.borderColor='rgba(0,229,160,0.12)'} />
-        </div>
-
-        {/* Action buttons */}
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={copyText} disabled={!text.trim()}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px 16px',
-              background: copied ? 'rgba(0,229,160,0.15)' : 'rgba(255,255,255,0.06)',
-              border: `1px solid ${copied ? 'rgba(0,229,160,0.3)' : 'rgba(255,255,255,0.1)'}`,
-              borderRadius: 10, color: copied ? '#00E5A0' : '#9DC4B0',
-              cursor: text.trim() ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-              opacity: text.trim() ? 1 : 0.5 }}>
-            {copied ? <><CheckCircle size={14} /> Copied!</> : '📋 Copy Text'}
-          </button>
-          <button onClick={openYouTubeStudio}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px 16px',
-              background: '#FF0000', border: 'none', borderRadius: 10,
-              color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}>
-            <ArrowUpRight size={14} /> Open YouTube Studio
-          </button>
-        </div>
-
-        {/* Steps */}
-        <div style={{ marginTop: 16, padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <p style={{ fontSize: 11, fontWeight: 700, color: '#7A9E8E', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>How to post:</p>
-          {[
-            '1. Write your post above',
-            '2. Click "Copy Text"',
-            '3. Click "Open YouTube Studio"',
-            '4. Go to Create → Community Post → Paste',
-          ].map(s => (
-            <p key={s} style={{ fontSize: 12, color: '#7A9E8E', margin: '0 0 6px', paddingLeft: 8, borderLeft: '2px solid rgba(255,0,0,0.2)' }}>{s}</p>
-          ))}
-        </div>
-      </div>
-
-      <div style={card}>
-        <h4 style={{ fontSize: 13, fontWeight: 700, color: '#fff', margin: '0 0 12px' }}>📢 Community Tips</h4>
-        {[
-          'Requires 500+ subscribers',
-          'Text-only posts perform great',
-          'Share behind-the-scenes content',
-          'Ask questions to boost comments',
-          'Announce videos before upload',
-          'Post 2-3x per week consistently',
-          'Use emojis to grab attention',
-        ].map(t => (
-          <p key={t} style={{ fontSize: 12, color: '#7A9E8E', margin: '0 0 7px', paddingLeft: 12, borderLeft: '2px solid rgba(255,0,0,0.2)', lineHeight: 1.5 }}>{t}</p>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MY VIDEOS TAB — with privacy edit
-// ─────────────────────────────────────────────────────────────────────────────
-function VideosTab({ userId }) {
-  const [videos,     setVideos]     = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [error,      setError]      = useState(null)
-  const [updatingId, setUpdatingId] = useState(null)
-  const [updateMsg,  setUpdateMsg]  = useState({})
-  const [selected,   setSelected]   = useState(null)  // selected video for analytics
-  const [vidDetail,  setVidDetail]  = useState(null)
-  const [vidLoading, setVidLoading] = useState(false)
-
-  useEffect(() => {
-    fetch(`${API}/api/youtube/videos/${userId}`)
-      .then(r => r.json())
-      .then(d => { setVideos(d.videos || []); setLoading(false) })
-      .catch(e => { setError(e.message); setLoading(false) })
-  }, [userId])
-
-  const selectVideo = async (v) => {
-    setSelected(v)
-    setVidDetail(null)
-    setVidLoading(true)
-    try {
-      const r = await fetch(`${API}/api/youtube/video-detail/${userId}/${v.id}`)
-      const d = await r.json()
-      setVidDetail(d)
-    } catch {}
-    setVidLoading(false)
-  }
-
-  const updatePrivacy = async (videoId, newPrivacy, e) => {
-    e.stopPropagation()
-    setUpdatingId(videoId)
-    try {
-      const r = await fetch(`${API}/api/youtube/update-video`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, video_id: videoId, privacy: newPrivacy }),
-      })
-      const d = await r.json()
-      if (r.ok) {
-        setVideos(prev => prev.map(v => v.id === videoId ? { ...v, status: newPrivacy } : v))
-        if (selected?.id === videoId) setSelected(s => ({ ...s, status: newPrivacy }))
-        setUpdateMsg(m => ({ ...m, [videoId]: '✅' }))
-        setTimeout(() => setUpdateMsg(m => { const n={...m}; delete n[videoId]; return n }), 2000)
-      }
-    } catch {}
-    setUpdatingId(null)
-  }
-
-  if (loading) return <div style={{ color: '#4A6357', textAlign: 'center', padding: 48 }}>Loading videos...</div>
-  if (error)   return <div style={{ color: '#F87171', padding: 16, background: 'rgba(248,113,113,0.08)', borderRadius: 10 }}>Error: {error}</div>
-
-  const privacyColor = (s) => s === 'public' ? '#00E5A0' : s === 'private' ? '#F87171' : '#FBBF24'
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 1.4fr' : '1fr', gap: 16, alignItems: 'start' }}>
-      {/* Video list */}
-      <div style={card}>
-        <h3 style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: '#fff', margin: '0 0 16px' }}>
-          My Videos ({videos.length})
-          {selected && <button onClick={() => { setSelected(null); setVidDetail(null) }} style={{ float: 'right', fontSize: 11, background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, color: '#7A9E8E', padding: '3px 8px', cursor: 'pointer', fontFamily: 'inherit' }}>✕ Close</button>}
-        </h3>
-        {videos.length === 0 && <div style={{ textAlign: 'center', padding: '32px 0', color: '#4A6357' }}>No videos found</div>}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 600, overflowY: 'auto' }}>
-          {videos.map(v => (
-            <div key={v.id} onClick={() => selectVideo(v)}
-              style={{ display: 'flex', gap: 12, padding: 12, borderRadius: 12, background: selected?.id === v.id ? 'rgba(255,0,0,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${selected?.id === v.id ? 'rgba(255,0,0,0.3)' : 'rgba(0,229,160,0.06)'}`, cursor: 'pointer', transition: 'all .15s' }}
-              onMouseEnter={e => { if (selected?.id !== v.id) e.currentTarget.style.borderColor='rgba(255,0,0,0.2)' }}
-              onMouseLeave={e => { if (selected?.id !== v.id) e.currentTarget.style.borderColor='rgba(0,229,160,0.06)' }}>
-              {v.thumbnail && <img src={v.thumbnail} alt="" style={{ width: 112, height: 63, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 5 }}>{v.title}</div>
-                <div style={{ display: 'flex', gap: 10, fontSize: 11, color: '#7A9E8E', marginBottom: 7 }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}><Eye size={10} />{fmt(v.views)}</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}><ThumbsUp size={10} />{fmt(v.likes)}</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}><Clock size={10} />{timeAgo(v.published_at)}</span>
-                </div>
-                {/* Privacy buttons */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-                  {['public', 'private', 'unlisted'].map(p => (
-                    <button key={p} onClick={(e) => updatePrivacy(v.id, p, e)} disabled={updatingId === v.id || v.status === p}
-                      style={{ padding: '2px 8px', borderRadius: 100, fontSize: 10, fontWeight: 700, cursor: v.status === p ? 'default' : 'pointer', fontFamily: 'inherit', border: 'none',
-                        background: v.status === p ? (p==='public' ? 'rgba(0,229,160,0.15)' : p==='private' ? 'rgba(248,113,113,0.15)' : 'rgba(251,191,36,0.15)') : 'rgba(255,255,255,0.05)',
-                        color: v.status === p ? privacyColor(p) : '#4A6357' }}>
-                      {p==='public' ? '🌐' : p==='private' ? '🔒' : '🔗'} {p}
-                    </button>
-                  ))}
-                  {updateMsg[v.id] && <span style={{ fontSize: 10, color: '#00E5A0' }}>{updateMsg[v.id]}</span>}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Analytics panel */}
-      {selected && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={card}>
-            {vidLoading ? (
-              <div style={{ color: '#4A6357', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                <Loader size={14} style={{ animation: 'sp .7s linear infinite' }} /> Loading analytics...
-              </div>
-            ) : vidDetail ? (
-              <>
-                {/* Video header */}
-                <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-                  {vidDetail.thumbnail && <img src={vidDetail.thumbnail} alt="" style={{ width: 140, height: 80, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', lineHeight: 1.4, marginBottom: 6 }}>{vidDetail.title}</div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 100, fontWeight: 700,
-                        background: vidDetail.status==='public' ? 'rgba(0,229,160,0.12)' : vidDetail.status==='private' ? 'rgba(248,113,113,0.12)' : 'rgba(251,191,36,0.12)',
-                        color: privacyColor(vidDetail.status) }}>{vidDetail.status}</span>
-                      <span style={{ fontSize: 11, color: '#4A6357' }}>⏱ {vidDetail.duration}</span>
-                      <span style={{ fontSize: 11, color: '#4A6357' }}>{timeAgo(vidDetail.published_at)}</span>
-                    </div>
-                    {/* View on YouTube button */}
-                    <a href={vidDetail.url} target="_blank" rel="noopener"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: '#FF0000', borderRadius: 8, color: '#fff', textDecoration: 'none', fontSize: 12, fontWeight: 700 }}>
-                      <ArrowUpRight size={12} /> View on YouTube
-                    </a>
-                  </div>
-                </div>
-
-                {/* Stats */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 14 }}>
-                  {[
-                    { label: 'Views',    value: fmt(vidDetail.stats.views),    color: '#60A5FA', icon: <Eye size={14}/> },
-                    { label: 'Likes',    value: fmt(vidDetail.stats.likes),    color: '#F87171', icon: <ThumbsUp size={14}/> },
-                    { label: 'Comments', value: fmt(vidDetail.stats.comments), color: '#A78BFA', icon: <MessageCircle size={14}/> },
-                  ].map(s => (
-                    <div key={s.label} style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: 10, textAlign: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, color: s.color, marginBottom: 4 }}>{s.icon}</div>
-                      <div style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 20, fontWeight: 900, color: s.color }}>{s.value}</div>
-                      <div style={{ fontSize: 10, color: '#4A6357' }}>{s.label}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Description preview */}
-                {vidDetail.description && (
-                  <div style={{ marginBottom: 12 }}>
-                    <p style={{ fontSize: 11, fontWeight: 700, color: '#7A9E8E', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Description</p>
-                    <p style={{ fontSize: 12, color: '#7A9E8E', lineHeight: 1.6, maxHeight: 60, overflow: 'hidden' }}>{vidDetail.description.slice(0, 200)}{vidDetail.description.length > 200 ? '...' : ''}</p>
-                  </div>
-                )}
-
-                {/* Tags */}
-                {vidDetail.tags?.length > 0 && (
-                  <div>
-                    <p style={{ fontSize: 11, fontWeight: 700, color: '#7A9E8E', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Tags</p>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                      {vidDetail.tags.slice(0, 12).map(t => (
-                        <span key={t} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 100, background: 'rgba(0,229,160,0.06)', border: '1px solid rgba(0,229,160,0.1)', color: '#7A9E8E' }}>#{t}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div style={{ color: '#4A6357', fontSize: 13 }}>Could not load video details.</div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ANALYTICS TAB
-// ─────────────────────────────────────────────────────────────────────────────
-function AnalyticsTab({ userId }) {
-  const [data,    setData]    = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState(null)
-
-  useEffect(() => {
-    fetch(`${API}/api/youtube/analytics/${userId}`)
-      .then(r => r.json())
-      .then(d => { setData(d); setLoading(false) })
-      .catch(e => { setError(e.message); setLoading(false) })
-  }, [userId])
-
-  if (loading) return <div style={{ color: '#4A6357', textAlign: 'center', padding: 48 }}>Loading analytics...</div>
-  if (error)   return <div style={{ color: '#F87171', padding: 16, background: 'rgba(248,113,113,0.08)', borderRadius: 10 }}>Error: {error}</div>
-  if (!data)   return null
-
-  const { channel, recent_videos } = data
-  const stats = [
-    { label: 'Subscribers', value: fmt(channel.subscribers), icon: <Users size={17} />,      color: '#FF0000' },
-    { label: 'Total Views',  value: fmt(channel.total_views), icon: <Eye size={17} />,        color: '#60A5FA' },
-    { label: 'Videos',       value: fmt(channel.video_count), icon: <Play size={17} />,       color: '#A78BFA' },
-    { label: 'Country',      value: channel.country || '—',   icon: <BarChart2 size={17} />,  color: '#FBBF24' },
-  ]
-
-  return (
-    <div>
-      <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
-        <img src={channel.thumbnail} alt="" style={{ width: 52, height: 52, borderRadius: '50%', border: '2px solid #FF0000' }} />
-        <div>
-          <div style={{ fontWeight: 700, color: '#fff', fontSize: 16 }}>{channel.name}</div>
-          {channel.description && <div style={{ fontSize: 12, color: '#7A9E8E', marginTop: 3 }}>{channel.description.slice(0, 120)}</div>}
-        </div>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10, marginBottom: 16 }}>
-        {stats.map(s => (
-          <div key={s.label} style={statCard}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8, color: s.color }}>{s.icon}<span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: '#7A9E8E' }}>{s.label}</span></div>
-            <div style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 26, fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.value}</div>
-          </div>
-        ))}
-      </div>
-      <div style={card}>
-        <h3 style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: '#fff', margin: '0 0 14px' }}>Recent Videos Performance</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 10 }}>
-          {(recent_videos || []).map(v => (
-            <a key={v.id} href={v.url} target="_blank" rel="noopener"
-              style={{ textDecoration: 'none', borderRadius: 10, overflow: 'hidden', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,0,0,0.08)', display: 'block', transition: 'border-color .15s' }}
-              onMouseEnter={e => e.currentTarget.style.borderColor='rgba(255,0,0,0.3)'}
-              onMouseLeave={e => e.currentTarget.style.borderColor='rgba(255,0,0,0.08)'}>
-              {v.thumbnail && <img src={v.thumbnail} alt="" style={{ width: '100%', height: 90, objectFit: 'cover' }} />}
-              <div style={{ padding: '8px 10px' }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#D8EEE5', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title}</div>
-                <div style={{ display: 'flex', gap: 10, fontSize: 11, color: '#7A9E8E' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><Eye size={10} />{fmt(v.views)}</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><ThumbsUp size={10} />{fmt(v.likes)}</span>
-                </div>
-              </div>
-            </a>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// INBOX TAB — comments with full video detail panel
-// ─────────────────────────────────────────────────────────────────────────────
-function InboxTab({ userId }) {
-  const [data,       setData]       = useState(null)
-  const [loading,    setLoading]    = useState(true)
-  const [selected,   setSelected]   = useState(null)
-  const [reply,      setReply]      = useState('')
-  const [sending,    setSending]    = useState(false)
-  const [sent,       setSent]       = useState({})
-  const [videoDetail,setVideoDetail]= useState({})
-  const [loadingVid, setLoadingVid] = useState(null)
-  const [filter,     setFilter]     = useState('all') // all | responded | unresponded
-
-  useEffect(() => {
-    fetch(`${API}/api/youtube/comments/${userId}?max_results=50`)
-      .then(r => r.json())
-      .then(d => { setData(d); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [userId])
-
-  const selectComment = async (c) => {
-    setSelected(c); setReply('')
-    if (!videoDetail[c.video_id]) {
-      setLoadingVid(c.video_id)
-      try {
-        const r = await fetch(`${API}/api/youtube/video-detail/${userId}/${c.video_id}`)
-        const d = await r.json()
-        setVideoDetail(prev => ({ ...prev, [c.video_id]: d }))
-      } catch {}
-      setLoadingVid(null)
-    }
-  }
-
-  const sendReply = async (commentId) => {
-    if (!reply.trim()) return
-    setSending(true)
-    try {
-      const r = await fetch(`${API}/api/youtube/reply-comment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, comment_id: commentId, text: reply }),
-      })
-      if (r.ok) { setSent({ ...sent, [commentId]: true }); setReply('') }
-    } catch {}
-    setSending(false)
-  }
-
-  if (loading) return <div style={{ color: '#4A6357', textAlign: 'center', padding: 48 }}>Loading comments...</div>
-
-  const allComments = data?.comments || []
-  const responded   = allComments.filter(c => c.reply_count > 0 || sent[c.id])
-  const unresponded = allComments.filter(c => c.reply_count === 0 && !sent[c.id])
-  const displayed   = filter === 'all' ? allComments : filter === 'responded' ? responded : unresponded
-
-  const vd = selected ? videoDetail[selected.video_id] : null
-
-  const filterBtn = (key, label, count, color) => (
-    <button onClick={() => setFilter(key)}
-      style={{ padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: 'none',
-        background: filter === key ? `rgba(${color},0.15)` : 'rgba(255,255,255,0.04)',
-        color: filter === key ? `rgb(${color})` : '#4A6357' }}>
-      {label} <span style={{ fontSize: 10, opacity: .7 }}>({count})</span>
-    </button>
-  )
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 16, alignItems: 'start' }}>
-      {/* Comment list */}
-      <div style={card}>
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <h3 style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 15, fontWeight: 700, color: '#fff', margin: 0 }}>Comments</h3>
-            <span style={{ fontSize: 11, color: '#7A9E8E' }}>{allComments.length} total</span>
-          </div>
-          {/* Filter buttons */}
-          <div style={{ display: 'flex', gap: 6 }}>
-            {filterBtn('all',         'All',          allComments.length, '157,180,176')}
-            {filterBtn('unresponded', '🔴 Pending',   unresponded.length, '248,113,113')}
-            {filterBtn('responded',   '✅ Responded', responded.length,   '0,229,160')}
-          </div>
-        </div>
-
-        <div style={{ maxHeight: 560, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {displayed.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '32px 0', color: '#4A6357', fontSize: 13 }}>
-              <MessageCircle size={28} style={{ display: 'block', margin: '0 auto 10px', opacity: .4 }} />
-              No {filter !== 'all' ? filter : ''} comments
-            </div>
-          )}
-          {displayed.map(c => (
-            <div key={c.id} onClick={() => selectComment(c)}
-              style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
-                background: selected?.id === c.id ? 'rgba(255,0,0,0.08)' : 'transparent',
-                border: selected?.id === c.id ? '1px solid rgba(255,0,0,0.25)' : '1px solid transparent',
-                transition: 'all .15s' }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {c.author_pic && <img src={c.author_pic} alt="" style={{ width: 26, height: 26, borderRadius: '50%', flexShrink: 0 }} />}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{c.author}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {(c.reply_count > 0 || sent[c.id])
-                        ? <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 100, background: 'rgba(0,229,160,0.1)', color: '#00E5A0', fontWeight: 700 }}>✓ replied</span>
-                        : <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 100, background: 'rgba(248,113,113,0.1)', color: '#F87171', fontWeight: 700 }}>pending</span>}
-                      <span style={{ fontSize: 10, color: '#4A6357' }}>{timeAgo(c.published_at)}</span>
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 12, color: '#7A9E8E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.text}</div>
-                  {c.likes > 0 && <div style={{ fontSize: 10, color: '#4A6357', marginTop: 2 }}>👍 {c.likes} likes</div>}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Right panel */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {!selected ? (
-          <div style={{ ...card, textAlign: 'center', padding: '48px 20px', color: '#4A6357' }}>
-            <MessageCircle size={34} style={{ display: 'block', margin: '0 auto 14px', opacity: .3 }} />
-            Select a comment to view video details and reply
-          </div>
-        ) : (
-          <>
-            {/* Video detail */}
             <div style={card}>
-              {loadingVid === selected.video_id ? (
-                <div style={{ color: '#4A6357', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Loader size={14} style={{ animation: 'sp .7s linear infinite' }} /> Loading video...
+              {!selComment ? (
+                <div style={{ textAlign:'center', padding:'48px 0', color:T.textMuted }}>
+                  <div style={{ fontSize:36, marginBottom:10 }}>💬</div>
+                  Select a comment to reply
                 </div>
-              ) : vd ? (
+              ) : (
                 <>
-                  <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
-                    {vd.thumbnail && <img src={vd.thumbnail} alt="" style={{ width: 130, height: 74, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.4, marginBottom: 6 }}>{vd.title}</div>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                        <span style={{ fontSize: 10, color: '#4A6357' }}>⏱ {vd.duration}</span>
-                        <span style={{ fontSize: 10, color: '#4A6357' }}>{timeAgo(vd.published_at)}</span>
-                      </div>
-                      <a href={vd.url} target="_blank" rel="noopener"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: '#FF0000', borderRadius: 7, color: '#fff', textDecoration: 'none', fontSize: 11, fontWeight: 700 }}>
-                        <ArrowUpRight size={11} /> View on YouTube
-                      </a>
-                    </div>
+                  <div style={{ background:T.cardAlt, border:`1px solid ${T.border}`, borderRadius:10, padding:'12px 14px', marginBottom:14 }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:T.yt, marginBottom:6 }}>@{selComment.from||selComment.author}</div>
+                    <div style={{ fontSize:14, color:T.textSub, lineHeight:1.65 }}>{selComment.text}</div>
+                    {selComment.post_title && <div style={{ fontSize:11, color:T.textMuted, marginTop:6 }}>📹 {selComment.post_title}</div>}
                   </div>
-                  {/* Stats */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-                    {[
-                      { label: 'Views',    value: fmt(vd.stats.views),    color: '#60A5FA', icon: <Eye size={13}/> },
-                      { label: 'Likes',    value: fmt(vd.stats.likes),    color: '#F87171', icon: <ThumbsUp size={13}/> },
-                      { label: 'Comments', value: fmt(vd.stats.comments), color: '#A78BFA', icon: <MessageCircle size={13}/> },
-                    ].map(s => (
-                      <div key={s.label} style={{ padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: 10, textAlign: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, color: s.color, marginBottom: 3 }}>{s.icon}</div>
-                        <div style={{ fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: 18, fontWeight: 900, color: s.color }}>{s.value}</div>
-                        <div style={{ fontSize: 10, color: '#4A6357' }}>{s.label}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {/* Tags */}
-                  {vd.tags?.length > 0 && (
-                    <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                      {vd.tags.slice(0, 8).map(t => (
-                        <span key={t} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 100, background: 'rgba(0,229,160,0.06)', border: '1px solid rgba(0,229,160,0.1)', color: '#7A9E8E' }}>#{t}</span>
-                      ))}
+                  {replySent[selComment.id] ? (
+                    <div style={{ display:'flex', alignItems:'center', gap:8, color:T.success, fontSize:13, fontWeight:600 }}>
+                      <span>✅</span> Reply sent!
                     </div>
+                  ) : (
+                    <>
+                      <label style={lbl}>Your Reply</label>
+                      <textarea style={{ ...ta, minHeight:80, marginBottom:10 }}
+                        value={replyText[selComment.id]||''}
+                        onChange={e=>setReplyText(p=>({...p,[selComment.id]:e.target.value}))}
+                        placeholder="Write your reply..."
+                        onFocus={e=>e.target.style.borderColor=T.yt+'60'}
+                        onBlur={e=>e.target.style.borderColor=T.inputBorder}/>
+                      <button onClick={()=>sendReply(selComment.id)}
+                        style={{ width:'100%', padding:'11px', background:T.yt, color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+                        ▶ Send Reply
+                      </button>
+                    </>
                   )}
                 </>
-              ) : (
-                <a href={`https://youtube.com/watch?v=${selected.video_id}`} target="_blank" rel="noopener"
-                  style={{ fontSize: 13, color: '#60A5FA', textDecoration: 'none' }}>View video on YouTube →</a>
               )}
             </div>
-
-            {/* Comment + Reply */}
-            <div style={card}>
-              <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-                {selected.author_pic && <img src={selected.author_pic} alt="" style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0 }} />}
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{selected.author}</div>
-                  <div style={{ fontSize: 11, color: '#4A6357' }}>{timeAgo(selected.published_at)} · 👍 {selected.likes}</div>
-                </div>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(0,229,160,0.08)', borderRadius: 10, padding: '12px 14px', fontSize: 14, color: '#D8EEE5', lineHeight: 1.65, marginBottom: 12 }}>
-                {selected.text}
-              </div>
-
-              {/* Existing replies */}
-              {selected.replies?.length > 0 && (
-                <div style={{ marginBottom: 12 }}>
-                  <p style={{ fontSize: 11, color: '#4A6357', marginBottom: 8, fontWeight: 700 }}>REPLIES ({selected.replies.length})</p>
-                  {selected.replies.map((r, i) => (
-                    <div key={i} style={{ display: 'flex', gap: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', marginBottom: 4 }}>
-                      {r.author_pic && <img src={r.author_pic} alt="" style={{ width: 20, height: 20, borderRadius: '50%', flexShrink: 0 }} />}
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: '#9DC4B0' }}>{r.author}</div>
-                        <div style={{ fontSize: 12, color: '#7A9E8E', lineHeight: 1.5 }}>{r.text}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Reply box */}
-              {sent[selected.id] ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#00E5A0', fontSize: 13 }}>
-                  <CheckCircle size={15} /> Reply sent!
-                </div>
-              ) : (
-                <>
-                  <label style={lbl}>Your Reply</label>
-                  <textarea style={{ ...ta, minHeight: 72, marginBottom: 10 }}
-                    value={reply} onChange={e => setReply(e.target.value)}
-                    placeholder="Write your reply..."
-                    onFocus={e => e.target.style.borderColor='rgba(255,0,0,0.4)'}
-                    onBlur={e => e.target.style.borderColor='rgba(0,229,160,0.12)'} />
-                  <button style={redBtn(sending)} onClick={() => sendReply(selected.id)} disabled={sending}>
-                    {sending ? 'Sending...' : <><Send size={14} /> Send Reply</>}
-                  </button>
-                </>
-              )}
-            </div>
-          </>
+          </div>
         )}
       </div>
     </div>
   )
-} 
+}
