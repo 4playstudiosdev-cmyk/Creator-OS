@@ -132,10 +132,16 @@ export default function SchedulerPage() {
   const loadCalendarPosts = async (uid) => {
     setCalLoading(true)
     try {
-      const { data } = await supabase.from('scheduled_posts').select('*')
-        .eq('user_id', uid).order('scheduled_for', { ascending: true })
+      // Only load last 3 months + next 3 months for performance
+      const from = new Date(); from.setMonth(from.getMonth() - 1)
+      const to   = new Date(); to.setMonth(to.getMonth() + 3)
+      const { data } = await supabase.from('scheduled_posts')
+        .select('id, platforms, platform, content, caption, title, status, scheduled_for, scheduled_at, content_type, media_url')
+        .eq('user_id', uid)
+        .order('scheduled_for', { ascending: true })
+        .limit(200)
       setCalPosts(data || [])
-    } catch {}
+    } catch (e) { console.error('[Calendar] Load error:', e) }
     setCalLoading(false)
   }
 
@@ -159,8 +165,6 @@ export default function SchedulerPage() {
       return new Date(`${schedDate} ${time}`).toISOString()
     } catch { return null }
   }
-
-  let uploadedUrl = null  // track across function calls
 
   const saveToSupabase = async (status, scheduledFor = null, mediaUrl = null) => {
     if (!userId) return
@@ -215,19 +219,26 @@ export default function SchedulerPage() {
           form.append('description', caption)
           form.append('privacy', privacy)
           if (file) form.append('file', file)
-          r = await fetch(`${API}/api/youtube/upload`, { method: 'POST', body: form })
+          r = await fetch(`${API}/api/youtube/upload-video`, { method: 'POST', body: form })
           d = await r.json()
 
         } else if (selPlatform === 'instagram') {
-          if (!uploadedUrl) { setPostError('Select an image/video first.'); setPosting(false); return }
+          if (!uploadedUrl) {
+            setPostError('Instagram requires an image. Please select an image file first.')
+            setPosting(false); return
+          }
+          console.log('[Scheduler] Instagram post with image:', uploadedUrl)
           r = await fetch(`${API}/api/instagram/${selType === 'story' ? 'story' : 'post'}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: userId, caption, image_url: uploadedUrl }),
           })
           d = await r.json()
+          console.log('[Scheduler] Instagram response:', JSON.stringify(d).slice(0,200))
 
         } else if (selPlatform === 'linkedin') {
-          const body = { user_id: userId, text: caption, visibility: privacy.toUpperCase() }
+          // LinkedIn only accepts PUBLIC or CONNECTIONS
+          const linkedinVis = privacy === 'PUBLIC_TO_EVERYONE' ? 'PUBLIC' : privacy === 'public' ? 'PUBLIC' : 'CONNECTIONS'
+          const body = { user_id: userId, text: caption, visibility: linkedinVis }
           if (uploadedUrl && selType === 'video') {
             body.video_url = uploadedUrl
             r = await fetch(`${API}/api/linkedin/post-video`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -453,7 +464,7 @@ export default function SchedulerPage() {
               )}
 
               {/* Privacy */}
-              {(selPlatform==='youtube'||selPlatform==='tiktok') && (
+              {(selPlatform==='youtube'||selPlatform==='tiktok'||selPlatform==='linkedin') && (
                 <div style={card}>
                   <label style={lbl}>Privacy</label>
                   <div style={{ display:'flex', gap:8 }}>
@@ -464,10 +475,16 @@ export default function SchedulerPage() {
                             {v==='public'?'🌍':v==='private'?'🔒':'🔗'} {v}
                           </div>
                         ))
-                      : ['SELF_ONLY','PUBLIC_TO_EVERYONE'].map(v=>(
+                      : (selPlatform==='linkedin' ? [
+                          { v:'PUBLIC', l:'🌍 Public' },
+                          { v:'CONNECTIONS', l:'🔗 Connections' }
+                        ] : [
+                          { v:'SELF_ONLY', l:'🔒 Only Me' },
+                          { v:'PUBLIC_TO_EVERYONE', l:'🌍 Everyone' }
+                        ]).map(({ v, l }) => (
                           <div key={v} onClick={()=>setPrivacy(v)}
                             style={{ flex:1, padding:'8px', borderRadius:9, cursor:'pointer', textAlign:'center', fontSize:12, fontWeight:600, border:`1.5px solid ${privacy===v?platColor+'60':T.border}`, background:privacy===v?`${platColor}12`:T.cardAlt, color:privacy===v?T.text:T.textMuted }}>
-                            {v==='SELF_ONLY'?'🔒 Only Me':'🌍 Everyone'}
+                            {l}
                           </div>
                         ))}
                   </div>
