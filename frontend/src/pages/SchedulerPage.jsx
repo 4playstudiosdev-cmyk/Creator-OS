@@ -163,16 +163,16 @@ export default function SchedulerPage() {
   const saveToSupabase = async (status, scheduledFor = null) => {
     if (!userId) return
     const { error } = await supabase.from('scheduled_posts').insert({
-      user_id:       userId,
-      platforms:     [selPlatform],
-      content_type:  selType,
-      content:       caption,
-      caption:       caption,
-      status:        status,
+      user_id:      userId,
+      platforms:    [selPlatform],
+      content:      caption,
+      caption:      caption,
+      status:       status,
       scheduled_for: scheduledFor,
-      privacy:       privacy,
-      created_at:    new Date().toISOString(),
+      privacy:      privacy,
+      created_at:   new Date().toISOString(),
     })
+    if (error) console.error('[Scheduler] Save error:', error)
     if (!error) loadCalendarPosts(userId)
   }
 
@@ -284,12 +284,16 @@ export default function SchedulerPage() {
   }
 
   const getPostsForDay = (day) => {
-    const d = new Date(calDate.getFullYear(), calDate.getMonth(), day)
-    return calPosts.filter(p => {
-      if (!p.scheduled_for) return false
-      const pd = new Date(p.scheduled_for)
-      return pd.getDate()===d.getDate() && pd.getMonth()===d.getMonth() && pd.getFullYear()===d.getFullYear()
-    })
+    try {
+      const d = new Date(calDate.getFullYear(), calDate.getMonth(), day)
+      return calPosts.filter(p => {
+        if (!p.scheduled_for && !p.scheduled_at) return false
+        try {
+          const pd = new Date(p.scheduled_for || p.scheduled_at)
+          return pd.getDate()===d.getDate() && pd.getMonth()===d.getMonth() && pd.getFullYear()===d.getFullYear()
+        } catch { return false }
+      })
+    } catch { return [] }
   }
 
   const today = new Date()

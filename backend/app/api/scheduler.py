@@ -1,61 +1,101 @@
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from datetime import datetime, timezone
-import httpx
-import os
-from supabase import create_client
-import tweepy
+# backend/app/api/scheduler.py
+# Nexora OS — Background Post Scheduler
+# Runs every minute, checks for posts due to publish
 
-TWITTER_API_KEY = os.getenv("TWITTER_API_KEY")
-TWITTER_API_SECRET = os.getenv("TWITTER_API_SECRET")
-TWITTER_ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
-TWITTER_ACCESS_TOKEN_SECRET = os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+import os
+import asyncio
+import httpx
+from datetime import datetime, timezone
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from supabase import create_client
+
+SUPABASE_URL     = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY     = os.environ.get("SUPABASE_SERVICE_KEY", "")
+API_BASE         = "http://localhost:8080"  # internal
 
 scheduler = AsyncIOScheduler()
 
-async def post_to_twitter(content: str, access_token: str):
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            "https://api.twitter.com/2/tweets",
-            json={"text": content},
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
-    return resp.status_code in [200, 201]
+def get_sb():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-async def post_to_linkedin(content: str, access_token: str, person_id: str):
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            "https://api.linkedin.com/v2/ugcPosts",
-            json={
-                "author": f"urn:li:person:{person_id}",
-                "lifecycleState": "PUBLISHED",
-                "specificContent": {
-                    "com.linkedin.ugc.ShareContent": {
-                        "shareCommentary": {"text": content},
-                        "shareMediaCategory": "NONE",
-                    }
-                },
-                "visibility": {
-                    "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
-                },
-            },
-            headers={
-                "Authorization": f"Bearer {access_token}",
-                "Content-Type": "application/json",
-            },
-        )
-    return resp.status_code in [200, 201]
+async def publish_post(post: dict, sb) -> bool:
+    """Try to publish a scheduled post to its platforms."""
+    uid      = post.get("user_id")
+    content  = post.get("content") or post.get("caption") or ""
+    platforms_raw = post.get("platforms") or []
 
-async def check_and_publish_posts():
+    # Handle platforms field — could be array or string
+    if isinstance(platforms_raw, str):
+        platforms = [platforms_raw]
+    elif isinstance(platforms_raw, list):
+        platforms = [p for p in platforms_raw if p]
+    else:
+        platforms = []
+
+    if not platforms:
+        print(f"[Scheduler] Post {post['id']} → skipping (no platforms set)")
+        return False
+
+    if not content:
+        print(f"[Scheduler] Post {post['id']} → skipping (no content)")
+        return False
+
+    print(f"[Scheduler] Publishing post {post['id'][:8]} to {platforms}")
+    success = False
+
+    async with httpx.AsyncClient(timeout=30) as c:
+        for platform in platforms:
+            try:
+                if platform == "instagram":
+                    # Need image_url for Instagram — skip if no media
+                    if not post.get("media_url"):
+                        print(f"[Scheduler] Instagram needs image — skipping")
+                        continue
+                    r = await c.post(f"{API_BASE}/api/instagram/post", json={
+                        "user_id":   uid,
+                        "caption":   content,
+                        "image_url": post.get("media_url"),
+                    })
+                    success = r.status_code == 200
+
+                elif platform == "linkedin":
+                    r = await c.post(f"{API_BASE}/api/linkedin/post", json={
+                        "user_id":    uid,
+                        "text":       content,
+                        "visibility": post.get("privacy", "PUBLIC").upper(),
+                    })
+                    success = r.status_code == 200
+
+                elif platform == "youtube":
+                    print(f"[Scheduler] YouTube requires manual upload — skipping auto-post")
+                    success = True  # Mark as processed
+
+                elif platform == "tiktok":
+                    print(f"[Scheduler] TikTok requires video file — skipping auto-post")
+                    success = True
+
+                else:
+                    print(f"[Scheduler] Platform {platform} not supported for auto-post")
+                    continue
+
+                print(f"[Scheduler] {platform} → {'✅' if success else '❌'}")
+
+            except Exception as e:
+                print(f"[Scheduler] {platform} error: {e}")
+
+    return success
+
+
+async def check_and_publish():
+    """Main scheduler job — runs every minute."""
     try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        sb = get_sb()
         now = datetime.now(timezone.utc).isoformat()
 
-        result = supabase.from_("scheduled_posts") \
+        # Find posts due to publish
+        result = sb.table("scheduled_posts") \
             .select("*") \
             .eq("status", "scheduled") \
-            .eq("post_now", False) \
             .lte("scheduled_for", now) \
             .execute()
 
@@ -63,64 +103,28 @@ async def check_and_publish_posts():
         print(f"[Scheduler] Checking posts... Found {len(posts)} ready to publish")
 
         for post in posts:
-            platforms = post.get("platforms", [])
-            content = post.get("content", "")
-            user_id = post.get("user_id")
-            post_id = post.get("id")
+            try:
+                success = await publish_post(post, sb)
 
-            # User tokens fetch karo
-            tokens_result = supabase.from_("social_tokens") \
-                .select("*") \
-                .eq("user_id", user_id) \
-                .execute()
+                # Update status
+                new_status = "published" if success else "failed"
+                sb.table("scheduled_posts").update({
+                    "status":       new_status,
+                    "published_at": now,
+                }).eq("id", post["id"]).execute()
 
-            tokens = {t["platform"]: t for t in (tokens_result.data or [])}
+                print(f"[Scheduler] Post {post['id'][:8]} → {new_status}")
 
-            # Agar koi token nahi to skip karo
-            if not tokens:
-                print(f"[Scheduler] Post {post_id} — No tokens found, skipping!")
-                supabase.from_("scheduled_posts") \
-                    .update({"status": "draft"}) \
-                    .eq("id", post_id) \
-                    .execute()
-                continue
-
-            success_platforms = []
-            failed_platforms = []
-
-            if "Twitter" in platforms and "twitter" in tokens:
-                token = tokens["twitter"]["access_token"]
-                ok = await post_to_twitter(content, token)
-                if ok:
-                    success_platforms.append("Twitter")
-                else:
-                    failed_platforms.append("Twitter")
-
-            if "LinkedIn" in platforms and "linkedin" in tokens:
-                token = tokens["linkedin"]["access_token"]
-                person_id = tokens["linkedin"].get("person_id", "")
-                ok = await post_to_linkedin(content, token, person_id)
-                if ok:
-                    success_platforms.append("LinkedIn")
-                else:
-                    failed_platforms.append("LinkedIn")
-
-            new_status = "published" if success_platforms else "failed"
-            supabase.from_("scheduled_posts") \
-                .update({
-                    "status": new_status,
-                    "published_at": datetime.now(timezone.utc).isoformat(),
-                    "published_platforms": success_platforms,
-                }) \
-                .eq("id", post_id) \
-                .execute()
-
-            print(f"[Scheduler] Post {post_id} → {new_status} | Platforms: {success_platforms}")
+            except Exception as e:
+                print(f"[Scheduler] Post {post['id'][:8]} error: {e}")
+                sb.table("scheduled_posts").update({ "status": "failed" }).eq("id", post["id"]).execute()
 
     except Exception as e:
-        print(f"[Scheduler] Error: {e}")
+        print(f"[Scheduler] Job error: {e}")
+
 
 def start_scheduler():
-    scheduler.add_job(check_and_publish_posts, "interval", minutes=1)
+    """Start the background scheduler."""
+    scheduler.add_job(check_and_publish, "interval", minutes=1, id="post_scheduler", replace_existing=True)
     scheduler.start()
     print("[Scheduler] Started — checking every minute!")
