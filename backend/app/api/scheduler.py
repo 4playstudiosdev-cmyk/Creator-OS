@@ -47,16 +47,22 @@ async def publish_post(post: dict, sb) -> bool:
         for platform in platforms:
             try:
                 if platform == "instagram":
-                    # Need image_url for Instagram — skip if no media
-                    if not post.get("media_url"):
-                        print(f"[Scheduler] Instagram needs image — skipping")
+                    media_url = post.get("media_url")
+                    if not media_url:
+                        print(f"[Scheduler] Instagram post {post['id'][:8]} — no media_url, marking needs_media")
+                        sb.table("scheduled_posts").update({"status":"needs_media"}).eq("id",post["id"]).execute()
                         continue
+
+                    # Try image post
+                    print(f"[Scheduler] Instagram posting with image: {media_url[:60]}")
                     r = await c.post(f"{API_BASE}/api/instagram/post", json={
                         "user_id":   uid,
                         "caption":   content,
-                        "image_url": post.get("media_url"),
+                        "image_url": media_url,
                     })
-                    success = r.status_code == 200
+                    resp_text = r.text[:200]
+                    print(f"[Scheduler] Instagram response: {r.status_code} — {resp_text}")
+                    success = r.status_code in [200, 201]
 
                 elif platform == "linkedin":
                     r = await c.post(f"{API_BASE}/api/linkedin/post", json={

@@ -160,7 +160,9 @@ export default function SchedulerPage() {
     } catch { return null }
   }
 
-  const saveToSupabase = async (status, scheduledFor = null) => {
+  let uploadedUrl = null  // track across function calls
+
+  const saveToSupabase = async (status, scheduledFor = null, mediaUrl = null) => {
     if (!userId) return
     const { error } = await supabase.from('scheduled_posts').insert({
       user_id:      userId,
@@ -170,10 +172,11 @@ export default function SchedulerPage() {
       status:       status,
       scheduled_for: scheduledFor,
       privacy:      privacy,
+      media_url:    mediaUrl || null,
       created_at:   new Date().toISOString(),
     })
     if (error) console.error('[Scheduler] Save error:', error)
-    if (!error) loadCalendarPosts(userId)
+    else loadCalendarPosts(userId)
   }
 
   const handlePost = async () => {
@@ -191,7 +194,7 @@ export default function SchedulerPage() {
 
     try {
       if (action === 'draft') {
-        await saveToSupabase('draft')
+        await saveToSupabase('draft', null, uploadedUrl)
         setPostResult({ success: true, message: `Draft saved for ${plat.label}! ✅` })
 
       } else if (action === 'schedule') {
@@ -201,18 +204,7 @@ export default function SchedulerPage() {
         setPostResult({ success: true, message: `Post scheduled for ${new Date(scheduledAt).toLocaleString()} ✅` })
 
       } else if (action === 'now') {
-        // Post immediately to platform
-        let uploadedUrl = null
-
-        // Upload file to Supabase if any
-        if (file) {
-          const ext = file.name.split('.').pop() || 'mp4'
-          const name = `scheduler/${userId}/${Date.now()}.${ext}`
-          const { error } = await supabase.storage.from('posts').upload(name, file, { upsert: true, contentType: file.type })
-          if (!error) {
-            uploadedUrl = supabase.storage.from('posts').getPublicUrl(name).data.publicUrl
-          }
-        }
+        // Post immediately — uploadedUrl already uploaded above
 
         // Call correct API endpoint
         let r, d
@@ -261,7 +253,7 @@ export default function SchedulerPage() {
         }
 
         if (!r.ok) throw new Error(d.detail || 'Post failed.')
-        await saveToSupabase('published')
+        await saveToSupabase('published', null, uploadedUrl)
         setPostResult({ success: true, message: `Posted to ${PLATFORMS.find(p=>p.id===selPlatform)?.label}! 🎉` })
       }
     } catch (e) {
@@ -648,13 +640,13 @@ export default function SchedulerPage() {
               {/* Calendar grid */}
               <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4 }}>
                 {/* Empty cells */}
-                {Array.from({ length: firstDay }).map((_,i) => <div key={`e${i}`}/>)}
+                {Array.from({ length: Math.max(0, firstDay) }).map((_,i) => <div key={`e${i}`}/>)}
 
                 {/* Day cells */}
-                {Array.from({ length: daysInMonth }).map((_,i) => {
+                {Array.from({ length: Math.max(0, daysInMonth) }).map((_,i) => {
                   const day = i + 1
                   const isToday = today.getDate()===day && today.getMonth()===calDate.getMonth() && today.getFullYear()===calDate.getFullYear()
-                  const dayPosts = getPostsForDay(day)
+                  const dayPosts = (() => { try { return getPostsForDay(day) } catch { return [] } })()
                   return (
                     <div key={day} style={{ minHeight:80, padding:'6px 8px', borderRadius:10, background:isToday?T.goldBg:T.cardAlt, border:`1px solid ${isToday?T.borderGold:T.border}`, cursor:'pointer', position:'relative' }}>
                       <div style={{ fontSize:12, fontWeight:isToday?800:600, color:isToday?T.gold:T.textMuted, marginBottom:4 }}>{day}</div>

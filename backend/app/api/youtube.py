@@ -391,9 +391,15 @@ async def upload_video(
 
     suffix = os.path.splitext(file.filename or "video.mp4")[1] or ".mp4"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        content  = await file.read()
-        tmp.write(content)
         tmp_path = tmp.name
+        # Chunked read for large videos
+        chunk_size = 4 * 1024 * 1024  # 4MB chunks
+        while True:
+            chunk = await file.read(chunk_size)
+            if not chunk:
+                break
+            tmp.write(chunk)
+    print(f"[YT Upload] Saved to {tmp_path}, size: {os.path.getsize(tmp_path)/1024/1024:.1f}MB")
 
     actual_privacy = "private" if privacy == "scheduled" else privacy
     body = {
@@ -426,13 +432,18 @@ async def upload_video(
             print(f"[YT Upload] Timezone conversion failed: {e} — using raw value")
             body["status"]["publishAt"] = scheduled_at
 
-    media = MediaFileUpload(tmp_path, chunksize=-1, resumable=True)
+    chunk_mb = 50  # 50MB chunks for resumable upload
+    media = MediaFileUpload(tmp_path, chunksize=chunk_mb * 1024 * 1024, resumable=True)
 
     try:
         request  = yt.videos().insert(part="snippet,status", body=body, media_body=media)
         response = None
+        attempt  = 0
         while response is None:
-            _, response = request.next_chunk()
+            attempt += 1
+            status, response = request.next_chunk()
+            if status:
+                print(f"[YT Upload] Progress: {int(status.progress() * 100)}%")
 
         video_id = response["id"]
         os.unlink(tmp_path)
@@ -442,12 +453,14 @@ async def upload_video(
                 "user_id":      user_id,
                 "title":        title,
                 "content":      description,
-                "platform":     "youtube",
-                "scheduled_at": scheduled_at or datetime.now(timezone.utc).isoformat(),
-                "status":       "published" if privacy == "public" else privacy,
+                "caption":      title,
+                "platforms":    ["youtube"],
+                "status":       "published",
+                "privacy":      privacy,
+                "created_at":   datetime.now(timezone.utc).isoformat(),
             }).execute()
-        except Exception:
-            pass
+        except Exception as db_err:
+            print(f"[YT Upload] DB save error (non-critical): {db_err}")
 
         return {
             "success":  True,
