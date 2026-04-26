@@ -150,7 +150,7 @@ export default function Dashboard() {
     // Scheduled posts
     try {
       const { data } = await supabase.from('scheduled_posts').select('*').eq('user_id',uid)
-        .gte('scheduled_at',new Date().toISOString()).order('scheduled_at',{ascending:true}).limit(5)
+        .gte('scheduled_for',new Date().toISOString()).order('scheduled_for',{ascending:true}).limit(5)
       setScheduled(data||[])
 
       const startMonth = new Date(); startMonth.setDate(1); startMonth.setHours(0,0,0,0)
@@ -305,16 +305,16 @@ export default function Dashboard() {
                 </button>
               </div>
             ) : scheduled.map(post => {
-              const platColor = PLATFORMS.find(p=>p.id===post.platform)?.color || T.gold
+              const platColor = PLATFORMS.find(p=>p.id===(Array.isArray(post.platforms)?post.platforms[0]:post.platform))?.color || T.gold
               return (
                 <div key={post.id} style={{ display:'flex',gap:10,padding:'10px 12px',borderRadius:10,background:T.cardAlt,border:`1px solid ${T.border}`,marginBottom:8 }}>
                   <div style={{ width:8,height:8,borderRadius:'50%',background:platColor,flexShrink:0,marginTop:4 }}/>
                   <div style={{ flex:1,minWidth:0 }}>
                     <div style={{ fontSize:12,fontWeight:600,color:T.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>
-                      {post.caption||post.title||'Scheduled post'}
+                      {post.caption||post.content||post.title||'Scheduled post'}
                     </div>
                     <div style={{ fontSize:11,color:T.textMuted,marginTop:2 }}>
-                      {post.platform} · {new Date(post.scheduled_at).toLocaleDateString('en',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+                      {(Array.isArray(post.platforms)?post.platforms[0]:post.platform)} · {new Date(post.scheduled_for).toLocaleDateString('en',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
                     </div>
                   </div>
                   <span style={{ fontSize:9,padding:'2px 7px',borderRadius:100,background:T.goldBg,color:T.gold,fontWeight:700,alignSelf:'flex-start' }}>Scheduled</span>
