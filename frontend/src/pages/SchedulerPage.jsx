@@ -217,23 +217,52 @@ export default function SchedulerPage() {
     setPosting(true); setPostError(''); setPostResult(null)
 
     try {
-      // ── STEP 1: Upload file to Supabase (always — for all actions) ──────
+      // ── STEP 1: Upload file ──────────────────────────────────────────────
       let uploadedUrl = null
-      if (file) {
-        const ext  = (file.name || 'file').split('.').pop().toLowerCase() || 'mp4'
-        const path = `scheduler/${userId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-        const { error: upErr } = await supabase.storage
-          .from('posts')
-          .upload(path, file, { upsert: true, contentType: file.type })
 
-        if (upErr) {
-          console.error('[Scheduler] Storage upload error:', upErr)
-          setPostError(`File upload failed: ${upErr.message}`)
-          setPosting(false); return
+      if (file) {
+        const fileSizeMB = file.size / 1024 / 1024
+
+        if (selPlatform === 'youtube') {
+          // YouTube: upload to Railway backend (handles large videos, 50MB+ ok)
+          const form = new FormData()
+          form.append('user_id', userId)
+          form.append('file', file)
+          const r = await fetch(`${API}/api/youtube/store-video`, { method:'POST', body:form })
+          const d = await r.json()
+          if (!r.ok) {
+            setPostError(d.detail || 'Video upload failed.')
+            setPosting(false); return
+          }
+          uploadedUrl = d.file_url  // Railway-stored URL for scheduler
+          console.log('[YouTube] Video stored on server:', uploadedUrl)
+
+        } else {
+          // Other platforms: upload to Supabase (images/small files)
+          if (fileSizeMB > 50) {
+            setPostError(`File too large (${fileSizeMB.toFixed(0)}MB). Max 50MB for images.`)
+            setPosting(false); return
+          }
+
+          // Compress images
+          let uploadFile = file
+          if (file.type.startsWith('image/') && file.size > 3 * 1024 * 1024) {
+            uploadFile = await compressImage(file, 1920, 0.85)
+            console.log('[Scheduler] Compressed to:', (uploadFile.size/1024/1024).toFixed(1)+'MB')
+          }
+
+          const ext  = (file.name || 'file').split('.').pop().toLowerCase() || 'jpg'
+          const path = `scheduler/${userId}/${Date.now()}.${ext}`
+          const { error: upErr } = await supabase.storage
+            .from('posts').upload(path, uploadFile, { upsert:true, contentType:file.type })
+
+          if (upErr) {
+            setPostError(`Upload failed: ${upErr.message}`)
+            setPosting(false); return
+          }
+          uploadedUrl = supabase.storage.from('posts').getPublicUrl(path).data?.publicUrl || null
+          console.log('[Scheduler] Uploaded to Supabase:', uploadedUrl)
         }
-        const { data: urlData } = supabase.storage.from('posts').getPublicUrl(path)
-        uploadedUrl = urlData?.publicUrl || null
-        console.log('[Scheduler] File uploaded to Supabase:', uploadedUrl)
       }
 
       // ── STEP 2: Action ───────────────────────────────────────────────────

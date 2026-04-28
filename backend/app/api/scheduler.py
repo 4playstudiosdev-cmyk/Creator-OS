@@ -90,13 +90,31 @@ async def publish_post(post: dict, sb) -> bool:
                     success = r.status_code in [200, 201]
 
                 elif platform == "youtube":
-                    # YouTube videos uploaded via UI are already published
-                    # Only skip if status is already published
-                    if post.get("status") == "published":
-                        print(f"[Scheduler] YouTube post {post['id'][:8]} already published — skipping")
-                        success = True
+                    media_url = post.get("media_url") or ""
+                    
+                    if media_url.startswith("local://"):
+                        # Video stored on server — upload to YouTube
+                        file_path = media_url.replace("local://", "")
+                        print(f"[Scheduler] YouTube uploading from local: {file_path}")
+                        
+                        import aiofiles, os as _os
+                        if not _os.path.exists(file_path):
+                            print(f"[Scheduler] YouTube file not found: {file_path}")
+                            sb.table("scheduled_posts").update({"status":"needs_media"}).eq("id",post["id"]).execute()
+                            continue
+                        
+                        r = await c.post(f"{API_BASE}/api/youtube/schedule-upload", data={
+                            "user_id":     uid,
+                            "file_path":   file_path,
+                            "title":       post.get("title") or post.get("caption") or content[:100],
+                            "description": content,
+                            "privacy":     post.get("privacy") or "private",
+                        })
+                        print(f"[Scheduler] YouTube schedule-upload: {r.status_code}")
+                        success = r.status_code in [200, 201]
+                        
                     else:
-                        print(f"[Scheduler] YouTube requires video file — cannot auto-post, marking needs_media")
+                        print(f"[Scheduler] YouTube post {post['id'][:8]} — no stored video, skipping")
                         sb.table("scheduled_posts").update({"status":"needs_media"}).eq("id",post["id"]).execute()
                         continue
 

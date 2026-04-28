@@ -796,3 +796,90 @@ async def reply_comment(body: ReplyRequest, sb=Depends(get_sb)):
         body={"snippet": {"parentId": body.comment_id, "textOriginal": body.text}}
     ).execute()
     return {"success": True, "reply_id": r["id"]}
+
+@router.post("/store-video")
+async def store_video(
+    user_id: str = Form(...),
+    file: UploadFile = File(...),
+):
+    """Store video on server for scheduled upload. Returns accessible URL."""
+    import uuid
+    
+    suffix   = os.path.splitext(file.filename or "video.mp4")[1] or ".mp4"
+    file_id  = str(uuid.uuid4())[:8]
+    filename = f"scheduled_{user_id[:8]}_{file_id}{suffix}"
+    save_dir = "/tmp/nexora_scheduled"
+    os.makedirs(save_dir, exist_ok=True)
+    save_path = os.path.join(save_dir, filename)
+    
+    # Stream write
+    with open(save_path, "wb") as f_out:
+        while True:
+            chunk = await file.read(4 * 1024 * 1024)
+            if not chunk: break
+            f_out.write(chunk)
+    
+    size_mb = os.path.getsize(save_path) / 1024 / 1024
+    print(f"[YT Store] Saved {filename} — {size_mb:.1f}MB")
+    
+    # Return internal URL that scheduler can use
+    return {
+        "file_url":  f"local://{save_path}",  # internal marker
+        "file_path": save_path,
+        "filename":  filename,
+        "size_mb":   round(size_mb, 2),
+    }
+
+
+@router.post("/schedule-upload")
+async def schedule_upload_from_file(
+    user_id: str = Form(...),
+    file_path: str = Form(...),
+    title: str = Form(...),
+    description: str = Form(""),
+    privacy: str = Form("private"),
+):
+    """Upload a pre-stored video to YouTube. Called by scheduler."""
+    if not os.path.exists(file_path):
+        raise HTTPException(404, f"Stored video not found: {file_path}")
+    
+    sb = get_sb()
+    tokens = sb.table("youtube_connections").select("*").eq("user_id", user_id).maybe_single().execute().data
+    if not tokens:
+        raise HTTPException(401, "YouTube not connected")
+    
+    creds = Credentials(
+        token=tokens["access_token"],
+        refresh_token=tokens.get("refresh_token"),
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+    )
+    yt = build("youtube", "v3", credentials=creds)
+    
+    body = {
+        "snippet": {"title": title[:100], "description": description, "categoryId": "22"},
+        "status":  {"privacyStatus": privacy},
+    }
+    
+    chunk_mb = 50
+    media = MediaFileUpload(file_path, chunksize=chunk_mb*1024*1024, resumable=True)
+    
+    try:
+        request  = yt.videos().insert(part="snippet,status", body=body, media_body=media)
+        response = None
+        while response is None:
+            status, response = request.next_chunk()
+            if status:
+                print(f"[YT Schedule Upload] {int(status.progress()*100)}%")
+        
+        video_id  = response.get("id", "")
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
+        
+        # Cleanup stored file
+        try: os.remove(file_path)
+        except: pass
+        
+        return {"success": True, "video_id": video_id, "video_url": video_url}
+    except Exception as e:
+        raise HTTPException(500, f"Upload failed: {str(e)}")
