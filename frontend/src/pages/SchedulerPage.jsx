@@ -66,6 +66,25 @@ const AI_TIME_REASONS = {
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
+
+// Image compression helper
+const compressImage = (file, maxWidth = 1920, quality = 0.85) => {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const canvas = document.createElement('canvas')
+      let { width, height } = img
+      if (width > maxWidth) { height = (height * maxWidth) / width; width = maxWidth }
+      canvas.width = width; canvas.height = height
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+      canvas.toBlob(blob => resolve(new File([blob], file.name, { type: 'image/jpeg' })), 'image/jpeg', quality)
+    }
+    img.src = url
+  })
+}
+
 export default function SchedulerPage() {
   const navigate = useNavigate()
   const [theme, setTheme] = useState(() => localStorage.getItem('nexora-theme')||'dark')
@@ -240,12 +259,14 @@ export default function SchedulerPage() {
 
         if (selPlatform === 'youtube') {
           if (!file) { setPostError('Select a video file for YouTube.'); setPosting(false); return }
+          // YouTube: send directly to Railway (bypasses Supabase 50MB limit)
           const form = new FormData()
           form.append('user_id',     userId)
           form.append('title',       caption.slice(0, 100) || 'Nexora OS Upload')
           form.append('description', caption)
-          form.append('privacy',     privacy)
+          form.append('privacy',     privacy || 'private')
           form.append('file',        file)
+          console.log('[YouTube] Uploading', (file.size/1024/1024).toFixed(1)+'MB directly to Railway...')
           r = await fetch(`${API}/api/youtube/upload-video`, { method:'POST', body:form })
           d = await r.json()
 

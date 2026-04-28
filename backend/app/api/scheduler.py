@@ -65,12 +65,29 @@ async def publish_post(post: dict, sb) -> bool:
                     success = r.status_code in [200, 201]
 
                 elif platform == "linkedin":
-                    r = await c.post(f"{API_BASE}/api/linkedin/post", json={
-                        "user_id":    uid,
-                        "text":       content,
-                        "visibility": post.get("privacy", "PUBLIC").upper(),
-                    })
-                    success = r.status_code == 200
+                    # Map privacy to valid LinkedIn values
+                    raw_priv = (post.get("privacy") or "public").upper()
+                    vis = "CONNECTIONS" if raw_priv == "CONNECTIONS" else "PUBLIC"
+
+                    media_url    = post.get("media_url")
+                    content_type = post.get("content_type", "post")
+                    body = {"user_id": uid, "text": content, "visibility": vis}
+                    endpoint = "post"
+
+                    if media_url:
+                        if content_type == "video":
+                            body["video_url"] = media_url
+                            endpoint = "post-video"
+                        else:
+                            body["image_url"] = media_url
+                        print(f"[Scheduler] LinkedIn posting with media ({content_type}): {media_url[:60]}")
+                    else:
+                        print(f"[Scheduler] LinkedIn posting text-only")
+
+                    r = await c.post(f"{API_BASE}/api/linkedin/{endpoint}", json=body)
+                    resp_body = r.text[:300]
+                    print(f"[Scheduler] LinkedIn {endpoint}: {r.status_code} — {resp_body}")
+                    success = r.status_code in [200, 201]
 
                 elif platform == "youtube":
                     # YouTube videos uploaded via UI are already published
